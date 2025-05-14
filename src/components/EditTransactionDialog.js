@@ -1,58 +1,37 @@
 "use client";
-import { useState } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { FormField } from "@/components/ui/form-field";
+import { useForm } from "@/hooks/use-form";
+import { COLLECTION_REFS, TRANSACTION_CONSTANTS } from "@/lib/constants";
 
+/**
+ * Dialog component for editing a transaction
+ */
 export function EditTransactionDialog({
   transaction,
   onEditTransaction,
   customerName,
 }) {
-  const [open, setOpen] = useState(false);
-
-  // Initialize formData with proper null checks and defaults
-  const [formData, setFormData] = useState(() => ({
-    date: transaction?.date || new Date().toISOString().split("T")[0],
-    memoNumber: transaction?.memoNumber || "",
-    details: transaction?.details || "",
-    total:
-      typeof transaction?.total === "number"
-        ? transaction.total.toString()
-        : "0",
-    deposit:
-      typeof transaction?.deposit === "number"
-        ? transaction.deposit.toString()
-        : "0",
-    storeId: transaction?.storeId || "STORE1",
-    customerId: transaction?.customerId || "",
-  }));
-
-  const [errors, setErrors] = useState({});
-
-  const validate = () => {
+  // Validation function for transaction data
+  const validateTransaction = (data) => {
     const newErrors = {};
 
-    // Required field validations with proper trim checks
-    if (!formData.date) {
+    // Required field validations
+    if (!data.date) {
       newErrors.date = "Date is required";
     }
 
-    // Explicit trim check for memo number
-    const trimmedMemo = formData.memoNumber?.trim();
+    // Memo number validation
+    const trimmedMemo = data.memoNumber?.trim();
     if (!trimmedMemo) {
       newErrors.memoNumber = "Memo number is required";
     }
 
-    // Amount validations with better type checking
-    const totalAmount = parseFloat(formData.total);
-    const depositAmount = parseFloat(formData.deposit);
+    // Amount validations
+    const totalAmount = parseFloat(data.total);
+    const depositAmount = parseFloat(data.deposit);
 
     if (isNaN(totalAmount) || totalAmount < 0) {
       newErrors.total = "Please enter a valid amount";
@@ -62,173 +41,162 @@ export function EditTransactionDialog({
       newErrors.deposit = "Please enter a valid deposit amount";
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Initialize form with useForm hook
+  const {
+    formData,
+    errors,
+    handleChange,
+    handleSubmit,
+    setFormData,
+    setField,
+  } = useForm(
+    // Initial form data - will be overridden by useEffect
+    {
+      date: new Date().toISOString().split("T")[0],
+      memoNumber: "",
+      details: "",
+      total: "0",
+      deposit: "0",
+      storeId: "STORE1",
+      customerId: "",
+    },
+    validateTransaction,
+    // Submit handler
+    async (data) => {
+      try {
+        // Parse numeric values
+        const totalAmount = parseFloat(data.total);
+        const depositAmount = parseFloat(data.deposit);
 
-    if (!validate()) return;
+        if (isNaN(totalAmount) || isNaN(depositAmount)) {
+          throw new Error("Invalid amount values");
+        }
 
-    try {
-      // Sanitize and validate data before submission
-      const totalAmount = parseFloat(formData.total);
-      const depositAmount = parseFloat(formData.deposit);
+        // Create the sanitized data object
+        const sanitizedData = {
+          date: data.date,
+          memoNumber: data.memoNumber.trim() || transaction.memoNumber,
+          details: data.details.trim(),
+          total: totalAmount,
+          deposit: depositAmount,
+          due: totalAmount - depositAmount,
+          storeId: data.storeId,
+          customerId: transaction.customerId,
+          id: transaction.id,
+          updatedAt: new Date().toISOString(),
+        };
 
-      if (isNaN(totalAmount) || isNaN(depositAmount)) {
-        throw new Error("Invalid amount values");
+        await onEditTransaction(sanitizedData);
+        return true;
+      } catch (error) {
+        throw new Error(error.message || "Failed to update transaction");
       }
+    }
+  );
 
-      const sanitizedData = {
-        date: formData.date,
-        memoNumber: formData.memoNumber.trim() || transaction.memoNumber, // Fallback to original
-        details: formData.details.trim(),
-        total: totalAmount,
-        deposit: depositAmount,
-        due: totalAmount - depositAmount,
-        storeId: formData.storeId,
-        customerId: transaction.customerId,
-        id: transaction.id,
-        updatedAt: new Date().toISOString(),
-      };
-
-      // Additional validation
-      if (!sanitizedData.memoNumber) {
-        throw new Error("Memo number is required");
-      }
-
-      await onEditTransaction(sanitizedData);
-      setOpen(false);
-    } catch (error) {
-      console.error("Error updating transaction:", error);
-      setErrors({
-        submit:
-          error.message || "Failed to update transaction. Please try again.",
+  // Update form data when transaction changes
+  useEffect(() => {
+    if (transaction) {
+      setFormData({
+        date: transaction.date || new Date().toISOString().split("T")[0],
+        memoNumber: transaction.memoNumber || "",
+        details: transaction.details || "",
+        total:
+          typeof transaction.total === "number"
+            ? transaction.total.toString()
+            : "0",
+        deposit:
+          typeof transaction.deposit === "number"
+            ? transaction.deposit.toString()
+            : "0",
+        storeId: transaction.storeId || "STORE1",
+        customerId: transaction.customerId || "",
       });
     }
-  };
+  }, [transaction, setFormData]);
+
+  // Store options for the select field
+  const storeOptions = [
+    { value: "STORE1", label: "Store 1" },
+    { value: "STORE2", label: "Store 2" },
+  ];
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <FormDialog
+      title={`Edit Transaction for ${customerName}`}
+      trigger={
         <Button variant="ghost" size="sm">
           Edit
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Edit Transaction for {customerName}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Date *</label>
-            <Input
-              type="date"
-              value={formData.date}
-              onChange={(e) =>
-                setFormData({ ...formData, date: e.target.value })
-              }
-              className={errors.date ? "border-red-500" : ""}
-            />
-            {errors.date && (
-              <p className="text-red-500 text-sm">{errors.date}</p>
-            )}
-          </div>
+      }
+      onSubmit={handleSubmit}
+      submitText="Update Transaction"
+    >
+      <FormField
+        label="Date"
+        name="date"
+        type="date"
+        value={formData.date}
+        onChange={handleChange}
+        error={errors.date}
+        required
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Memo Number *</label>
-            <Input
-              placeholder="Enter memo number"
-              value={formData.memoNumber}
-              onChange={(e) =>
-                setFormData({ ...formData, memoNumber: e.target.value })
-              }
-              className={errors.memoNumber ? "border-red-500" : ""}
-            />
-            {errors.memoNumber && (
-              <p className="text-red-500 text-sm">{errors.memoNumber}</p>
-            )}
-          </div>
+      <FormField
+        label="Memo Number"
+        name="memoNumber"
+        value={formData.memoNumber}
+        onChange={handleChange}
+        error={errors.memoNumber}
+        required
+        placeholder="Enter memo number"
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Details</label>
-            <Input
-              placeholder="Enter transaction details"
-              value={formData.details}
-              onChange={(e) =>
-                setFormData({ ...formData, details: e.target.value })
-              }
-            />
-          </div>
+      <FormField
+        label="Details"
+        name="details"
+        value={formData.details}
+        onChange={handleChange}
+        placeholder="Enter transaction details"
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Total Bill</label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Enter total amount"
-              value={formData.total}
-              onChange={(e) =>
-                setFormData({ ...formData, total: e.target.value })
-              }
-              className={errors.total ? "border-red-500" : ""}
-            />
-            {errors.total && (
-              <p className="text-red-500 text-sm">{errors.total}</p>
-            )}
-          </div>
+      <FormField
+        label="Total Bill"
+        name="total"
+        type="number"
+        value={formData.total}
+        onChange={handleChange}
+        error={errors.total}
+        min="0"
+        step="0.01"
+        placeholder="Enter total amount"
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Deposit</label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Enter deposit amount"
-              value={formData.deposit}
-              onChange={(e) =>
-                setFormData({ ...formData, deposit: e.target.value })
-              }
-              className={errors.deposit ? "border-red-500" : ""}
-            />
-            {errors.deposit && (
-              <p className="text-red-500 text-sm">{errors.deposit}</p>
-            )}
-          </div>
+      <FormField
+        label="Deposit"
+        name="deposit"
+        type="number"
+        value={formData.deposit}
+        onChange={handleChange}
+        error={errors.deposit}
+        min="0"
+        step="0.01"
+        placeholder="Enter deposit amount"
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Store</label>
-            <select
-              className={`w-full border rounded-md px-3 py-2 ${
-                errors.storeId ? "border-red-500" : ""
-              }`}
-              value={formData.storeId}
-              onChange={(e) =>
-                setFormData({ ...formData, storeId: e.target.value })
-              }
-            >
-              <option value="STORE1">Store 1</option>
-              <option value="STORE2">Store 2</option>
-            </select>
-            {errors.storeId && (
-              <p className="text-red-500 text-sm">{errors.storeId}</p>
-            )}
-          </div>
+      <FormField
+        label="Store"
+        name="storeId"
+        type="select"
+        value={formData.storeId}
+        onChange={handleChange}
+        options={storeOptions}
+      />
 
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit">Update Transaction</Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+      {errors.submit && <p className="text-sm text-red-500">{errors.submit}</p>}
+    </FormDialog>
   );
 }

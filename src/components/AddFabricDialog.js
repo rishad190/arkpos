@@ -1,179 +1,104 @@
-import { useState } from "react";
+"use client";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { FormField } from "@/components/ui/form-field";
+import { useForm } from "@/hooks/use-form";
+import { useFirebaseCrud } from "@/hooks/use-firebase-crud";
+import { COLLECTION_REFS, FABRIC_CONSTANTS } from "@/lib/constants";
 
+/**
+ * Dialog component for adding a new fabric
+ */
 export function AddFabricDialog({ onAddFabric }) {
-  const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    code: "",
-    name: "",
-    description: "",
-    unit: "METER",
-    category: "COTTON",
-  });
-  const [errors, setErrors] = useState({});
-
-  const validate = () => {
-    const newErrors = {};
-    if (!formData.code?.trim()) newErrors.code = "Code is required";
-    if (!formData.name?.trim()) newErrors.name = "Name is required";
-    if (!formData.unit) newErrors.unit = "Unit is required";
-    if (!formData.category) newErrors.category = "Category is required";
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  // Validation function
+  const validateFabric = (data) => {
+    const errors = {};
+    if (!data.code?.trim()) errors.code = "Code is required";
+    if (!data.name?.trim()) errors.name = "Name is required";
+    if (!data.unit) errors.unit = "Unit is required";
+    if (!data.category) errors.category = "Category is required";
+    return errors;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-
-    try {
+  // Form state management with useForm hook
+  const { formData, errors, handleChange, handleSubmit } = useForm(
+    {
+      code: "",
+      name: "",
+      description: "",
+      unit: "METER",
+      category: "COTTON",
+    },
+    validateFabric,
+    async (data) => {
+      // Submit the fabric data
       await onAddFabric({
-        ...formData,
-        code: formData.code.toUpperCase(),
+        ...data,
+        code: data.code.toUpperCase(),
         createdAt: new Date().toISOString(),
       });
-      setOpen(false);
-      setFormData({
-        code: "",
-        name: "",
-        description: "",
-        unit: "METER",
-        category: "COTTON",
-      });
-    } catch (error) {
-      setErrors({ submit: error.message });
+      return true;
     }
-  };
+  );
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>+ New Fabric</Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add New Fabric</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Fabric Code *</label>
-            <Input
-              value={formData.code}
-              onChange={(e) =>
-                setFormData({ ...formData, code: e.target.value })
-              }
-              className={errors.code ? "border-red-500" : ""}
-              placeholder="Enter fabric code"
-            />
-            {errors.code && (
-              <p className="text-sm text-red-500">{errors.code}</p>
-            )}
-          </div>
+    <FormDialog
+      title="Add New Fabric"
+      trigger={<Button>+ New Fabric</Button>}
+      onSubmit={handleSubmit}
+      submitText="Add Fabric"
+    >
+      <FormField
+        label="Fabric Code"
+        name="code"
+        value={formData.code}
+        onChange={handleChange}
+        error={errors.code}
+        required
+        placeholder="Enter fabric code"
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Name *</label>
-            <Input
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className={errors.name ? "border-red-500" : ""}
-              placeholder="Enter fabric name"
-            />
-            {errors.name && (
-              <p className="text-sm text-red-500">{errors.name}</p>
-            )}
-          </div>
+      <FormField
+        label="Name"
+        name="name"
+        value={formData.name}
+        onChange={handleChange}
+        error={errors.name}
+        required
+        placeholder="Enter fabric name"
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Description</label>
-            <Input
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              placeholder="Enter description"
-            />
-          </div>
+      <FormField
+        label="Description"
+        name="description"
+        value={formData.description}
+        onChange={handleChange}
+        placeholder="Enter description"
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Unit *</label>
-            <Select
-              value={formData.unit}
-              onValueChange={(value) =>
-                setFormData({ ...formData, unit: value })
-              }
-            >
-              <SelectTrigger className={errors.unit ? "border-red-500" : ""}>
-                <SelectValue placeholder="Select unit" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="METER">Meter</SelectItem>
-                <SelectItem value="YARD">Yard</SelectItem>
-                <SelectItem value="PIECE">Piece</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.unit && (
-              <p className="text-sm text-red-500">{errors.unit}</p>
-            )}
-          </div>
+      <FormField
+        label="Unit"
+        name="unit"
+        type="select"
+        value={formData.unit}
+        onChange={handleChange}
+        error={errors.unit}
+        required
+        options={FABRIC_CONSTANTS.UNITS}
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Category *</label>
-            <Select
-              value={formData.category}
-              onValueChange={(value) =>
-                setFormData({ ...formData, category: value })
-              }
-            >
-              <SelectTrigger
-                className={errors.category ? "border-red-500" : ""}
-              >
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="COTTON">Cotton</SelectItem>
-                <SelectItem value="POLYESTER">Polyester</SelectItem>
-                <SelectItem value="MIXED">Mixed</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.category && (
-              <p className="text-sm text-red-500">{errors.category}</p>
-            )}
-          </div>
+      <FormField
+        label="Category"
+        name="category"
+        type="select"
+        value={formData.category}
+        onChange={handleChange}
+        error={errors.category}
+        required
+        options={FABRIC_CONSTANTS.CATEGORIES}
+      />
 
-          {errors.submit && (
-            <p className="text-sm text-red-500">{errors.submit}</p>
-          )}
-
-          <div className="flex justify-end gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit">Add Fabric</Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+      {errors.submit && <p className="text-sm text-red-500">{errors.submit}</p>}
+    </FormDialog>
   );
 }

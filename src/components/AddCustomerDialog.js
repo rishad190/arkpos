@@ -1,154 +1,98 @@
 "use client";
-import { useState } from "react";
-
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { FormField } from "@/components/ui/form-field";
+import { useForm } from "@/hooks/use-form";
 import { useData } from "@/app/data-context";
+import { useFirebaseCrud } from "@/hooks/use-firebase-crud";
+import { COLLECTION_REFS } from "@/lib/constants";
 
+/**
+ * Dialog component for adding a new customer
+ */
 export function AddCustomerDialog({ onClose }) {
   const { addCustomer } = useData();
-  const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
-    storeId: "STORE1", // Default value
+  const customerCrud = useFirebaseCrud(COLLECTION_REFS.CUSTOMERS, {
+    successMessages: {
+      create: "Customer added successfully",
+    },
+    errorMessages: {
+      create: "Failed to add customer. Please try again.",
+    },
   });
 
-  const validate = () => {
-    if (!formData.name || !formData.phone) {
-      alert("Name and Phone are required!");
-      return false;
-    }
-    return true;
+  // Validation function
+  const validateCustomer = (data) => {
+    const errors = {};
+    if (!data.name?.trim()) errors.name = "Name is required";
+    if (!data.phone?.trim()) errors.phone = "Phone is required";
+    return errors;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-
-    try {
+  // Form state management with useForm hook
+  const { formData, errors, handleChange, handleSubmit } = useForm(
+    {
+      name: "",
+      phone: "",
+      email: "",
+      address: "",
+      storeId: "STORE1",
+    },
+    validateCustomer,
+    async (data) => {
+      // Use the addCustomer function from context or the CRUD hook
       await addCustomer({
-        name: formData.name,
-        phone: formData.phone,
-        address: formData.address,
-        storeId: formData.storeId,
+        ...data,
         createdAt: new Date().toISOString(),
       });
-      setOpen(false);
       onClose?.();
-    } catch (error) {
-      console.error("Error adding customer:", error);
-      alert("Failed to add customer. Please try again.");
     }
-  };
+  );
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>Add New Customer</Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add New Customer</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="name" className="text-sm font-medium">
-              Name *
-            </label>
-            <Input
-              id="name"
-              required
-              placeholder="Enter customer name"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-            />
-          </div>
+    <FormDialog
+      title="Add New Customer"
+      trigger={<Button>Add New Customer</Button>}
+      onSubmit={handleSubmit}
+    >
+      <FormField
+        label="Name"
+        name="name"
+        value={formData.name}
+        onChange={handleChange}
+        error={errors.name}
+        required
+        placeholder="Enter customer name"
+      />
 
-          <div className="space-y-2">
-            <label htmlFor="phone" className="text-sm font-medium">
-              Phone *
-            </label>
-            <Input
-              id="phone"
-              required
-              placeholder="Enter phone number"
-              value={formData.phone}
-              onChange={(e) =>
-                setFormData({ ...formData, phone: e.target.value })
-              }
-            />
-          </div>
+      <FormField
+        label="Phone"
+        name="phone"
+        value={formData.phone}
+        onChange={handleChange}
+        error={errors.phone}
+        required
+        placeholder="Enter phone number"
+      />
 
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium">
-              Email
-            </label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="Enter email address"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-            />
-          </div>
+      <FormField
+        label="Email"
+        name="email"
+        type="email"
+        value={formData.email}
+        onChange={handleChange}
+        placeholder="Enter email address"
+      />
 
-          <div className="space-y-2">
-            <label htmlFor="address" className="text-sm font-medium">
-              Address
-            </label>
-            <Input
-              id="address"
-              placeholder="Enter customer address"
-              value={formData.address}
-              onChange={(e) =>
-                setFormData({ ...formData, address: e.target.value })
-              }
-            />
-          </div>
+      <FormField
+        label="Address"
+        name="address"
+        value={formData.address}
+        onChange={handleChange}
+        placeholder="Enter address"
+      />
 
-          <div className="space-y-2">
-            <label htmlFor="storeId" className="text-sm font-medium">
-              Store
-            </label>
-            <select
-              id="storeId"
-              className="w-full border rounded-md px-3 py-2"
-              value={formData.storeId}
-              onChange={(e) =>
-                setFormData({ ...formData, storeId: e.target.value })
-              }
-            >
-              <option value="STORE1">Store 1</option>
-              <option value="STORE2">Store 2</option>
-            </select>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit">Save Customer</Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+      {errors.submit && <p className="text-sm text-red-500">{errors.submit}</p>}
+    </FormDialog>
   );
 }

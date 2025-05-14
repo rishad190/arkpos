@@ -1,28 +1,51 @@
-import { useState, useEffect } from "react";
+"use client";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { FormField } from "@/components/ui/form-field";
+import { useForm } from "@/hooks/use-form";
+import { useFirebaseCrud } from "@/hooks/use-firebase-crud";
+import { COLLECTION_REFS } from "@/lib/constants";
 
+/**
+ * Dialog component for editing a customer
+ */
 export function EditCustomerDialog({
   customer,
   onEditCustomer,
   isOpen,
   onClose,
 }) {
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    address: "",
-    email: "",
-    storeId: "STORE1",
-  });
+  // Validation function
+  const validateCustomer = (data) => {
+    const errors = {};
+    if (!data.name?.trim()) errors.name = "Name is required";
+    if (!data.phone?.trim()) errors.phone = "Phone is required";
+    return errors;
+  };
 
-  // Use useEffect to update form data when customer changes
+  // Set up the form with useForm hook
+  const { formData, errors, handleChange, handleSubmit, setFormData } = useForm(
+    {
+      name: "",
+      phone: "",
+      address: "",
+      email: "",
+      storeId: "STORE1",
+    },
+    validateCustomer,
+    async (data) => {
+      // Submit the edited customer data
+      await onEditCustomer(customer?.id, {
+        ...data,
+        updatedAt: new Date().toISOString(),
+      });
+      onClose?.();
+      return true;
+    }
+  );
+
+  // Update form data when customer changes
   useEffect(() => {
     if (customer) {
       setFormData({
@@ -33,90 +56,69 @@ export function EditCustomerDialog({
         storeId: customer.storeId || "STORE1",
       });
     }
-  }, [customer]);
+  }, [customer, setFormData]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await onEditCustomer(customer.id, formData);
-      onClose();
-    } catch (error) {
-      console.error("Error updating customer:", error);
-    }
-  };
+  // Store options for the select field
+  const storeOptions = [
+    { value: "STORE1", label: "Store 1" },
+    { value: "STORE2", label: "Store 2" },
+  ];
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Edit Customer</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Name *</label>
-            <Input
-              required
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-            />
-          </div>
+    <FormDialog
+      title="Edit Customer"
+      onSubmit={handleSubmit}
+      defaultOpen={isOpen}
+      onOpenChange={onClose}
+      submitText="Update Customer"
+    >
+      <FormField
+        label="Name"
+        name="name"
+        value={formData.name}
+        onChange={handleChange}
+        error={errors.name}
+        required
+        placeholder="Enter customer name"
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Phone *</label>
-            <Input
-              required
-              value={formData.phone}
-              onChange={(e) =>
-                setFormData({ ...formData, phone: e.target.value })
-              }
-            />
-          </div>
+      <FormField
+        label="Phone"
+        name="phone"
+        value={formData.phone}
+        onChange={handleChange}
+        error={errors.phone}
+        required
+        placeholder="Enter phone number"
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Address</label>
-            <Input
-              value={formData.address}
-              onChange={(e) =>
-                setFormData({ ...formData, address: e.target.value })
-              }
-            />
-          </div>
+      <FormField
+        label="Email"
+        name="email"
+        type="email"
+        value={formData.email}
+        onChange={handleChange}
+        placeholder="Enter email address"
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Email</label>
-            <Input
-              type="email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-            />
-          </div>
+      <FormField
+        label="Address"
+        name="address"
+        value={formData.address}
+        onChange={handleChange}
+        placeholder="Enter address"
+      />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Store</label>
-            <select
-              className="w-full border rounded-md px-3 py-2"
-              value={formData.storeId}
-              onChange={(e) =>
-                setFormData({ ...formData, storeId: e.target.value })
-              }
-            >
-              <option value="STORE1">Store 1</option>
-              <option value="STORE2">Store 2</option>
-            </select>
-          </div>
+      <FormField
+        label="Store"
+        name="storeId"
+        type="select"
+        value={formData.storeId}
+        onChange={handleChange}
+        options={storeOptions}
+      />
 
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit">Update Customer</Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+      {errors.submit && <p className="text-sm text-red-500">{errors.submit}</p>}
+    </FormDialog>
   );
 }

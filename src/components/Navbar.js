@@ -109,13 +109,13 @@ export function Navbar() {
             <Link href="/" className="flex items-center">
               <Image
                 src="/download.png"
-                alt="Sky Fabric Logo"
+                alt="ARK Enterprise Logo"
                 width={40}
                 height={40}
                 className="rounded-md"
               />
               <span className="ml-2 text-xl md:text-2xl font-semibold text-gray-800">
-                Sky Fabric&apos;s
+                ARK Enterprise &apos;s
               </span>
             </Link>
           </div>
