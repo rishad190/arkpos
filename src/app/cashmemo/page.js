@@ -4,6 +4,14 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/app/data-context";
 import { CashMemoPrint } from "@/components/CashMemoPrint";
 
+// Add Dialog imports for new customer creation
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
 import {
   Table,
   TableBody,
@@ -44,12 +52,22 @@ import { useToast } from "@/hooks/use-toast";
 export default function CashMemoPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { customers, addTransaction, addDailyCashTransaction } = useData();
+  const { customers, addTransaction, addDailyCashTransaction, addCustomer } =
+    useData();
   const [customerId, setCustomerId] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [openPhonePopover, setOpenPhonePopover] = useState(false);
   const [phoneSearchValue, setPhoneSearchValue] = useState("");
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+  const [newCustomerData, setNewCustomerData] = useState({
+    name: "",
+    phone: "",
+    address: "",
+    email: "",
+    storeId: "STORE1",
+  });
+
   const [memoData, setMemoData] = useState({
     date: new Date().toISOString().split("T")[0],
     customerName: "",
@@ -347,12 +365,73 @@ export default function CashMemoPage() {
     }
   };
 
+  const handleCreateCustomer = async () => {
+    if (!newCustomerData.name.trim() || !newCustomerData.phone.trim()) {
+      toast({
+        title: "Error",
+        description: "Name and phone number are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const customer = await addCustomer({
+        ...newCustomerData,
+        createdAt: new Date().toISOString(),
+      });
+
+      setMemoData({
+        ...memoData,
+        customerName: newCustomerData.name,
+        customerPhone: newCustomerData.phone,
+        customerAddress: newCustomerData.address || "",
+      });
+
+      setCustomerId(customer.id);
+      setIsCreatingCustomer(false);
+      setNewCustomerData({
+        name: "",
+        phone: "",
+        address: "",
+        email: "",
+        storeId: "STORE1",
+      });
+
+      toast({
+        title: "Success",
+        description: "Customer added successfully",
+      });
+    } catch (error) {
+      console.error("Error creating customer:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create customer. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePhoneChange = (e) => {
+    const phoneNumber = e.target.value;
+    setMemoData({ ...memoData, customerPhone: phoneNumber });
+    setPhoneSearchValue(phoneNumber);
+
+    // Check if customer exists with this phone number
+    const existingCustomer = customers?.find((c) => c.phone === phoneNumber);
+
+    if (!existingCustomer && phoneNumber) {
+      setNewCustomerData((prev) => ({ ...prev, phone: phoneNumber }));
+    }
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
       <Toaster />
       <Card className="p-4 md:p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-4">
+            {/* Date field */}
             <div>
               <label className="text-sm font-medium">Date</label>
               <Input
@@ -363,6 +442,7 @@ export default function CashMemoPage() {
                 }
               />
             </div>
+            {/* Customer Name field */}
             <div>
               <label className="text-sm font-medium">Customer Name</label>
               <Input
@@ -373,6 +453,7 @@ export default function CashMemoPage() {
                 placeholder="Enter customer name"
               />
             </div>
+            {/* Phone Number field with customer search/create */}
             <div>
               <label className="text-sm font-medium">Phone Number</label>
               <div className="relative">
@@ -384,10 +465,7 @@ export default function CashMemoPage() {
                     <div className="flex items-center">
                       <Input
                         value={memoData.customerPhone}
-                        onChange={(e) => {
-                          handlePhoneChange(e);
-                          setPhoneSearchValue(e.target.value);
-                        }}
+                        onChange={handlePhoneChange}
                         placeholder="Enter phone number"
                         className="w-full"
                       />
@@ -410,7 +488,22 @@ export default function CashMemoPage() {
                         onValueChange={setPhoneSearchValue}
                       />
                       <CommandList>
-                        <CommandEmpty>No customer found.</CommandEmpty>
+                        <CommandEmpty>
+                          <div className="p-4 text-center">
+                            <p className="text-sm text-muted-foreground mb-2">
+                              No customer found with this number
+                            </p>
+                            <Button
+                              variant="secondary"
+                              onClick={() => {
+                                setIsCreatingCustomer(true);
+                                setOpenPhonePopover(false);
+                              }}
+                            >
+                              Create New Customer
+                            </Button>
+                          </div>
+                        </CommandEmpty>
                         <CommandGroup>
                           {customers
                             ?.filter(
@@ -449,6 +542,7 @@ export default function CashMemoPage() {
                 </Popover>
               </div>
             </div>
+
             <div>
               <label className="text-sm font-medium">Deposit Amount</label>
               <Input
@@ -651,6 +745,81 @@ export default function CashMemoPage() {
           grandTotal={grandTotal}
         />
       </div>
+
+      {/* New Customer Creation Dialog */}
+      <Dialog open={isCreatingCustomer} onOpenChange={setIsCreatingCustomer}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Customer</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Name *</label>
+              <Input
+                value={newCustomerData.name}
+                onChange={(e) =>
+                  setNewCustomerData({
+                    ...newCustomerData,
+                    name: e.target.value,
+                  })
+                }
+                placeholder="Enter customer name"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Phone *</label>
+              <Input
+                value={newCustomerData.phone}
+                onChange={(e) =>
+                  setNewCustomerData({
+                    ...newCustomerData,
+                    phone: e.target.value,
+                  })
+                }
+                placeholder="Enter phone number"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Email</label>
+              <Input
+                type="email"
+                value={newCustomerData.email}
+                onChange={(e) =>
+                  setNewCustomerData({
+                    ...newCustomerData,
+                    email: e.target.value,
+                  })
+                }
+                placeholder="Enter email address"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Address</label>
+              <Input
+                value={newCustomerData.address}
+                onChange={(e) =>
+                  setNewCustomerData({
+                    ...newCustomerData,
+                    address: e.target.value,
+                  })
+                }
+                placeholder="Enter address"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsCreatingCustomer(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleCreateCustomer}>Create Customer</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

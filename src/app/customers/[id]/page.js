@@ -467,7 +467,9 @@ export default function CustomerDetail() {
                   Balance
                 </TableHead>
                 <TableHead className="whitespace-nowrap">Store</TableHead>
-                <TableHead className="whitespace-nowrap">Actions</TableHead>
+                <TableHead className="whitespace-nowrap">
+                  Actions
+                </TableHead>{" "}
               </TableRow>
             </TableHeader>
             <TableBody>

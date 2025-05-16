@@ -74,9 +74,17 @@ export default function FabricViewPage() {
   }, [fabrics, fabricBatches]);
 
   const fabric = fabrics?.find((f) => f.id === id);
-  const batches = fabricBatches?.filter((b) => b.fabricId === id) || [];
-  const fabricTransactions =
-    transactions?.filter((t) => t.fabricId === id) || [];
+
+  // Get filtered batches and transactions for this fabric
+  const batches = useMemo(
+    () => fabricBatches?.filter((b) => b.fabricId === id) || [],
+    [fabricBatches, id]
+  );
+
+  const fabricTransactions = useMemo(
+    () => transactions?.filter((t) => t.fabricId === id) || [],
+    [transactions, id]
+  );
 
   // Memoize calculations
   const {
@@ -94,6 +102,7 @@ export default function FabricViewPage() {
 
     const history = batches
       .map((b) => ({
+        id: b.id, // Add the batch ID
         date: new Date(b.createdAt).toLocaleDateString(),
         price: b.unitCost,
         quantity: b.quantity,
@@ -510,11 +519,11 @@ export default function FabricViewPage() {
                   <TableHead>Quantity</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Actions</TableHead>
-                </TableRow>
+                </TableRow>{" "}
               </TableHeader>
               <TableBody>
-                {priceHistory.map((batch) => (
-                  <TableRow key={batch.id}>
+                {priceHistory.map((batch, index) => (
+                  <TableRow key={batch.id || `price-history-${index}`}>
                     <TableCell>{batch.date}</TableCell>
                     <TableCell>৳{batch.price.toFixed(2)}</TableCell>
                     <TableCell>
@@ -560,8 +569,7 @@ export default function FabricViewPage() {
           <div className="flex items-center gap-2 mb-6">
             <History className="h-5 w-5 text-muted-foreground" />
             <h2 className="text-xl font-semibold">Recent Stock Movements</h2>
-          </div>
-
+          </div>{" "}
           <Table>
             <TableHeader>
               <TableRow>

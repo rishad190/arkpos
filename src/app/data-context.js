@@ -27,6 +27,20 @@ import { db } from "@/lib/firebase";
 // Create context
 const DataContext = createContext(null);
 
+// Default expense categories
+const DEFAULT_EXPENSE_CATEGORIES = [
+  "Utilities",
+  "Rent",
+  "Salaries",
+  "Supplies",
+  "Transportation",
+  "Maintenance",
+  "Marketing",
+  "Insurance",
+  "Taxes",
+  "Others",
+];
+
 // Firebase References
 const COLLECTION_REFS = {
   CUSTOMERS: "customers",
@@ -73,6 +87,7 @@ const initialState = {
       sessionTimeout: 30,
       backupEnabled: true,
     },
+    expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
   },
 };
 
@@ -234,6 +249,11 @@ export function DataProvider({ children }) {
     },
     [customerDues]
   );
+
+  // Get expense categories
+  const getExpenseCategories = useCallback(() => {
+    return state.settings.expenseCategories || DEFAULT_EXPENSE_CATEGORIES;
+  }, [state.settings.expenseCategories]);
 
   // Customer Operations
   const customerOperations = {
@@ -577,6 +597,7 @@ export function DataProvider({ children }) {
     ...dailyCashOperations,
     settings: state.settings,
     updateSettings,
+    getExpenseCategories,
   };
 
   return (

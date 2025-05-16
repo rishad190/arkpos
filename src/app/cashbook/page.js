@@ -28,18 +28,30 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   X,
-  Filter,
   RefreshCw,
   Download,
   FileText,
+  BarChart3,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { exportToCSV, exportToPDF } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CashBookPage() {
   const {
@@ -47,6 +59,7 @@ export default function CashBookPage() {
     addDailyCashTransaction,
     updateDailyCashTransaction,
     deleteDailyCashTransaction,
+    getExpenseCategories,
   } = useData();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
@@ -54,13 +67,23 @@ export default function CashBookPage() {
     const today = new Date();
     return today.toISOString().split("T")[0];
   });
+  const [yearFilter, setYearFilter] = useState(() => {
+    return new Date().getFullYear().toString();
+  });
+  const [monthFilter, setMonthFilter] = useState(() => {
+    return (new Date().getMonth() + 1).toString().padStart(2, "0");
+  });
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [editingTransaction, setEditingTransaction] = useState(null);
+  const [activeTab, setActiveTab] = useState("all");
+  const [viewMode, setViewMode] = useState("daily"); // daily, monthly, yearly
   const [loadingState, setLoadingState] = useState({
     initial: true,
     transactions: false,
     actions: false,
   });
-  const [activeTab, setActiveTab] = useState("all");
+
+  const expenseCategories = getExpenseCategories();
 
   // Add useEffect to handle initial loading state
   useEffect(() => {
@@ -151,8 +174,7 @@ export default function CashBookPage() {
 
     return { dailyCash, financials, monthlyTotals };
   }, [dailyCashTransactions]);
-
-  // Filter transactions based on search term, date, and active tab
+  // Filter transactions based on search term, date, active tab, year, category, and view mode
   const filteredCash = useMemo(() => {
     return dailyCash.filter((day) => {
       const matchesSearch = searchTerm
@@ -161,7 +183,20 @@ export default function CashBookPage() {
           )
         : true;
 
-      const matchesDate = dateFilter ? day.date === dateFilter : true;
+      // Skip date filter check when in monthly or yearly view
+      const matchesDate =
+        viewMode === "daily"
+          ? dateFilter
+            ? day.date === dateFilter
+            : true
+          : true;
+
+      const matchesYear = yearFilter ? day.date.startsWith(yearFilter) : true;
+
+      const matchesCategory =
+        categoryFilter !== "all"
+          ? day.dailyCash.some((t) => t.category === categoryFilter)
+          : true;
 
       const matchesTab = (() => {
         switch (activeTab) {
@@ -174,9 +209,48 @@ export default function CashBookPage() {
         }
       })();
 
-      return matchesSearch && matchesDate && matchesTab;
+      // Apply view mode filtering
+      const matchesViewMode = (() => {
+        const currentDate = new Date(day.date);
+
+        switch (viewMode) {
+          case "daily":
+            return true; // Date filter is handled above
+          case "monthly": {
+            const transactionMonth = (currentDate.getMonth() + 1)
+              .toString()
+              .padStart(2, "0");
+            const transactionYear = currentDate.getFullYear().toString();
+            return (
+              transactionMonth === monthFilter && transactionYear === yearFilter
+            );
+          }
+          case "yearly":
+            return currentDate.getFullYear().toString() === yearFilter;
+          default:
+            return true;
+        }
+      })();
+
+      return (
+        matchesSearch &&
+        matchesDate &&
+        matchesTab &&
+        matchesYear &&
+        matchesCategory &&
+        matchesViewMode
+      );
     });
-  }, [dailyCash, searchTerm, dateFilter, activeTab]);
+  }, [
+    dailyCash,
+    searchTerm,
+    dateFilter,
+    activeTab,
+    yearFilter,
+    monthFilter,
+    categoryFilter,
+    viewMode,
+  ]);
 
   const handleAddTransaction = async (transaction) => {
     setLoadingState((prev) => ({ ...prev, actions: true }));
@@ -399,7 +473,11 @@ export default function CashBookPage() {
           </p>
         </div>
         <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
-          <AddCashTransactionDialog onAddTransaction={handleAddTransaction}>
+          {" "}
+          <AddCashTransactionDialog
+            onAddTransaction={handleAddTransaction}
+            expenseCategories={expenseCategories}
+          >
             <Button
               className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
               disabled={loadingState.actions}
@@ -609,6 +687,75 @@ export default function CashBookPage() {
         </CardContent>
       </Card>
 
+      {/* View Mode and Filters */}
+      <div className="mb-6 space-y-4">
+        <Tabs value={viewMode} onValueChange={setViewMode}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="daily">Daily View</TabsTrigger>
+            <TabsTrigger value="monthly">Monthly View</TabsTrigger>
+            <TabsTrigger value="yearly">Yearly View</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="flex flex-wrap gap-4">
+          {" "}
+          <Select value={yearFilter} onValueChange={setYearFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Year" />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from(
+                new Set(
+                  dailyCashTransactions.map((t) =>
+                    new Date(t.date).getFullYear()
+                  )
+                )
+              )
+                .sort((a, b) => b - a)
+                .map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          {viewMode === "monthly" && (
+            <Select value={monthFilter} onValueChange={setMonthFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select Month" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="01">January</SelectItem>
+                <SelectItem value="02">February</SelectItem>
+                <SelectItem value="03">March</SelectItem>
+                <SelectItem value="04">April</SelectItem>
+                <SelectItem value="05">May</SelectItem>
+                <SelectItem value="06">June</SelectItem>
+                <SelectItem value="07">July</SelectItem>
+                <SelectItem value="08">August</SelectItem>
+                <SelectItem value="09">September</SelectItem>
+                <SelectItem value="10">October</SelectItem>
+                <SelectItem value="11">November</SelectItem>
+                <SelectItem value="12">December</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {expenseCategories.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {/* Transactions Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList className="mb-4">
@@ -777,6 +924,7 @@ export default function CashBookPage() {
                         Cash Out
                       </TableHead>
                       <TableHead className="text-right whitespace-nowrap min-w-[100px]">
+                        {" "}
                         Balance
                       </TableHead>
                       <TableHead className="whitespace-nowrap min-w-[200px]">

@@ -21,11 +21,18 @@ export function AddCustomerDialog({ onClose }) {
     },
   });
 
+  // Store options for the select field
+  const storeOptions = [
+    { value: "STORE1", label: "Store 1" },
+    { value: "STORE2", label: "Store 2" },
+  ];
+
   // Validation function
   const validateCustomer = (data) => {
     const errors = {};
     if (!data.name?.trim()) errors.name = "Name is required";
     if (!data.phone?.trim()) errors.phone = "Phone is required";
+    if (!data.storeId) errors.storeId = "Store is required";
     return errors;
   };
 
@@ -40,12 +47,16 @@ export function AddCustomerDialog({ onClose }) {
     },
     validateCustomer,
     async (data) => {
-      // Use the addCustomer function from context or the CRUD hook
-      await addCustomer({
-        ...data,
-        createdAt: new Date().toISOString(),
-      });
-      onClose?.();
+      try {
+        // Use customerCrud hook instead of direct context call
+        await customerCrud.create({
+          ...data,
+          createdAt: new Date().toISOString(),
+        });
+        onClose?.();
+      } catch (error) {
+        throw new Error(error.message || "Failed to add customer");
+      }
     }
   );
 
@@ -90,6 +101,17 @@ export function AddCustomerDialog({ onClose }) {
         value={formData.address}
         onChange={handleChange}
         placeholder="Enter address"
+      />
+
+      <FormField
+        label="Store"
+        name="storeId"
+        type="select"
+        value={formData.storeId}
+        onChange={handleChange}
+        error={errors.storeId}
+        required
+        options={storeOptions}
       />
 
       {errors.submit && <p className="text-sm text-red-500">{errors.submit}</p>}

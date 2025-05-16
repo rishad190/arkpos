@@ -18,7 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export function AddCashTransactionDialog({ onAddTransaction, children }) {
+export function AddCashTransactionDialog({
+  onAddTransaction,
+  children,
+  expenseCategories,
+}) {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
@@ -26,6 +30,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
     reference: "",
     cashIn: "",
     cashOut: "",
+    category: "",
   });
 
   const handleSubmit = async (e) => {
@@ -35,11 +40,18 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
       return;
     }
 
+    // Require category for cash out transactions
+    if (formData.cashOut && !formData.category) {
+      alert("Please select a category for cash out transaction");
+      return;
+    }
+
     try {
       await onAddTransaction({
         ...formData,
         cashIn: parseFloat(formData.cashIn) || 0,
         cashOut: parseFloat(formData.cashOut) || 0,
+        category: formData.cashOut ? formData.category : "Income", // Default category for cash in
       });
       setOpen(false);
       setFormData({
@@ -48,6 +60,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         reference: "",
         cashIn: "",
         cashOut: "",
+        category: "",
       });
     } catch (error) {
       console.error("Error adding transaction:", error);
@@ -108,9 +121,14 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                 id="cashIn"
                 type="number"
                 value={formData.cashIn}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, cashIn: e.target.value }))
-                }
+                onChange={(e) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    cashIn: e.target.value,
+                    cashOut: "", // Clear cash out when cash in is entered
+                    category: "", // Clear category
+                  }));
+                }}
                 placeholder="0.00"
                 min="0"
                 step="0.01"
@@ -122,15 +140,42 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                 id="cashOut"
                 type="number"
                 value={formData.cashOut}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, cashOut: e.target.value }))
-                }
+                onChange={(e) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    cashOut: e.target.value,
+                    cashIn: "", // Clear cash in when cash out is entered
+                  }));
+                }}
                 placeholder="0.00"
                 min="0"
                 step="0.01"
               />
             </div>
           </div>
+          {/* Category Selection - Only show for cash out transactions */}
+          {formData.cashOut ? (
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Select
+                value={formData.category}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, category: value }))
+                }
+              >
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {expenseCategories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button
               type="button"

@@ -410,7 +410,7 @@ export default function SupplierDetail() {
               <TableHead className="text-right whitespace-nowrap">
                 Balance
               </TableHead>
-              <TableHead className="whitespace-nowrap">Actions</TableHead>
+              <TableHead className="whitespace-nowrap">Actions</TableHead>{" "}
             </TableRow>
           </TableHeader>
           <TableBody>

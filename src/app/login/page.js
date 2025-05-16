@@ -67,16 +67,14 @@ export default function LoginPage() {
           <div className="flex justify-center">
             <Image
               src="/download.png"
-              alt="Sky Fabric Logo"
+              alt="ARK"
               width={80}
               height={80}
               className="rounded-lg shadow-sm"
               priority
             />
           </div>
-          <h2 className="text-center text-3xl font-bold text-gray-900">
-            Sky Fabric's
-          </h2>
+          <h2 className="text-center text-3xl font-bold text-gray-900">ARK</h2>
           <p className="text-center text-sm text-gray-600">
             Welcome back! Please sign in to continue.
           </p>

@@ -18,6 +18,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { calculateWeightedAverage } from "@/lib/inventory-utils";
 import { SellFabricDialog } from "@/components/SellFabricDialog";
 import { calculateFifoSale } from "@/lib/inventory-utils";
@@ -47,6 +58,7 @@ import {
   Package,
   DollarSign,
   Scale,
+  Trash2,
 } from "lucide-react";
 
 export default function InventoryPage() {
@@ -495,6 +507,7 @@ export default function InventoryPage() {
       {/* Inventory Table */}
       <Card className="border-none shadow-md">
         <CardContent className="p-6">
+          {" "}
           <Table>
             <TableHeader>
               <TableRow>
@@ -553,6 +566,35 @@ export default function InventoryPage() {
                         fabric={stock}
                         onSellFabric={handleSellFabric}
                       />
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Fabric</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete &ldquo;
+                              {stock.name}&rdquo;? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-red-500 hover:bg-red-600"
+                              onClick={() => handleDeleteFabric(stock.id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
