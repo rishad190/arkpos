@@ -12,6 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import {
   LayoutDashboard,
@@ -25,6 +31,7 @@ import {
   X,
   Bell,
   User,
+  BarChart3,
 } from "lucide-react";
 
 export function Navbar() {
@@ -72,31 +79,37 @@ export function Navbar() {
       href: "/",
       label: "Dashboard",
       icon: LayoutDashboard,
+      tooltip: "View your dashboard",
     },
     {
       href: "/cashbook",
       label: "Cash Book",
       icon: BookOpen,
+      tooltip: "Manage cash transactions",
     },
     {
       href: "/suppliers",
       label: "Suppliers",
       icon: Users,
+      tooltip: "Manage suppliers",
     },
     {
       href: "/inventory",
       label: "Inventory",
       icon: Package,
+      tooltip: "Manage inventory",
     },
     {
       href: "/cashmemo",
       label: "Cash Memo",
       icon: Receipt,
+      tooltip: "Create and manage cash memos",
     },
     {
-      name: "Settings",
-      href: "/settings",
-      icon: Settings,
+      href: "/reports/expense",
+      label: "Expense Report",
+      icon: BarChart3,
+      tooltip: "View expense analysis",
     },
   ];
 
@@ -121,82 +134,106 @@ export function Navbar() {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-4">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <item.icon className="h-4 w-4 mr-2" />
-                  {item.label}
-                </Link>
-              );
-            })}
+          <div className="hidden md:flex items-center space-x-1">
+            <TooltipProvider>
+              {navItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Tooltip key={item.href}>
+                    <TooltipTrigger asChild>
+                      <Link
+                        href={item.href}
+                        className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "text-gray-700 hover:bg-gray-100"
+                        }`}
+                      >
+                        <item.icon className="h-4 w-4 mr-2" />
+                        {item.label}
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{item.tooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
 
-            {/* Notifications */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative"
-                  aria-label="Notifications"
-                >
-                  <Bell className="h-5 w-5" />
-                  {notifications.length > 0 && (
-                    <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80">
-                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {notifications.length > 0 ? (
-                  notifications.map((notification) => (
-                    <DropdownMenuItem key={notification.id}>
-                      {notification.message}
-                    </DropdownMenuItem>
-                  ))
-                ) : (
-                  <div className="p-4 text-center text-sm text-muted-foreground">
-                    No new notifications
-                  </div>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              {/* Notifications */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="relative"
+                        aria-label="Notifications"
+                      >
+                        <Bell className="h-5 w-5" />
+                        {notifications.length > 0 && (
+                          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-80">
+                      <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {notifications.length > 0 ? (
+                        notifications.map((notification) => (
+                          <DropdownMenuItem key={notification.id}>
+                            {notification.message}
+                          </DropdownMenuItem>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          No new notifications
+                        </div>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>View notifications</p>
+                </TooltipContent>
+              </Tooltip>
 
-            {/* User Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative"
-                  aria-label="User menu"
-                >
-                  <User className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/settings")}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              {/* User Menu */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="relative"
+                        aria-label="User menu"
+                      >
+                        <User className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => router.push("/settings")}
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Settings
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleLogout}>
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Account settings</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
           {/* Mobile Navigation Toggle */}
@@ -270,6 +307,7 @@ export function Navbar() {
                 </Link>
               );
             })}
+
             <div className="border-t pt-2 mt-2">
               <Button
                 variant="ghost"

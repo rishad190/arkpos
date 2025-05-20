@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatCurrency } from "@/lib/utils";
 import { AddCashTransactionDialog } from "@/components/AddCashTransactionDialog";
 import { EditCashTransactionDialog } from "@/components/EditCashTransactionDialog";
 import {
@@ -32,6 +32,7 @@ import {
   Download,
   FileText,
   BarChart3,
+  Trash2,
 } from "lucide-react";
 import {
   Card,
@@ -70,6 +71,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
 
 export default function CashBookPage() {
   const {
@@ -78,6 +80,7 @@ export default function CashBookPage() {
     updateDailyCashTransaction,
     deleteDailyCashTransaction,
     getExpenseCategories,
+    updateExpenseCategories,
   } = useData();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
@@ -103,8 +106,25 @@ export default function CashBookPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [expenseCategories, setExpenseCategories] = useState([]);
 
-  const expenseCategories = getExpenseCategories();
+  // Load expense categories
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const categories = await getExpenseCategories();
+        setExpenseCategories(categories);
+      } catch (error) {
+        console.error("Error loading categories:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load expense categories",
+          variant: "destructive",
+        });
+      }
+    };
+    loadCategories();
+  }, [getExpenseCategories, toast]);
 
   // Add useEffect to handle initial loading state
   useEffect(() => {
@@ -403,6 +423,31 @@ export default function CashBookPage() {
     }
   };
 
+  // Handle adding new expense category
+  const handleAddCategory = async (newCategory) => {
+    try {
+      // Update local state
+      const updatedCategories = [...expenseCategories, newCategory];
+      setExpenseCategories(updatedCategories);
+
+      // Update in Firebase
+      await updateExpenseCategories(updatedCategories);
+
+      toast({
+        title: "Success",
+        description: "Category added successfully",
+      });
+    } catch (error) {
+      console.error("Error adding category:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add category. Please try again.",
+        variant: "destructive",
+      });
+      throw error; // Re-throw to let the dialog handle the error
+    }
+  };
+
   // Loading skeleton components
   const SummaryCardSkeleton = () => (
     <Card className="overflow-hidden border-none shadow-md">
@@ -518,145 +563,228 @@ export default function CashBookPage() {
   );
 
   // Add this new component for the financial summary
-  const FinancialSummary = () => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-      <Card className="overflow-hidden border-none shadow-md">
-        <CardContent className="p-0">
-          <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-green-100 dark:border-green-800">
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-medium text-green-800 dark:text-green-300">
-                Total Cash In
-              </h3>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Total income received</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
-          <div className="p-4">
-            <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
-              ৳{financials.totalCashIn.toLocaleString()}
-            </p>
-            <div className="mt-2">
-              <Progress value={100} className="h-2 bg-green-100" />
-            </div>
-            <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
-              All time income
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+  const FinancialSummary = () => {
+    // Calculate bank transaction totals
+    const bankSummary = dailyCashTransactions.reduce(
+      (acc, transaction) => {
+        if (transaction.transactionType === "bank_deposit") {
+          acc.totalBankDeposits += parseFloat(transaction.cashIn || 0);
+        } else if (transaction.transactionType === "bank_withdrawal") {
+          acc.totalBankWithdrawals += parseFloat(transaction.cashOut || 0);
+        }
+        return acc;
+      },
+      { totalBankDeposits: 0, totalBankWithdrawals: 0 }
+    );
 
-      <Card className="overflow-hidden border-none shadow-md">
-        <CardContent className="p-0">
-          <div className="bg-red-50 dark:bg-red-900/20 p-4 border-b border-red-100 dark:border-red-800">
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
-                Total Cash Out
-              </h3>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Total expenses paid</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        <Card className="overflow-hidden border-none shadow-md">
+          <CardContent className="p-0">
+            <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-green-100 dark:border-green-800">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-medium text-green-800 dark:text-green-300">
+                  Total Cash In
+                </h3>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Total cash received</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
-          </div>
-          <div className="p-4">
-            <p className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
-              ৳{financials.totalCashOut.toLocaleString()}
-            </p>
-            <div className="mt-2">
-              <Progress value={100} className="h-2 bg-red-100" />
+            <div className="p-4">
+              <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
+                ৳{financials.totalCashIn.toLocaleString()}
+              </p>
+              <div className="mt-2">
+                <Progress value={100} className="h-2 bg-green-100" />
+              </div>
+              <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
+                All time income
+              </p>
             </div>
-            <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
-              All time expenses
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card className="overflow-hidden border-none shadow-md">
-        <CardContent className="p-0">
-          <div
-            className={`${
-              financials.availableCash >= 0
-                ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800"
-                : "bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800"
-            } p-4 border-b`}
-          >
-            <div className="flex justify-between items-center">
-              <h3
-                className={`text-sm font-medium ${
+        <Card className="overflow-hidden border-none shadow-md">
+          <CardContent className="p-0">
+            <div className="bg-red-50 dark:bg-red-900/20 p-4 border-b border-red-100 dark:border-red-800">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
+                  Total Cash Out
+                </h3>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Total expenses paid</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </div>
+            <div className="p-4">
+              <p className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
+                ৳{financials.totalCashOut.toLocaleString()}
+              </p>
+              <div className="mt-2">
+                <Progress value={100} className="h-2 bg-red-100" />
+              </div>
+              <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
+                All time expenses
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-none shadow-md">
+          <CardContent className="p-0">
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 border-b border-blue-100 dark:border-blue-800">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                  Bank Deposits
+                </h3>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <ArrowUpRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Total bank deposits</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </div>
+            <div className="p-4">
+              <p className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">
+                ৳{bankSummary.totalBankDeposits.toLocaleString()}
+              </p>
+              <div className="mt-2">
+                <Progress value={100} className="h-2 bg-blue-100" />
+              </div>
+              <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
+                Total bank deposits
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-none shadow-md">
+          <CardContent className="p-0">
+            <div className="bg-purple-50 dark:bg-purple-900/20 p-4 border-b border-purple-100 dark:border-purple-800">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-medium text-purple-800 dark:text-purple-300">
+                  Bank Withdrawals
+                </h3>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <ArrowDownRight className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Total bank withdrawals</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </div>
+            <div className="p-4">
+              <p className="text-2xl md:text-3xl font-bold text-purple-600 dark:text-purple-400">
+                ৳{bankSummary.totalBankWithdrawals.toLocaleString()}
+              </p>
+              <div className="mt-2">
+                <Progress value={100} className="h-2 bg-purple-100" />
+              </div>
+              <p className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1">
+                Total bank withdrawals
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-none shadow-md">
+          <CardContent className="p-0">
+            <div
+              className={`${
+                financials.availableCash >= 0
+                  ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800"
+                  : "bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800"
+              } p-4 border-b`}
+            >
+              <div className="flex justify-between items-center">
+                <h3
+                  className={`text-sm font-medium ${
+                    financials.availableCash >= 0
+                      ? "text-blue-800 dark:text-blue-300"
+                      : "text-amber-800 dark:text-amber-300"
+                  }`}
+                >
+                  Available Balance
+                </h3>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <RefreshCw
+                        className={`h-4 w-4 ${
+                          financials.availableCash >= 0
+                            ? "text-blue-600 dark:text-blue-400"
+                            : "text-amber-600 dark:text-amber-400"
+                        }`}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Current available balance</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </div>
+            <div className="p-4">
+              <p
+                className={`text-2xl md:text-3xl font-bold ${
                   financials.availableCash >= 0
-                    ? "text-blue-800 dark:text-blue-300"
-                    : "text-amber-800 dark:text-amber-300"
+                    ? "text-blue-600 dark:text-blue-400"
+                    : "text-amber-600 dark:text-amber-400"
                 }`}
               >
-                Available Balance
-              </h3>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <RefreshCw
-                      className={`h-4 w-4 ${
-                        financials.availableCash >= 0
-                          ? "text-blue-600 dark:text-blue-400"
-                          : "text-amber-600 dark:text-amber-400"
-                      }`}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Current available balance</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                ৳{financials.availableCash.toLocaleString()}
+              </p>
+              <div className="mt-2">
+                <Progress
+                  value={Math.abs(
+                    (financials.availableCash / financials.totalCashIn) * 100
+                  )}
+                  className={`h-2 ${
+                    financials.availableCash >= 0
+                      ? "bg-blue-100"
+                      : "bg-amber-100"
+                  }`}
+                />
+              </div>
+              <p
+                className={`text-xs ${
+                  financials.availableCash >= 0
+                    ? "text-blue-600/70 dark:text-blue-400/70"
+                    : "text-amber-600/70 dark:text-amber-400/70"
+                } mt-1`}
+              >
+                Current balance
+              </p>
             </div>
-          </div>
-          <div className="p-4">
-            <p
-              className={`text-2xl md:text-3xl font-bold ${
-                financials.availableCash >= 0
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "text-amber-600 dark:text-amber-400"
-              }`}
-            >
-              ৳{financials.availableCash.toLocaleString()}
-            </p>
-            <div className="mt-2">
-              <Progress
-                value={Math.abs(
-                  (financials.availableCash / financials.totalCashIn) * 100
-                )}
-                className={`h-2 ${
-                  financials.availableCash >= 0 ? "bg-blue-100" : "bg-amber-100"
-                }`}
-              />
-            </div>
-            <p
-              className={`text-xs ${
-                financials.availableCash >= 0
-                  ? "text-blue-600/70 dark:text-blue-400/70"
-                  : "text-amber-600/70 dark:text-amber-400/70"
-              } mt-1`}
-            >
-              Current balance
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
 
   if (loadingState.initial) {
     return (
@@ -704,10 +832,10 @@ export default function CashBookPage() {
           </p>
         </div>
         <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
-          {" "}
           <AddCashTransactionDialog
             onAddTransaction={handleAddTransaction}
             expenseCategories={expenseCategories}
+            onAddCategory={handleAddCategory}
           >
             <Button
               className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
@@ -845,7 +973,6 @@ export default function CashBookPage() {
         </Tabs>
 
         <div className="flex flex-wrap gap-4">
-          {" "}
           <Select value={yearFilter} onValueChange={setYearFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select Year" />
@@ -1071,7 +1198,6 @@ export default function CashBookPage() {
                         Cash Out
                       </TableHead>
                       <TableHead className="text-right whitespace-nowrap min-w-[100px]">
-                        {" "}
                         Balance
                       </TableHead>
                       <TableHead className="whitespace-nowrap min-w-[200px]">

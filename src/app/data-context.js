@@ -21,7 +21,7 @@ import {
   orderByChild,
   equalTo,
 } from "firebase/database";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // Create context
@@ -50,6 +50,7 @@ const COLLECTION_REFS = {
   FABRICS: "fabrics",
   SUPPLIERS: "suppliers",
   SUPPLIER_TRANSACTIONS: "supplierTransactions",
+  SETTINGS: "settings",
 };
 
 // Add settings to the initial state
@@ -251,9 +252,45 @@ export function DataProvider({ children }) {
   );
 
   // Get expense categories
-  const getExpenseCategories = useCallback(() => {
-    return state.settings.expenseCategories || DEFAULT_EXPENSE_CATEGORIES;
-  }, [state.settings.expenseCategories]);
+  const getExpenseCategories = useCallback(async () => {
+    try {
+      const categoriesRef = ref(
+        db,
+        `${COLLECTION_REFS.SETTINGS}/expense_categories`
+      );
+      const snapshot = await get(categoriesRef);
+
+      if (snapshot.exists()) {
+        return snapshot.val().categories || DEFAULT_EXPENSE_CATEGORIES;
+      }
+
+      // If no categories exist, initialize with defaults
+      await set(categoriesRef, { categories: DEFAULT_EXPENSE_CATEGORIES });
+      return DEFAULT_EXPENSE_CATEGORIES;
+    } catch (error) {
+      console.error("Error getting expense categories:", error);
+      return DEFAULT_EXPENSE_CATEGORIES;
+    }
+  }, []);
+
+  const updateExpenseCategories = async (categories) => {
+    try {
+      const categoriesRef = ref(
+        db,
+        `${COLLECTION_REFS.SETTINGS}/expense_categories`
+      );
+      await set(categoriesRef, { categories });
+
+      // Update local state
+      dispatch({
+        type: "UPDATE_SETTINGS",
+        payload: { expenseCategories: categories },
+      });
+    } catch (error) {
+      console.error("Error updating expense categories:", error);
+      throw error;
+    }
+  };
 
   // Customer Operations
   const customerOperations = {
@@ -598,6 +635,7 @@ export function DataProvider({ children }) {
     settings: state.settings,
     updateSettings,
     getExpenseCategories,
+    updateExpenseCategories,
   };
 
   return (
