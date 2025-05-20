@@ -41,7 +41,26 @@ import {
   History,
   Trash2,
   Edit,
+  Printer,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function FabricViewPage() {
   const router = useRouter();
@@ -65,6 +84,9 @@ export default function FabricViewPage() {
     initial: true,
     actions: false,
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [batchToDelete, setBatchToDelete] = useState(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Initialize loading state
   useEffect(() => {
@@ -184,13 +206,16 @@ export default function FabricViewPage() {
   };
 
   const handleDeleteBatch = async (batchId) => {
-    if (!window.confirm("Are you sure you want to delete this batch?")) {
-      return;
-    }
+    setBatchToDelete(batchId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!batchToDelete) return;
 
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await deleteFabricBatch(batchId);
+      await deleteFabricBatch(batchToDelete);
       toast({
         title: "Success",
         description: "Batch deleted successfully",
@@ -204,6 +229,8 @@ export default function FabricViewPage() {
       });
     } finally {
       setLoadingState((prev) => ({ ...prev, actions: false }));
+      setDeleteDialogOpen(false);
+      setBatchToDelete(null);
     }
   };
 
@@ -280,6 +307,55 @@ export default function FabricViewPage() {
     }
   };
 
+  // Add this new function for printing
+  const handlePrint = () => {
+    setIsPrinting(true);
+    const printWindow = window.open("", "_blank");
+    const content = document.getElementById("printable-content");
+
+    if (printWindow && content) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Fabric Details - ${fabric.name}</title>
+            <style>
+              body { font-family: Arial, sans-serif; }
+              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              th { background-color: #f5f5f5; }
+              .summary { margin-bottom: 20px; }
+              .summary-item { margin: 10px 0; }
+              @media print {
+                .no-print { display: none; }
+              }
+            </style>
+          </head>
+          <body>
+            <h1>Fabric Details - ${fabric.name}</h1>
+            <div class="summary">
+              <div class="summary-item">Code: ${fabric.code}</div>
+              <div class="summary-item">Category: ${fabric.category}</div>
+              <div class="summary-item">Unit: ${fabric.unit}</div>
+              <div class="summary-item">Total Quantity: ${totalQuantity.toFixed(
+                2
+              )} ${fabric.unit}</div>
+              <div class="summary-item">Average Cost: ৳${averageCost.toFixed(
+                2
+              )}</div>
+              <div class="summary-item">Current Value: ৳${currentValue.toFixed(
+                2
+              )}</div>
+            </div>
+            ${content.innerHTML}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+      setIsPrinting(false);
+    }
+  };
+
   // Loading skeleton components
   const SummaryCardSkeleton = () => (
     <Card className="overflow-hidden border-none shadow-md">
@@ -315,6 +391,30 @@ export default function FabricViewPage() {
         </div>
       </CardContent>
     </Card>
+  );
+
+  // Move DeleteConfirmationDialog inside the main component
+  const DeleteConfirmationDialog = () => (
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Batch</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this batch? This action cannot be
+            undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={confirmDelete}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 
   if (loadingState.initial) {
@@ -418,10 +518,19 @@ export default function FabricViewPage() {
               Purchase Stock
             </Button>
           </PurchaseStockDialog>
+          <Button
+            onClick={handlePrint}
+            className="w-full md:w-auto"
+            variant="outline"
+            disabled={loadingState.actions || isPrinting}
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            {isPrinting ? "Printing..." : "Print Report"}
+          </Button>
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Financial Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="overflow-hidden border-none shadow-md">
           <CardContent className="p-0">
@@ -430,13 +539,25 @@ export default function FabricViewPage() {
                 <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
                   Total Quantity
                 </h3>
-                <Scale className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Scale className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Current stock quantity</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
             <div className="p-4">
               <p className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">
                 {totalQuantity.toFixed(2)} {fabric.unit}
               </p>
+              <div className="mt-2">
+                <Progress value={100} className="h-2 bg-blue-100" />
+              </div>
               <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
                 Current stock quantity
               </p>
@@ -451,13 +572,25 @@ export default function FabricViewPage() {
                 <h3 className="text-sm font-medium text-green-800 dark:text-green-300">
                   Average Cost
                 </h3>
-                <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Average cost per unit</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
             <div className="p-4">
               <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
                 ৳{averageCost.toFixed(2)}
               </p>
+              <div className="mt-2">
+                <Progress value={100} className="h-2 bg-green-100" />
+              </div>
               <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
                 Average cost per unit
               </p>
@@ -472,13 +605,25 @@ export default function FabricViewPage() {
                 <h3 className="text-sm font-medium text-purple-800 dark:text-purple-300">
                   Current Value
                 </h3>
-                <RefreshCw className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <RefreshCw className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Total inventory value</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
             <div className="p-4">
               <p className="text-2xl md:text-3xl font-bold text-purple-600 dark:text-purple-400">
                 ৳{currentValue.toFixed(2)}
               </p>
+              <div className="mt-2">
+                <Progress value={100} className="h-2 bg-purple-100" />
+              </div>
               <p className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1">
                 Total inventory value
               </p>
@@ -519,7 +664,7 @@ export default function FabricViewPage() {
                   <TableHead>Quantity</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Actions</TableHead>
-                </TableRow>{" "}
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {priceHistory.map((batch, index) => (
@@ -640,6 +785,35 @@ export default function FabricViewPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add the Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog />
+
+      {/* Add the printable content div */}
+      <div id="printable-content" className="hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Purchase Price</TableHead>
+              <TableHead>Quantity</TableHead>
+              <TableHead>Supplier</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {priceHistory.map((batch) => (
+              <TableRow key={batch.id}>
+                <TableCell>{batch.date}</TableCell>
+                <TableCell>৳{batch.price.toFixed(2)}</TableCell>
+                <TableCell>
+                  {batch.quantity} {fabric.unit}
+                </TableCell>
+                <TableCell>{batch.supplierName}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

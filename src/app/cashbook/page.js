@@ -52,6 +52,24 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 
 export default function CashBookPage() {
   const {
@@ -82,6 +100,9 @@ export default function CashBookPage() {
     transactions: false,
     actions: false,
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const expenseCategories = getExpenseCategories();
 
@@ -293,13 +314,16 @@ export default function CashBookPage() {
   };
 
   const handleDeleteTransaction = async (transactionId) => {
-    if (!window.confirm("Are you sure you want to delete this transaction?")) {
-      return;
-    }
+    setTransactionToDelete(transactionId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!transactionToDelete) return;
 
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await deleteDailyCashTransaction(transactionId);
+      await deleteDailyCashTransaction(transactionToDelete);
       toast({
         title: "Success",
         description: "Transaction deleted successfully",
@@ -313,6 +337,8 @@ export default function CashBookPage() {
       });
     } finally {
       setLoadingState((prev) => ({ ...prev, actions: false }));
+      setDeleteDialogOpen(false);
+      setTransactionToDelete(null);
     }
   };
 
@@ -335,6 +361,46 @@ export default function CashBookPage() {
       summary: financials,
     };
     exportToPDF(data, "cashbook-report.pdf");
+  };
+
+  // Add this new function for printing
+  const handlePrint = () => {
+    setIsPrinting(true);
+    const printWindow = window.open("", "_blank");
+    const content = document.getElementById("printable-content");
+
+    if (printWindow && content) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Cash Book Report</title>
+            <style>
+              body { font-family: Arial, sans-serif; }
+              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              th { background-color: #f5f5f5; }
+              .summary { margin-bottom: 20px; }
+              .summary-item { margin: 10px 0; }
+              @media print {
+                .no-print { display: none; }
+              }
+            </style>
+          </head>
+          <body>
+            <h1>Cash Book Report</h1>
+            <div class="summary">
+              <div class="summary-item">Total Cash In: ৳${financials.totalCashIn.toLocaleString()}</div>
+              <div class="summary-item">Total Cash Out: ৳${financials.totalCashOut.toLocaleString()}</div>
+              <div class="summary-item">Available Balance: ৳${financials.availableCash.toLocaleString()}</div>
+            </div>
+            ${content.innerHTML}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+      setIsPrinting(false);
+    }
   };
 
   // Loading skeleton components
@@ -427,6 +493,171 @@ export default function CashBookPage() {
     </Card>
   );
 
+  // Add this new component for the delete confirmation dialog
+  const DeleteConfirmationDialog = () => (
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this transaction? This action cannot
+            be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={confirmDelete}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
+  // Add this new component for the financial summary
+  const FinancialSummary = () => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <Card className="overflow-hidden border-none shadow-md">
+        <CardContent className="p-0">
+          <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-green-100 dark:border-green-800">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-medium text-green-800 dark:text-green-300">
+                Total Cash In
+              </h3>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Total income received</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+          <div className="p-4">
+            <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
+              ৳{financials.totalCashIn.toLocaleString()}
+            </p>
+            <div className="mt-2">
+              <Progress value={100} className="h-2 bg-green-100" />
+            </div>
+            <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
+              All time income
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden border-none shadow-md">
+        <CardContent className="p-0">
+          <div className="bg-red-50 dark:bg-red-900/20 p-4 border-b border-red-100 dark:border-red-800">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
+                Total Cash Out
+              </h3>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Total expenses paid</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+          <div className="p-4">
+            <p className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
+              ৳{financials.totalCashOut.toLocaleString()}
+            </p>
+            <div className="mt-2">
+              <Progress value={100} className="h-2 bg-red-100" />
+            </div>
+            <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
+              All time expenses
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden border-none shadow-md">
+        <CardContent className="p-0">
+          <div
+            className={`${
+              financials.availableCash >= 0
+                ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800"
+                : "bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800"
+            } p-4 border-b`}
+          >
+            <div className="flex justify-between items-center">
+              <h3
+                className={`text-sm font-medium ${
+                  financials.availableCash >= 0
+                    ? "text-blue-800 dark:text-blue-300"
+                    : "text-amber-800 dark:text-amber-300"
+                }`}
+              >
+                Available Balance
+              </h3>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <RefreshCw
+                      className={`h-4 w-4 ${
+                        financials.availableCash >= 0
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-amber-600 dark:text-amber-400"
+                      }`}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Current available balance</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+          <div className="p-4">
+            <p
+              className={`text-2xl md:text-3xl font-bold ${
+                financials.availableCash >= 0
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-amber-600 dark:text-amber-400"
+              }`}
+            >
+              ৳{financials.availableCash.toLocaleString()}
+            </p>
+            <div className="mt-2">
+              <Progress
+                value={Math.abs(
+                  (financials.availableCash / financials.totalCashIn) * 100
+                )}
+                className={`h-2 ${
+                  financials.availableCash >= 0 ? "bg-blue-100" : "bg-amber-100"
+                }`}
+              />
+            </div>
+            <p
+              className={`text-xs ${
+                financials.availableCash >= 0
+                  ? "text-blue-600/70 dark:text-blue-400/70"
+                  : "text-amber-600/70 dark:text-amber-400/70"
+              } mt-1`}
+            >
+              Current balance
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   if (loadingState.initial) {
     return (
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
@@ -487,6 +718,15 @@ export default function CashBookPage() {
             </Button>
           </AddCashTransactionDialog>
           <Button
+            onClick={handlePrint}
+            className="w-full md:w-auto"
+            variant="outline"
+            disabled={loadingState.actions || isPrinting}
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            {isPrinting ? "Printing..." : "Print Report"}
+          </Button>
+          <Button
             onClick={handleExportPDF}
             className="w-full md:w-auto"
             variant="outline"
@@ -507,101 +747,8 @@ export default function CashBookPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card className="overflow-hidden border-none shadow-md">
-          <CardContent className="p-0">
-            <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-green-100 dark:border-green-800">
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-medium text-green-800 dark:text-green-300">
-                  Total Cash In
-                </h3>
-                <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-            <div className="p-4">
-              <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
-                ৳{financials.totalCashIn.toLocaleString()}
-              </p>
-              <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
-                All time income
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-none shadow-md">
-          <CardContent className="p-0">
-            <div className="bg-red-50 dark:bg-red-900/20 p-4 border-b border-red-100 dark:border-red-800">
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
-                  Total Cash Out
-                </h3>
-                <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
-              </div>
-            </div>
-            <div className="p-4">
-              <p className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
-                ৳{financials.totalCashOut.toLocaleString()}
-              </p>
-              <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
-                All time expenses
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-none shadow-md">
-          <CardContent className="p-0">
-            <div
-              className={`${
-                financials.availableCash >= 0
-                  ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800"
-                  : "bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800"
-              } p-4 border-b`}
-            >
-              <div className="flex justify-between items-center">
-                <h3
-                  className={`text-sm font-medium ${
-                    financials.availableCash >= 0
-                      ? "text-blue-800 dark:text-blue-300"
-                      : "text-amber-800 dark:text-amber-300"
-                  }`}
-                >
-                  Available Balance
-                </h3>
-                <RefreshCw
-                  className={`h-4 w-4 ${
-                    financials.availableCash >= 0
-                      ? "text-blue-600 dark:text-blue-400"
-                      : "text-amber-600 dark:text-amber-400"
-                  }`}
-                />
-              </div>
-            </div>
-            <div className="p-4">
-              <p
-                className={`text-2xl md:text-3xl font-bold ${
-                  financials.availableCash >= 0
-                    ? "text-blue-600 dark:text-blue-400"
-                    : "text-amber-600 dark:text-amber-400"
-                }`}
-              >
-                ৳{financials.availableCash.toLocaleString()}
-              </p>
-              <p
-                className={`text-xs ${
-                  financials.availableCash >= 0
-                    ? "text-blue-600/70 dark:text-blue-400/70"
-                    : "text-amber-600/70 dark:text-amber-400/70"
-                } mt-1`}
-              >
-                Current balance
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Financial Summary */}
+      <FinancialSummary />
 
       {/* Monthly Summary */}
       <Card className="mb-8 border-none shadow-md overflow-hidden">
@@ -1082,6 +1229,43 @@ export default function CashBookPage() {
           }}
         />
       )}
+
+      {/* Add the Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog />
+
+      {/* Add the printable content div */}
+      <div id="printable-content" className="hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right">Cash In</TableHead>
+              <TableHead className="text-right">Cash Out</TableHead>
+              <TableHead className="text-right">Balance</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredCash.map((day) => (
+              <TableRow key={day.date}>
+                <TableCell>{formatDate(day.date)}</TableCell>
+                <TableCell>
+                  {day.dailyCash.map((t) => t.description).join(", ")}
+                </TableCell>
+                <TableCell className="text-right">
+                  ৳{day.cashIn.toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right">
+                  ৳{day.cashOut.toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right">
+                  ৳{day.balance.toLocaleString()}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

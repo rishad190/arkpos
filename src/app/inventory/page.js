@@ -59,7 +59,16 @@ import {
   DollarSign,
   Scale,
   Trash2,
+  Printer,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function InventoryPage() {
   const router = useRouter();
@@ -82,6 +91,9 @@ export default function InventoryPage() {
     initial: true,
     actions: false,
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [fabricToDelete, setFabricToDelete] = useState(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Initialize loading state
   useEffect(() => {
@@ -220,13 +232,16 @@ export default function InventoryPage() {
   };
 
   const handleDeleteFabric = async (fabricId) => {
-    if (!window.confirm("Are you sure you want to delete this fabric?")) {
-      return;
-    }
+    setFabricToDelete(fabricId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!fabricToDelete) return;
 
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await deleteFabric(fabricId);
+      await deleteFabric(fabricToDelete);
       toast({
         title: "Success",
         description: "Fabric deleted successfully",
@@ -240,6 +255,8 @@ export default function InventoryPage() {
       });
     } finally {
       setLoadingState((prev) => ({ ...prev, actions: false }));
+      setDeleteDialogOpen(false);
+      setFabricToDelete(null);
     }
   };
 
@@ -287,6 +304,51 @@ export default function InventoryPage() {
     exportToPDF(data, "inventory-report.pdf");
   };
 
+  const handlePrint = () => {
+    setIsPrinting(true);
+    const printWindow = window.open("", "_blank");
+    const content = document.getElementById("printable-content");
+
+    if (printWindow && content) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Inventory Report</title>
+            <style>
+              body { font-family: Arial, sans-serif; }
+              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              th { background-color: #f5f5f5; }
+              .summary { margin-bottom: 20px; }
+              .summary-item { margin: 10px 0; }
+              @media print {
+                .no-print { display: none; }
+              }
+            </style>
+          </head>
+          <body>
+            <h1>Inventory Report</h1>
+            <div class="summary">
+              <div class="summary-item">Total Quantity: ${totals.totalQuantity.toFixed(
+                2
+              )}</div>
+              <div class="summary-item">Average Cost: ৳${totals.averageCost.toFixed(
+                2
+              )}</div>
+              <div class="summary-item">Total Value: ৳${totals.totalValue.toFixed(
+                2
+              )}</div>
+            </div>
+            ${content.innerHTML}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+      setIsPrinting(false);
+    }
+  };
+
   // Loading skeleton components
   const SummaryCardSkeleton = () => (
     <Card className="overflow-hidden border-none shadow-md">
@@ -323,6 +385,132 @@ export default function InventoryPage() {
         </div>
       </CardContent>
     </Card>
+  );
+
+  const DeleteConfirmationDialog = () => (
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Fabric</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this fabric? This action cannot be
+            undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={confirmDelete}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
+  const FinancialSummary = () => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <Card className="overflow-hidden border-none shadow-md">
+        <CardContent className="p-0">
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 border-b border-blue-100 dark:border-blue-800">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                Total Quantity
+              </h3>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Scale className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Total stock quantity across all fabrics</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+          <div className="p-4">
+            <p className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">
+              {totals.totalQuantity.toFixed(2)}
+            </p>
+            <div className="mt-2">
+              <Progress value={100} className="h-2 bg-blue-100" />
+            </div>
+            <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
+              Total stock quantity
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden border-none shadow-md">
+        <CardContent className="p-0">
+          <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-green-100 dark:border-green-800">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-medium text-green-800 dark:text-green-300">
+                Average Cost
+              </h3>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Average cost per unit across all fabrics</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+          <div className="p-4">
+            <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
+              ৳{totals.averageCost.toFixed(2)}
+            </p>
+            <div className="mt-2">
+              <Progress value={100} className="h-2 bg-green-100" />
+            </div>
+            <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
+              Average cost per unit
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden border-none shadow-md">
+        <CardContent className="p-0">
+          <div className="bg-purple-50 dark:bg-purple-900/20 p-4 border-b border-purple-100 dark:border-purple-800">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-medium text-purple-800 dark:text-purple-300">
+                Total Value
+              </h3>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <RefreshCw className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Total inventory value across all fabrics</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+          <div className="p-4">
+            <p className="text-2xl md:text-3xl font-bold text-purple-600 dark:text-purple-400">
+              ৳{totals.totalValue.toFixed(2)}
+            </p>
+            <div className="mt-2">
+              <Progress value={100} className="h-2 bg-purple-100" />
+            </div>
+            <p className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1">
+              Total inventory value
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 
   if (loadingState.initial) {
@@ -391,6 +579,15 @@ export default function InventoryPage() {
             </Button>
           </PurchaseStockDialog>
           <Button
+            onClick={handlePrint}
+            className="w-full md:w-auto"
+            variant="outline"
+            disabled={loadingState.actions || isPrinting}
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            {isPrinting ? "Printing..." : "Print Report"}
+          </Button>
+          <Button
             onClick={handleExportPDF}
             className="w-full md:w-auto"
             variant="outline"
@@ -411,71 +608,8 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card className="overflow-hidden border-none shadow-md">
-          <CardContent className="p-0">
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 border-b border-blue-100 dark:border-blue-800">
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
-                  Total Quantity
-                </h3>
-                <Scale className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-            <div className="p-4">
-              <p className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">
-                {totals.totalQuantity.toFixed(2)}
-              </p>
-              <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
-                Total stock quantity
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-none shadow-md">
-          <CardContent className="p-0">
-            <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-green-100 dark:border-green-800">
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-medium text-green-800 dark:text-green-300">
-                  Average Cost
-                </h3>
-                <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-            <div className="p-4">
-              <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
-                ৳{totals.averageCost.toFixed(2)}
-              </p>
-              <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
-                Average cost per unit
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-none shadow-md">
-          <CardContent className="p-0">
-            <div className="bg-purple-50 dark:bg-purple-900/20 p-4 border-b border-purple-100 dark:border-purple-800">
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-medium text-purple-800 dark:text-purple-300">
-                  Total Value
-                </h3>
-                <RefreshCw className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-              </div>
-            </div>
-            <div className="p-4">
-              <p className="text-2xl md:text-3xl font-bold text-purple-600 dark:text-purple-400">
-                ৳{totals.totalValue.toFixed(2)}
-              </p>
-              <p className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1">
-                Total inventory value
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Financial Summary */}
+      <FinancialSummary />
 
       {/* Search & Filter Section */}
       <Card className="mb-8 border-none shadow-md">
@@ -610,6 +744,41 @@ export default function InventoryPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Add the Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog />
+
+      {/* Add the printable content div */}
+      <div id="printable-content" className="hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Fabric Code</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead className="text-right">Stock Qty</TableHead>
+              <TableHead className="text-right">Avg. Cost</TableHead>
+              <TableHead className="text-right">Current Value</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredFabrics.map((stock) => (
+              <TableRow key={stock.id}>
+                <TableCell>{stock.code}</TableCell>
+                <TableCell>{stock.name}</TableCell>
+                <TableCell className="text-right">
+                  {stock.totalQuantity.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right">
+                  ৳{stock.averageCost.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right">
+                  ৳{stock.currentValue.toFixed(2)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

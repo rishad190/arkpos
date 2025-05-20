@@ -11,7 +11,7 @@ const geist = Geist({
 // Add metadata configuration
 export const metadata = {
   title: {
-    default: "Sky Fabric",
+    default: "ARK ENTERPRISE",
     template: "%s | POS System",
   },
   description:

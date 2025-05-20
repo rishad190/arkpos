@@ -40,11 +40,16 @@ import {
   CreditCard,
   FileText,
   MoreVertical,
+  Tag,
 } from "lucide-react";
 import { formatDate, exportToCSV } from "@/lib/utils";
 import { TRANSACTION_CONSTANTS, ERROR_MESSAGES } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { exportToPDF } from "@/utils/export";
+import { Input } from "@/components/ui/input";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function CustomerDetail() {
   const params = useParams();
@@ -67,6 +72,8 @@ export default function CustomerDetail() {
   const [storeFilter, setStoreFilter] = useState(
     TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL
   );
+  const [dateRange, setDateRange] = useState({ from: null, to: null });
+  const [searchTerm, setSearchTerm] = useState("");
 
   const customer = customers?.find((c) => c.id === params.id);
 
@@ -218,6 +225,59 @@ export default function CustomerDetail() {
     exportToCSV(data, `${customer?.name}-transactions-${params.id}.csv`);
   };
 
+  const TransactionFilters = () => (
+    <div className="flex flex-col md:flex-row gap-4 mb-6">
+      <div className="flex-1">
+        <Input
+          placeholder="Search transactions..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full"
+        />
+      </div>
+      <DateRangePicker
+        value={dateRange}
+        onChange={setDateRange}
+        className="w-full md:w-[300px]"
+      />
+    </div>
+  );
+
+  const filteredTransactions = useMemo(() => {
+    if (!customerTransactionsWithBalance) return [];
+
+    return customerTransactionsWithBalance.filter((transaction) => {
+      const matchesSearch =
+        transaction.memoNumber
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        transaction.details?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        transaction.total?.toString().includes(searchTerm) ||
+        transaction.deposit?.toString().includes(searchTerm);
+
+      const matchesDate =
+        !dateRange.from ||
+        !dateRange.to ||
+        (new Date(transaction.date) >= dateRange.from &&
+          new Date(transaction.date) <= dateRange.to);
+
+      return matchesSearch && matchesDate;
+    });
+  }, [customerTransactionsWithBalance, searchTerm, dateRange]);
+
+  const paymentProgress = useMemo(() => {
+    if (!customerTransactionsWithBalance.length) return 0;
+    const totalBill = customerTransactionsWithBalance.reduce(
+      (sum, t) => sum + (t.total || 0),
+      0
+    );
+    const totalDeposit = customerTransactionsWithBalance.reduce(
+      (sum, t) => sum + (t.deposit || 0),
+      0
+    );
+    return (totalDeposit / totalBill) * 100;
+  }, [customerTransactionsWithBalance]);
+
   if (loadingState.initial) {
     return (
       <LoadingState
@@ -318,6 +378,29 @@ export default function CustomerDetail() {
                   <span>Store ID: {customer.storeId}</span>
                 </div>
               </div>
+
+              {/* Fabric Preferences Tags */}
+              {customer.tags && customer.tags.length > 0 && (
+                <div className="mt-6 pt-4 border-t">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Tag className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="text-sm font-medium text-muted-foreground">
+                      Fabric Preferences
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {customer.tags.map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="secondary"
+                        className="text-sm font-normal"
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -396,6 +479,19 @@ export default function CustomerDetail() {
                 </Card>
               </div>
 
+              <div className="mt-6 pt-4 border-t">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium">Payment Progress</span>
+                  <span className="text-sm text-muted-foreground">
+                    {paymentProgress.toFixed(1)}%
+                  </span>
+                </div>
+                <Progress value={paymentProgress} className="h-2" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {paymentProgress >= 100 ? "Fully Paid" : "Partially Paid"}
+                </p>
+              </div>
+
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t">
                 <select
                   className="w-full sm:w-[180px] border rounded-md px-4 py-2"
@@ -447,118 +543,131 @@ export default function CustomerDetail() {
         </div>
 
         {/* Transactions Table */}
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="whitespace-nowrap">Date</TableHead>
-                <TableHead className="whitespace-nowrap">Memo Number</TableHead>
-                <TableHead className="whitespace-nowrap">Details</TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  Total Bill
-                </TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  Deposit
-                </TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  Due Amount
-                </TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  Balance
-                </TableHead>
-                <TableHead className="whitespace-nowrap">Store</TableHead>
-                <TableHead className="whitespace-nowrap">
-                  Actions
-                </TableHead>{" "}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadingState.transactions ? (
-                <TableSkeleton />
-              ) : (
-                customerTransactionsWithBalance.map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell className="whitespace-nowrap">
-                      {new Date(transaction.date)
-                        .toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })
-                        .replace(/\//g, "-")}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {transaction.memoNumber}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {transaction.details}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      ৳{transaction.total.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      ৳{transaction.deposit.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      ৳{transaction.due.toLocaleString()}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right font-medium whitespace-nowrap ${
-                        transaction.cumulativeBalance > 0
-                          ? "text-red-500"
-                          : "text-green-500"
-                      }`}
-                    >
-                      ৳{transaction.cumulativeBalance.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {transaction.storeId}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <EditTransactionDialog
-                                transaction={transaction}
-                                onEditTransaction={(updatedData) =>
-                                  handleEditTransaction(
-                                    transaction.id,
-                                    updatedData
-                                  )
-                                }
-                                isLoading={loadingState.action}
-                              />
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-red-500"
-                              onClick={() =>
-                                handleDeleteTransaction(transaction.id)
-                              }
-                              disabled={loadingState.action}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
+        <Card className="border-none shadow-md">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+              <div>
+                <h2 className="text-xl font-semibold">Transactions</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  View and manage customer transactions
+                </p>
+              </div>
+              <TransactionFilters />
+            </div>
+            <ScrollArea className="h-[600px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Date</TableHead>
+                    <TableHead className="whitespace-nowrap">
+                      Memo Number
+                    </TableHead>
+                    <TableHead className="whitespace-nowrap">Details</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      Total Bill
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      Deposit
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      Due Amount
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      Balance
+                    </TableHead>
+                    <TableHead className="whitespace-nowrap">Store</TableHead>
+                    <TableHead className="whitespace-nowrap">Actions</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                </TableHeader>
+                <TableBody>
+                  {loadingState.transactions ? (
+                    <TableSkeleton />
+                  ) : (
+                    filteredTransactions.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {new Date(transaction.date)
+                            .toLocaleDateString("en-GB", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                            })
+                            .replace(/\//g, "-")}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {transaction.memoNumber}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {transaction.details}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          ৳{transaction.total.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          ৳{transaction.deposit.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          ৳{transaction.due.toLocaleString()}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right font-medium whitespace-nowrap ${
+                            transaction.cumulativeBalance > 0
+                              ? "text-red-500"
+                              : "text-green-500"
+                          }`}
+                        >
+                          ৳{transaction.cumulativeBalance.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {transaction.storeId}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                  <EditTransactionDialog
+                                    transaction={transaction}
+                                    onEditTransaction={(updatedData) =>
+                                      handleEditTransaction(
+                                        transaction.id,
+                                        updatedData
+                                      )
+                                    }
+                                    isLoading={loadingState.action}
+                                  />
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-red-500"
+                                  onClick={() =>
+                                    handleDeleteTransaction(transaction.id)
+                                  }
+                                  disabled={loadingState.action}
+                                >
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </CardContent>
+        </Card>
 
         {/* Footer Section */}
         <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="text-sm text-gray-500">
-            Total Transactions: {customerTransactionsWithBalance.length}
+            Total Transactions: {filteredTransactions.length}
           </div>
           <div className="bg-gray-100 p-4 rounded-lg w-full md:w-auto">
             <span className="font-semibold">Current Balance: </span>

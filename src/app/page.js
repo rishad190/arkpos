@@ -36,6 +36,7 @@ import {
   RefreshCw,
   TrendingUp,
   History,
+  Tag,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +72,7 @@ export default function Dashboard() {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState("customers");
+  const [selectedTags, setSelectedTags] = useState([]);
 
   // Add debug logging
   useEffect(() => {
@@ -132,6 +134,15 @@ export default function Dashboard() {
       lowStockItems,
     };
   }, [customers, transactions, fabrics, suppliers, getCustomerDue]);
+
+  // Get all unique tags from customers
+  const allTags = useMemo(() => {
+    const tags = new Set();
+    customers?.forEach((customer) => {
+      customer.tags?.forEach((tag) => tags.add(tag));
+    });
+    return Array.from(tags).sort();
+  }, [customers]);
 
   const handleAddCustomer = async (customerData) => {
     setLoadingState((prev) => ({ ...prev, actions: true }));
@@ -279,6 +290,7 @@ export default function Dashboard() {
     const matchesSearch =
       customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.phone?.includes(searchTerm);
+
     const currentDue = getCustomerDue(customer.id);
     const matchesFilter =
       selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL ||
@@ -286,7 +298,12 @@ export default function Dashboard() {
         currentDue > 0) ||
       (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.PAID &&
         currentDue === 0);
-    return matchesSearch && matchesFilter;
+
+    const matchesTags =
+      selectedTags.length === 0 ||
+      selectedTags.every((tag) => customer.tags?.includes(tag));
+
+    return matchesSearch && matchesFilter && matchesTags;
   });
 
   return (
@@ -460,12 +477,15 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </div>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col gap-4">
               <CustomerSearch
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 selectedFilter={selectedFilter}
                 onFilterChange={setSelectedFilter}
+                selectedTags={selectedTags}
+                onTagsChange={setSelectedTags}
+                allTags={allTags}
               />
               <Button
                 onClick={() => setIsAddingCustomer(true)}
