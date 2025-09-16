@@ -67,14 +67,12 @@ export function FormDialog({
         aria-labelledby="dialog-title"
         aria-describedby={description ? "dialog-description" : undefined}
       >
-        <DialogHeader>
-          <DialogTitle id="dialog-title">{title}</DialogTitle>
-          {description && (
-            <DialogDescription id="dialog-description">
-              {description}
-            </DialogDescription>
-          )}
-        </DialogHeader>
+        <DialogTitle id="dialog-title">{title}</DialogTitle>
+        {description && (
+          <DialogDescription id="dialog-description">
+            {description}
+          </DialogDescription>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4" ref={formRef}>
           {children}
 
