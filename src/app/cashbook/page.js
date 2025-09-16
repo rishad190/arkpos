@@ -168,8 +168,16 @@ export default function CashBookPage() {
         };
       }
 
-      acc[date].cashIn += item.cashIn || 0;
-      acc[date].cashOut += item.cashOut || 0;
+      // Handle bank deposits and withdrawals
+      if (item.transactionType === "bank_deposit") {
+        acc[date].cashIn += item.cashIn || 0;
+      } else if (item.transactionType === "bank_withdrawal") {
+        acc[date].cashOut += item.cashOut || 0;
+      } else {
+        acc[date].cashIn += item.cashIn || 0;
+        acc[date].cashOut += item.cashOut || 0;
+      }
+
       acc[date].balance = acc[date].cashIn - acc[date].cashOut;
       acc[date].dailyCash.push(item);
 
@@ -200,8 +208,17 @@ export default function CashBookPage() {
       if (!acc[month]) {
         acc[month] = { cashIn: 0, cashOut: 0 };
       }
-      acc[month].cashIn += transaction.cashIn || 0;
-      acc[month].cashOut += transaction.cashOut || 0;
+
+      // Handle bank deposits and withdrawals in monthly totals
+      if (transaction.transactionType === "bank_deposit") {
+        acc[month].cashIn += transaction.cashIn || 0;
+      } else if (transaction.transactionType === "bank_withdrawal") {
+        acc[month].cashOut += transaction.cashOut || 0;
+      } else {
+        acc[month].cashIn += transaction.cashIn || 0;
+        acc[month].cashOut += transaction.cashOut || 0;
+      }
+
       return acc;
     }, {});
 
@@ -541,19 +558,33 @@ export default function CashBookPage() {
   // Add this new component for the delete confirmation dialog
   const DeleteConfirmationDialog = () => (
     <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-      <AlertDialogContent>
+      <AlertDialogContent
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+        className="focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+      >
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogTitle id="delete-dialog-title">
+            Delete Transaction
+          </AlertDialogTitle>
+          <AlertDialogDescription id="delete-dialog-description">
             Are you sure you want to delete this transaction? This action cannot
             be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel
+            aria-label="Cancel deletion"
+            className="focus:ring-2 focus:ring-offset-2"
+          >
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
             onClick={confirmDelete}
-            className="bg-red-600 hover:bg-red-700"
+            className="bg-red-600 hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            aria-label="Confirm deletion"
           >
             Delete
           </AlertDialogAction>
@@ -564,21 +595,20 @@ export default function CashBookPage() {
 
   // Add this new component for the financial summary
   const FinancialSummary = () => {
-    // Calculate bank transaction totals
-    const bankSummary = dailyCashTransactions.reduce(
-      (acc, transaction) => {
-        if (transaction.transactionType === "bank_deposit") {
-          acc.totalBankDeposits += parseFloat(transaction.cashIn || 0);
-        } else if (transaction.transactionType === "bank_withdrawal") {
-          acc.totalBankWithdrawals += parseFloat(transaction.cashOut || 0);
-        }
-        return acc;
-      },
-      { totalBankDeposits: 0, totalBankWithdrawals: 0 }
-    );
+    // Calculate transaction totals
+    const summary = useMemo(() => {
+      return dailyCashTransactions.reduce(
+        (acc, transaction) => {
+          acc.totalCashIn += parseFloat(transaction.cashIn || 0);
+          acc.totalCashOut += parseFloat(transaction.cashOut || 0);
+          return acc;
+        },
+        { totalCashIn: 0, totalCashOut: 0 }
+      );
+    }, [dailyCashTransactions]);
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <Card className="overflow-hidden border-none shadow-md">
           <CardContent className="p-0">
             <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-green-100 dark:border-green-800">
@@ -600,13 +630,13 @@ export default function CashBookPage() {
             </div>
             <div className="p-4">
               <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
-                ৳{financials.totalCashIn.toLocaleString()}
+                ৳{summary.totalCashIn.toLocaleString()}
               </p>
               <div className="mt-2">
                 <Progress value={100} className="h-2 bg-green-100" />
               </div>
               <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
-                All time income
+                All transactions
               </p>
             </div>
           </CardContent>
@@ -633,79 +663,13 @@ export default function CashBookPage() {
             </div>
             <div className="p-4">
               <p className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
-                ৳{financials.totalCashOut.toLocaleString()}
+                ৳{summary.totalCashOut.toLocaleString()}
               </p>
               <div className="mt-2">
                 <Progress value={100} className="h-2 bg-red-100" />
               </div>
               <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
-                All time expenses
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-none shadow-md">
-          <CardContent className="p-0">
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 border-b border-blue-100 dark:border-blue-800">
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
-                  Bank Deposits
-                </h3>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <ArrowUpRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Total bank deposits</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            </div>
-            <div className="p-4">
-              <p className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">
-                ৳{bankSummary.totalBankDeposits.toLocaleString()}
-              </p>
-              <div className="mt-2">
-                <Progress value={100} className="h-2 bg-blue-100" />
-              </div>
-              <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
-                Total bank deposits
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-none shadow-md">
-          <CardContent className="p-0">
-            <div className="bg-purple-50 dark:bg-purple-900/20 p-4 border-b border-purple-100 dark:border-purple-800">
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-medium text-purple-800 dark:text-purple-300">
-                  Bank Withdrawals
-                </h3>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <ArrowDownRight className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Total bank withdrawals</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            </div>
-            <div className="p-4">
-              <p className="text-2xl md:text-3xl font-bold text-purple-600 dark:text-purple-400">
-                ৳{bankSummary.totalBankWithdrawals.toLocaleString()}
-              </p>
-              <div className="mt-2">
-                <Progress value={100} className="h-2 bg-purple-100" />
-              </div>
-              <p className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1">
-                Total bank withdrawals
+                All transactions
               </p>
             </div>
           </CardContent>
@@ -761,7 +725,7 @@ export default function CashBookPage() {
               <div className="mt-2">
                 <Progress
                   value={Math.abs(
-                    (financials.availableCash / financials.totalCashIn) * 100
+                    (financials.availableCash / summary.totalCashIn) * 100
                   )}
                   className={`h-2 ${
                     financials.availableCash >= 0
@@ -823,53 +787,79 @@ export default function CashBookPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
+      {/* Screen reader announcements */}
+      <div aria-live="polite" className="sr-only">
+        {loadingState.actions && "Processing your request..."}
+        {isPrinting && "Preparing to print..."}
+      </div>
+      <div aria-live="assertive" className="sr-only">
+        {loadingState.error && "An error occurred. Please try again."}
+      </div>
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Cash Book</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1
+            className="text-3xl font-bold tracking-tight"
+            role="heading"
+            aria-level="1"
+          >
+            Cash Book
+          </h1>
+          <p className="text-muted-foreground mt-1" role="contentinfo">
             Manage and track all cash transactions
           </p>
         </div>
-        <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
+        <div
+          className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto"
+          role="toolbar"
+          aria-label="Actions"
+        >
           <AddCashTransactionDialog
             onAddTransaction={handleAddTransaction}
             expenseCategories={expenseCategories}
             onAddCategory={handleAddCategory}
           >
             <Button
-              className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
+              className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white focus:ring-2 focus:ring-offset-2"
               disabled={loadingState.actions}
+              aria-label="Add new transaction"
+              role="button"
             >
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
               Add Transaction
             </Button>
           </AddCashTransactionDialog>
           <Button
             onClick={handlePrint}
-            className="w-full md:w-auto"
+            className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
             variant="outline"
             disabled={loadingState.actions || isPrinting}
+            aria-label={isPrinting ? "Printing report..." : "Print report"}
+            role="button"
+            aria-busy={isPrinting}
           >
-            <Printer className="mr-2 h-4 w-4" />
+            <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
             {isPrinting ? "Printing..." : "Print Report"}
           </Button>
           <Button
             onClick={handleExportPDF}
-            className="w-full md:w-auto"
+            className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
             variant="outline"
             disabled={loadingState.actions}
+            aria-label="Export as PDF"
           >
-            <FileText className="mr-2 h-4 w-4" />
+            <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
             Export PDF
           </Button>
           <Button
             onClick={handleExportCSV}
-            className="w-full md:w-auto"
+            className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
             variant="outline"
             disabled={loadingState.actions}
+            aria-label="Export as CSV"
           >
-            <Download className="mr-2 h-4 w-4" />
+            <Download className="mr-2 h-4 w-4" aria-hidden="true" />
             Export CSV
           </Button>
         </div>
@@ -923,37 +913,60 @@ export default function CashBookPage() {
       </Card>
 
       {/* Search and Filter Section */}
-      <Card className="mb-8 border-none shadow-md">
+      <Card
+        className="mb-8 border-none shadow-md"
+        role="search"
+        aria-label="Filter transactions"
+      >
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                aria-hidden="true"
+              />
               <Input
                 type="text"
                 placeholder="Search transactions..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9 w-full"
+                aria-label="Search transactions"
+                role="searchbox"
+                aria-controls="transactions-table"
+                aria-expanded="false"
               />
             </div>
-            <div className="flex flex-col md:flex-row gap-2 md:gap-4">
+            <div
+              className="flex flex-col md:flex-row gap-2 md:gap-4"
+              role="group"
+              aria-label="Date filters"
+            >
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Calendar
+                  className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                  aria-hidden="true"
+                />
                 <Input
                   type="date"
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
-                  className="pl-9 w-full md:w-[200px]"
+                  className="pl-9 w-full md:w-[200px] focus:ring-2 focus:ring-offset-2"
+                  aria-label="Filter by date"
+                  id="date-filter"
+                  aria-controls="transactions-table"
                 />
               </div>
               {dateFilter && (
                 <Button
                   variant="outline"
                   onClick={() => setDateFilter("")}
-                  className="w-full md:w-auto"
+                  className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
                   size="icon"
+                  aria-label="Clear date filter"
+                  role="button"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-4 w-4" aria-hidden="true" />
                   <span className="sr-only">Clear Date</span>
                 </Button>
               )}
@@ -963,42 +976,92 @@ export default function CashBookPage() {
       </Card>
 
       {/* View Mode and Filters */}
-      <div className="mb-6 space-y-4">
-        <Tabs value={viewMode} onValueChange={setViewMode}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="daily">Daily View</TabsTrigger>
-            <TabsTrigger value="monthly">Monthly View</TabsTrigger>
-            <TabsTrigger value="yearly">Yearly View</TabsTrigger>
+      <div
+        className="mb-6 space-y-4"
+        role="group"
+        aria-label="View and filter options"
+      >
+        <Tabs
+          value={viewMode}
+          onValueChange={setViewMode}
+          aria-label="View mode"
+          className="focus:outline-none"
+        >
+          <TabsList className="mb-4" role="tablist" aria-label="View options">
+            <TabsTrigger
+              value="daily"
+              role="tab"
+              aria-controls="daily-content"
+              aria-selected={viewMode === "daily"}
+            >
+              Daily View
+            </TabsTrigger>
+            <TabsTrigger
+              value="monthly"
+              role="tab"
+              aria-controls="monthly-content"
+              aria-selected={viewMode === "monthly"}
+            >
+              Monthly View
+            </TabsTrigger>
+            <TabsTrigger
+              value="yearly"
+              role="tab"
+              aria-controls="yearly-content"
+              aria-selected={viewMode === "yearly"}
+            >
+              Yearly View
+            </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        <div className="flex flex-wrap gap-4">
-          <Select value={yearFilter} onValueChange={setYearFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select Year" />
+        <div
+          className="flex flex-wrap gap-4"
+          role="group"
+          aria-label="Time period filters"
+        >
+          <Select
+            value={yearFilter}
+            onValueChange={setYearFilter}
+            name="year-filter"
+          >
+            <SelectTrigger
+              className="w-[180px]"
+              aria-label="Filter by year"
+              role="combobox"
+            >
+              <SelectValue
+                placeholder="Select Year"
+                aria-label="Selected year"
+              />
             </SelectTrigger>
-            <SelectContent>
-              {Array.from(
-                new Set(
-                  dailyCashTransactions.map((t) =>
-                    new Date(t.date).getFullYear()
-                  )
-                )
-              )
-                .sort((a, b) => b - a)
-                .map((year) => (
+            <SelectContent role="listbox" aria-label="Available years">
+              {(() => {
+                const years = [
+                  ...new Set(
+                    dailyCashTransactions.map((t) =>
+                      new Date(t.date).getFullYear()
+                    )
+                  ),
+                ].sort((a, b) => b - a);
+                return years.map((year) => (
                   <SelectItem key={year} value={year.toString()}>
                     {year}
                   </SelectItem>
-                ))}
+                ));
+              })()}
             </SelectContent>
           </Select>
           {viewMode === "monthly" && (
-            <Select value={monthFilter} onValueChange={setMonthFilter}>
-              <SelectTrigger className="w-[180px]">
+            <Select
+              value={monthFilter}
+              onValueChange={setMonthFilter}
+              aria-label="Filter by month"
+            >
+              <SelectTrigger className="w-[180px]" role="combobox">
                 <SelectValue placeholder="Select Month" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent role="listbox" aria-label="Available months">
                 <SelectItem value="01">January</SelectItem>
                 <SelectItem value="02">February</SelectItem>
                 <SelectItem value="03">March</SelectItem>
@@ -1014,11 +1077,15 @@ export default function CashBookPage() {
               </SelectContent>
             </Select>
           )}
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]">
+          <Select
+            value={categoryFilter}
+            onValueChange={setCategoryFilter}
+            aria-label="Filter by category"
+          >
+            <SelectTrigger className="w-[180px]" role="combobox">
               <SelectValue placeholder="Select Category" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent role="listbox" aria-label="Available categories">
               <SelectItem value="all">All Categories</SelectItem>
               {expenseCategories.map((category) => (
                 <SelectItem key={category} value={category}>
@@ -1052,43 +1119,82 @@ export default function CashBookPage() {
                   <div
                     key={day.date}
                     className="bg-white rounded-lg shadow mb-4"
+                    role="article"
+                    aria-label={`Transactions for ${formatDate(day.date)}`}
                   >
                     {/* Summary Card */}
-                    <div className="grid grid-cols-2 gap-2 p-4 border-b">
+                    <div
+                      className="grid grid-cols-2 gap-2 p-4 border-b"
+                      role="region"
+                      aria-label="Daily summary"
+                    >
                       <div>
-                        <div className="text-sm text-gray-500">Date</div>
-                        <div className="font-medium">
+                        <div
+                          className="text-sm text-gray-500"
+                          aria-hidden="true"
+                        >
+                          Date
+                        </div>
+                        <div className="font-medium" role="text">
                           {formatDate(day.date)}
                         </div>
                       </div>
                       <div>
-                        <div className="text-sm text-gray-500">Balance</div>
-                        <div className="font-medium">
+                        <div
+                          className="text-sm text-gray-500"
+                          aria-hidden="true"
+                        >
+                          Balance
+                        </div>
+                        <div className="font-medium" role="text">
                           ৳{day.balance.toLocaleString()}
                         </div>
                       </div>
                       <div>
-                        <div className="text-sm text-gray-500">Cash In</div>
-                        <div className="text-green-600">
+                        <div
+                          className="text-sm text-gray-500"
+                          aria-hidden="true"
+                        >
+                          Cash In
+                        </div>
+                        <div
+                          className="text-green-600"
+                          role="text"
+                          aria-label={`Cash in amount ${day.cashIn.toLocaleString()}`}
+                        >
                           ৳{day.cashIn.toLocaleString()}
                         </div>
                       </div>
                       <div>
-                        <div className="text-sm text-gray-500">Cash Out</div>
-                        <div className="text-red-600">
+                        <div
+                          className="text-sm text-gray-500"
+                          aria-hidden="true"
+                        >
+                          Cash Out
+                        </div>
+                        <div
+                          className="text-red-600"
+                          role="text"
+                          aria-label={`Cash out amount ${day.cashOut.toLocaleString()}`}
+                        >
                           ৳{day.cashOut.toLocaleString()}
                         </div>
                       </div>
                     </div>
 
                     {/* Mobile View - Transactions List */}
-                    <div className="divide-y divide-gray-100">
+                    <div
+                      className="divide-y divide-gray-100"
+                      role="list"
+                      aria-label="Transaction details"
+                    >
                       {day.dailyCash
                         .filter((t) => t.cashIn > 0)
                         .map((t) => (
                           <div
                             key={`in-${t.id}`}
                             className="flex flex-col gap-2 py-2 px-4"
+                            role="listitem"
                           >
                             <div className="flex justify-between items-start">
                               <span className="font-medium">
@@ -1137,6 +1243,7 @@ export default function CashBookPage() {
                           <div
                             key={`out-${t.id}`}
                             className="flex flex-col gap-2 py-2 px-4"
+                            role="listitem"
                           >
                             <div className="flex justify-between items-start">
                               <span className="font-medium">
@@ -1185,22 +1292,46 @@ export default function CashBookPage() {
 
               {/* Desktop View */}
               <div className="hidden md:block">
-                <Table>
+                <Table
+                  role="grid"
+                  aria-label="Cash transactions list"
+                  tabIndex="0"
+                >
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="whitespace-nowrap min-w-[100px]">
+                      <TableHead
+                        className="whitespace-nowrap min-w-[100px]"
+                        scope="col"
+                        role="columnheader"
+                      >
                         Date
                       </TableHead>
-                      <TableHead className="text-right whitespace-nowrap min-w-[100px]">
+                      <TableHead
+                        className="text-right whitespace-nowrap min-w-[100px]"
+                        scope="col"
+                        role="columnheader"
+                      >
                         Cash In
                       </TableHead>
-                      <TableHead className="text-right whitespace-nowrap min-w-[100px]">
+                      <TableHead
+                        className="text-right whitespace-nowrap min-w-[100px]"
+                        scope="col"
+                        role="columnheader"
+                      >
                         Cash Out
                       </TableHead>
-                      <TableHead className="text-right whitespace-nowrap min-w-[100px]">
+                      <TableHead
+                        className="text-right whitespace-nowrap min-w-[100px]"
+                        scope="col"
+                        role="columnheader"
+                      >
                         Balance
                       </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[200px]">
+                      <TableHead
+                        className="whitespace-nowrap min-w-[200px]"
+                        scope="col"
+                        role="columnheader"
+                      >
                         Details
                       </TableHead>
                     </TableRow>
@@ -1353,6 +1484,9 @@ export default function CashBookPage() {
             handleEditTransaction(editingTransaction.id, updated);
             setEditingTransaction(null);
           }}
+          aria-label="Edit transaction"
+          role="dialog"
+          aria-modal="true"
         />
       )}
 

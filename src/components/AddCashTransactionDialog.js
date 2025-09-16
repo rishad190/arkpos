@@ -6,6 +6,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,10 +46,7 @@ export function AddCashTransactionDialog({
     cashIn: "",
     cashOut: "",
     category: "",
-    transactionType: "cash",
-    bankName: "",
-    bankAccount: "",
-    accountName: "",
+    transactionType: "regular",
   });
   const [errors, setErrors] = useState({});
 
@@ -69,16 +68,11 @@ export function AddCashTransactionDialog({
         cashIn: "",
         cashOut: "",
         category: "",
-        transactionType: "cash",
-        bankName: "",
-        bankAccount: "",
-        accountName: "",
+        transactionType: "regular",
       });
       setErrors({});
       setNewCategory("");
       setShowAddCategory(false);
-      setShowAddAccount(false);
-      setSaveAccount(false);
     }
   }, [open]);
 
@@ -128,25 +122,8 @@ export function AddCashTransactionDialog({
       newErrors.amount = "Either Cash In or Cash Out is required";
     }
 
-    if (
-      formData.cashOut &&
-      !formData.category &&
-      formData.transactionType === "cash"
-    ) {
+    if (formData.cashOut && !formData.category) {
       newErrors.category = "Category is required for Cash Out transactions";
-    }
-
-    // Validate bank details for bank transactions
-    if (formData.transactionType !== "cash") {
-      if (!formData.bankName?.trim()) {
-        newErrors.bankName = "Bank name is required";
-      }
-      if (!formData.bankAccount?.trim()) {
-        newErrors.bankAccount = "Bank account is required";
-      }
-      if (showAddAccount && !formData.accountName?.trim()) {
-        newErrors.accountName = "Account name is required";
-      }
     }
 
     // Validate numeric values
@@ -178,19 +155,7 @@ export function AddCashTransactionDialog({
         ...formData,
         cashIn: parseFloat(formData.cashIn) || 0,
         cashOut: parseFloat(formData.cashOut) || 0,
-        category:
-          formData.transactionType === "cash" && formData.cashOut
-            ? formData.category
-            : "Income",
-        isBankTransaction: formData.transactionType !== "cash",
-        bankDetails:
-          formData.transactionType !== "cash"
-            ? {
-                bankName: formData.bankName,
-                accountNumber: formData.bankAccount,
-                accountName: formData.accountName,
-              }
-            : null,
+        category: formData.cashOut ? formData.category : "Income",
       };
 
       await onAddTransaction(transactionData);
@@ -201,35 +166,6 @@ export function AddCashTransactionDialog({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleTransactionTypeChange = (value) => {
-    setFormData((prev) => {
-      const newData = {
-        ...prev,
-        transactionType: value,
-      };
-
-      // Reset bank fields when switching to cash
-      if (value === "cash") {
-        newData.bankName = "";
-        newData.bankAccount = "";
-        newData.accountName = "";
-      }
-
-      // Handle bank deposit
-      if (value === "bank_deposit") {
-        newData.cashOut = "";
-        newData.category = "";
-      }
-
-      // Handle bank withdrawal
-      if (value === "bank_withdrawal") {
-        newData.cashIn = "";
-      }
-
-      return newData;
-    });
   };
 
   const handleAmountChange = (type, value) => {
@@ -273,12 +209,29 @@ export function AddCashTransactionDialog({
     }
   };
 
+  // Add transaction type options
+  const transactionTypes = [
+    { value: "regular", label: "Regular" },
+    { value: "sales", label: "Sales" },
+    { value: "advance", label: "Advance" },
+    { value: "from_bank", label: "From Bank" },
+    { value: "other", label: "Other" },
+  ];
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent
+        className="sm:max-w-[425px] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-transaction-title"
+        aria-describedby="add-transaction-description"
+      >
         <DialogHeader>
-          <DialogTitle>Add Transaction</DialogTitle>
+          <DialogTitle id="add-transaction-title">Add Transaction</DialogTitle>
+          <DialogDescription id="add-transaction-description">
+            Enter the transaction details below.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -313,168 +266,6 @@ export function AddCashTransactionDialog({
               />
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label>Transaction Type</Label>
-            <RadioGroup
-              value={formData.transactionType}
-              onValueChange={handleTransactionTypeChange}
-              className="flex gap-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="cash" id="cash" />
-                <Label htmlFor="cash">Cash</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="bank_deposit" id="bank_deposit" />
-                <Label htmlFor="bank_deposit">Bank Deposit</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="bank_withdrawal" id="bank_withdrawal" />
-                <Label htmlFor="bank_withdrawal">Bank Withdrawal</Label>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {(formData.transactionType === "bank_deposit" ||
-            formData.transactionType === "bank_withdrawal") && (
-            <div className="space-y-4">
-              {savedAccounts.length > 0 && !showAddAccount ? (
-                <div className="space-y-2">
-                  <Label>Select Saved Account</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      handleSelectAccount(
-                        savedAccounts.find((acc) => acc.id === value)
-                      )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a saved account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {savedAccounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.bankName} - {account.accountName} (
-                          {account.accountNumber})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAddAccount(true)}
-                    className="w-full"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add New Account
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Add New Account</Label>
-                    <div className="flex items-center space-x-2">
-                      <Label htmlFor="save-account" className="text-sm">
-                        Save Account
-                      </Label>
-                      <Switch
-                        id="save-account"
-                        checked={saveAccount}
-                        onCheckedChange={setSaveAccount}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="accountName">Account Name</Label>
-                    <Input
-                      id="accountName"
-                      value={formData.accountName}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          accountName: e.target.value,
-                        }))
-                      }
-                      placeholder="Enter account name"
-                      className={errors.accountName ? "border-red-500" : ""}
-                    />
-                    {errors.accountName && (
-                      <p className="text-sm text-red-500">
-                        {errors.accountName}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="bankName">Bank Name</Label>
-                    <Input
-                      id="bankName"
-                      value={formData.bankName}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          bankName: e.target.value,
-                        }))
-                      }
-                      placeholder="Enter bank name"
-                      className={errors.bankName ? "border-red-500" : ""}
-                    />
-                    {errors.bankName && (
-                      <p className="text-sm text-red-500">{errors.bankName}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="bankAccount">Account Number</Label>
-                    <Input
-                      id="bankAccount"
-                      value={formData.bankAccount}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          bankAccount: e.target.value,
-                        }))
-                      }
-                      placeholder="Enter account number"
-                      className={errors.bankAccount ? "border-red-500" : ""}
-                    />
-                    {errors.bankAccount && (
-                      <p className="text-sm text-red-500">
-                        {errors.bankAccount}
-                      </p>
-                    )}
-                  </div>
-
-                  {saveAccount && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleSaveAccount}
-                      className="w-full"
-                    >
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Account
-                    </Button>
-                  )}
-
-                  {savedAccounts.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setShowAddAccount(false)}
-                      className="w-full"
-                    >
-                      Cancel
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
 
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
@@ -512,6 +303,25 @@ export function AddCashTransactionDialog({
               {errors.cashIn && (
                 <p className="text-sm text-red-500">{errors.cashIn}</p>
               )}
+              {formData.cashIn && (
+                <Select
+                  value={formData.transactionType}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, transactionType: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select transaction type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {transactionTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="cashOut">Cash Out</Label>
@@ -538,7 +348,7 @@ export function AddCashTransactionDialog({
             </Alert>
           )}
 
-          {formData.cashOut && formData.transactionType === "cash" && (
+          {formData.cashOut && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="category">Category</Label>
@@ -599,6 +409,7 @@ export function AddCashTransactionDialog({
                         {category}
                       </SelectItem>
                     ))}
+                    <SelectItem value="new">+ Add New Category</SelectItem>
                   </SelectContent>
                 </Select>
               )}

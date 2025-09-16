@@ -47,21 +47,33 @@ export function EditCashTransactionDialog({
     };
     onEditTransaction(updatedTransaction);
   };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent
+        className="sm:max-w-[425px] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-transaction-title"
+        aria-describedby="edit-transaction-description"
+      >
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">
+          <DialogTitle
+            id="edit-transaction-title"
+            className="text-xl font-semibold"
+          >
             Edit Cash Transaction
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <p
+            id="edit-transaction-description"
+            className="text-sm text-muted-foreground"
+          >
             Update the transaction details below.
           </p>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Transaction Type Selection */}
           <div className="grid grid-cols-2 gap-4">
+            {" "}
             <Button
               type="button"
               variant={transactionType === "in" ? "default" : "outline"}
@@ -71,14 +83,17 @@ export function EditCashTransactionDialog({
                   ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
                   : ""
               }`}
+              aria-pressed={transactionType === "in"}
+              aria-label="Select Cash In transaction type"
             >
               <ArrowUpRight
                 className={`h-6 w-6 ${
                   transactionType === "in" ? "text-green-600" : "text-gray-400"
                 }`}
+                aria-hidden="true"
               />
               <span>Cash In</span>
-            </Button>
+            </Button>{" "}
             <Button
               type="button"
               variant={transactionType === "out" ? "default" : "outline"}
@@ -88,51 +103,75 @@ export function EditCashTransactionDialog({
                   ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
                   : ""
               }`}
+              aria-pressed={transactionType === "out"}
+              aria-label="Select Cash Out transaction type"
             >
               <ArrowDownRight
                 className={`h-6 w-6 ${
                   transactionType === "out" ? "text-red-600" : "text-gray-400"
                 }`}
+                aria-hidden="true"
               />
               <span>Cash Out</span>
             </Button>
           </div>
 
           <div className="space-y-4">
-            {/* Date Input */}
+            {/* Date Input */}{" "}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Date</Label>
+              <Label htmlFor="transaction-date" className="text-sm font-medium">
+                Date
+              </Label>
               <Input
+                id="transaction-date"
                 type="date"
                 value={formData.date}
                 onChange={(e) =>
                   setFormData({ ...formData, date: e.target.value })
                 }
                 className="w-full"
+                required
+                aria-required="true"
               />
             </div>
-
-            {/* Description Input */}
+            {/* Description Input */}{" "}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Description</Label>
+              <Label
+                htmlFor="transaction-description"
+                className="text-sm font-medium"
+              >
+                Description
+              </Label>
               <Input
+                id="transaction-description"
                 placeholder="Enter transaction description"
                 value={formData.description}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
                 className="w-full"
+                required
+                aria-required="true"
+                aria-invalid={!formData.description}
               />
             </div>
-
-            {/* Amount Input */}
+            {/* Amount Input */}{" "}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Amount</Label>
+              <Label
+                htmlFor="transaction-amount"
+                className="text-sm font-medium"
+              >
+                Amount
+              </Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                <span
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+                  aria-hidden="true"
+                >
                   ৳
                 </span>
                 <Input
+                  id="transaction-amount"
                   type="number"
                   min="0"
                   step="0.01"
@@ -151,6 +190,16 @@ export function EditCashTransactionDialog({
                     }
                   }}
                   className="pl-8 w-full"
+                  required
+                  aria-required="true"
+                  aria-label={`${
+                    transactionType === "in" ? "Cash in" : "Cash out"
+                  } amount`}
+                  aria-invalid={
+                    transactionType === "in"
+                      ? !formData.cashIn || formData.cashIn <= 0
+                      : !formData.cashOut || formData.cashOut <= 0
+                  }
                 />
               </div>
             </div>

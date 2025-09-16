@@ -30,9 +30,17 @@ export default function RootLayout({ children }) {
       <body>
         <ClientLayout>
           <ProtectedRoute>
-            <div className="min-h-screen flex flex-col">
+            <div
+              className="flex flex-col min-h-screen"
+              data-dialog-root
+              inert={false} // Explicitly set inert to false to ensure focus management works
+              role="region"
+              aria-label="Main application"
+            >
               <Navbar />
-              <main className="flex-1">{children}</main>
+              <main className="flex-1" role="main">
+                {children}
+              </main>
             </div>
           </ProtectedRoute>
         </ClientLayout>

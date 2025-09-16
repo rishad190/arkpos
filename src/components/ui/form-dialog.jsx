@@ -1,11 +1,12 @@
 "use client";
-import { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -33,8 +34,10 @@ export function FormDialog({
   submitText = "Save",
   cancelText = "Cancel",
   size = "md",
+  description,
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const formRef = useRef(null);
 
   const handleOpenChange = (newOpen) => {
     setOpen(newOpen);
@@ -59,11 +62,20 @@ export function FormDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className={sizeClasses[size] || sizeClasses.md}>
+      <DialogContent
+        className={sizeClasses[size] || sizeClasses.md}
+        aria-labelledby="dialog-title"
+        aria-describedby={description ? "dialog-description" : undefined}
+      >
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle id="dialog-title">{title}</DialogTitle>
+          {description && (
+            <DialogDescription id="dialog-description">
+              {description}
+            </DialogDescription>
+          )}
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" ref={formRef}>
           {children}
 
           <div className="flex justify-end gap-2">
