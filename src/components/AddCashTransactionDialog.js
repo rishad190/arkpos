@@ -58,9 +58,10 @@ export function AddCashTransactionDialog({
     }
   }, []);
 
-  // Reset form when dialog closes
+  // Reset form only when dialog is closed
   useEffect(() => {
     if (!open) {
+      // Full reset only when closing the dialog
       setFormData({
         date: new Date().toISOString().split("T")[0],
         description: "",
@@ -159,7 +160,22 @@ export function AddCashTransactionDialog({
       };
 
       await onAddTransaction(transactionData);
-      setOpen(false);
+      // Reset form while keeping the selected date
+      setFormData((prev) => ({
+        date: prev.date, // Keep the same date
+        description: "",
+        reference: "",
+        cashIn: "",
+        cashOut: "",
+        category: "",
+        transactionType: "regular",
+      }));
+      setErrors({});
+      toast({
+        title: "Success",
+        description:
+          "Transaction added successfully. You can add another transaction for the same date.",
+      });
     } catch (error) {
       console.error("Error adding transaction:", error);
       setErrors({ submit: "Failed to add transaction. Please try again." });
@@ -227,10 +243,12 @@ export function AddCashTransactionDialog({
         aria-labelledby="add-transaction-title"
         aria-describedby="add-transaction-description"
       >
-        <DialogTitle id="add-transaction-title">Add Transaction</DialogTitle>
-        <DialogDescription id="add-transaction-description">
-          Enter the transaction details below.
-        </DialogDescription>
+        <DialogHeader>
+          <DialogTitle id="add-transaction-title">Add Transaction</DialogTitle>
+          <DialogDescription id="add-transaction-description">
+            Enter the transaction details below.
+          </DialogDescription>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
