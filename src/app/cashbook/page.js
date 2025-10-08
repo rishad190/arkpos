@@ -53,16 +53,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+
 import {
   Tooltip,
   TooltipContent,
@@ -81,6 +72,7 @@ export default function CashBookPage() {
     deleteDailyCashTransaction,
     getExpenseCategories,
     updateExpenseCategories,
+    setDailyCashTransactions, // Add this
   } = useData();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
@@ -103,8 +95,7 @@ export default function CashBookPage() {
     transactions: false,
     actions: false,
   });
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [transactionToDelete, setTransactionToDelete] = useState(null);
+  const [loadingDelete, setLoadingDelete] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [expenseCategories, setExpenseCategories] = useState([]);
 
@@ -126,40 +117,45 @@ export default function CashBookPage() {
     loadCategories();
   }, [getExpenseCategories, toast]);
 
-  // Add useEffect to handle initial loading state
+  // Handle initial loading state
   useEffect(() => {
-    const initializeData = async () => {
-      try {
-        // Wait for dailyCashTransactions to be available
-        if (dailyCashTransactions !== undefined) {
-          setLoadingState((prev) => ({ ...prev, initial: false }));
-        }
-      } catch (error) {
-        console.error("Error loading initial data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load data. Please refresh the page.",
-          variant: "destructive",
-        });
-        setLoadingState((prev) => ({ ...prev, initial: false }));
-      }
-    };
+    if (dailyCashTransactions !== undefined) {
+      setLoadingState((prev) => ({ ...prev, initial: false }));
+    }
+  }, [dailyCashTransactions]);
 
-    initializeData();
-  }, [dailyCashTransactions, toast]);
-
-  // Add debug logging
+  // Debug logging only in development
   useEffect(() => {
-    console.log("Loading state:", loadingState);
-    console.log("Daily cash transactions:", dailyCashTransactions);
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Loading state:", loadingState);
+      console.log("Daily cash transactions:", dailyCashTransactions);
+    }
   }, [loadingState, dailyCashTransactions]);
 
-  // Memoize calculations for better performance
+  // Calculate daily cash summary from transactions
   const { dailyCash, financials, monthlyTotals } = useMemo(() => {
-    const dailySummary = dailyCashTransactions.reduce((acc, item) => {
+    const transactions = dailyCashTransactions || [];
+    
+    // Return empty data if no valid transactions
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return {
+        dailyCash: [],
+        financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
+        monthlyTotals: []
+      };
+    }
+
+    const dailySummary = {};
+    let totalCashIn = 0;
+    let totalCashOut = 0;
+    const monthly = {};
+
+    // Process transactions once for all calculations
+    dailyCashTransactions.forEach(item => {
+      // Daily summary calculation
       const date = item.date;
-      if (!acc[date]) {
-        acc[date] = {
+      if (!dailySummary[date]) {
+        dailySummary[date] = {
           date,
           cashIn: 0,
           cashOut: 0,
@@ -168,60 +164,53 @@ export default function CashBookPage() {
         };
       }
 
-      // Handle bank deposits and withdrawals
+      const cashIn = item.cashIn || 0;
+      const cashOut = item.cashOut || 0;
+
+      // Update daily totals
       if (item.transactionType === "bank_deposit") {
-        acc[date].cashIn += item.cashIn || 0;
+        dailySummary[date].cashIn += cashIn;
       } else if (item.transactionType === "bank_withdrawal") {
-        acc[date].cashOut += item.cashOut || 0;
+        dailySummary[date].cashOut += cashOut;
       } else {
-        acc[date].cashIn += item.cashIn || 0;
-        acc[date].cashOut += item.cashOut || 0;
+        dailySummary[date].cashIn += cashIn;
+        dailySummary[date].cashOut += cashOut;
       }
 
-      acc[date].balance = acc[date].cashIn - acc[date].cashOut;
-      acc[date].dailyCash.push(item);
+      dailySummary[date].balance = dailySummary[date].cashIn - dailySummary[date].cashOut;
+      dailySummary[date].dailyCash.push(item);
 
-      return acc;
-    }, {});
+      // Update overall totals
+      totalCashIn += cashIn;
+      totalCashOut += cashOut;
 
-    const dailyCash = Object.values(dailySummary).sort(
-      (a, b) => new Date(b.date) - new Date(a.date)
-    );
+      // Monthly totals calculation
+      const month = date.substring(0, 7);
+      if (!monthly[month]) {
+        monthly[month] = { cashIn: 0, cashOut: 0 };
+      }
+      if (item.transactionType === "bank_deposit") {
+        monthly[month].cashIn += cashIn;
+      } else if (item.transactionType === "bank_withdrawal") {
+        monthly[month].cashOut += cashOut;
+      } else {
+        monthly[month].cashIn += cashIn;
+        monthly[month].cashOut += cashOut;
+      }
+    });
 
+    // Convert daily summary to sorted array
+    const dailyCash = Object.values(dailySummary)
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Calculate financial summary
     const financials = {
-      totalCashIn: dailyCashTransactions.reduce(
-        (sum, t) => sum + (t.cashIn || 0),
-        0
-      ),
-      totalCashOut: dailyCashTransactions.reduce(
-        (sum, t) => sum + (t.cashOut || 0),
-        0
-      ),
-      availableCash: dailyCashTransactions.reduce(
-        (sum, t) => sum + ((t.cashIn || 0) - (t.cashOut || 0)),
-        0
-      ),
+      totalCashIn,
+      totalCashOut,
+      availableCash: totalCashIn - totalCashOut,
     };
 
-    const monthly = dailyCashTransactions.reduce((acc, transaction) => {
-      const month = transaction.date.substring(0, 7);
-      if (!acc[month]) {
-        acc[month] = { cashIn: 0, cashOut: 0 };
-      }
-
-      // Handle bank deposits and withdrawals in monthly totals
-      if (transaction.transactionType === "bank_deposit") {
-        acc[month].cashIn += transaction.cashIn || 0;
-      } else if (transaction.transactionType === "bank_withdrawal") {
-        acc[month].cashOut += transaction.cashOut || 0;
-      } else {
-        acc[month].cashIn += transaction.cashIn || 0;
-        acc[month].cashOut += transaction.cashOut || 0;
-      }
-
-      return acc;
-    }, {});
-
+    // Convert and sort monthly totals
     const monthlyTotals = Object.entries(monthly)
       .map(([month, totals]) => ({
         month,
@@ -231,7 +220,7 @@ export default function CashBookPage() {
       .sort((a, b) => b.month.localeCompare(a.month));
 
     return { dailyCash, financials, monthlyTotals };
-  }, [dailyCashTransactions]);
+  }, [dailyCashTransactions]); // Recalculate when transactions change
   // Filter transactions based on search term, date, active tab, year, category, and view mode
   const filteredCash = useMemo(() => {
     return dailyCash.filter((day) => {
@@ -351,19 +340,27 @@ export default function CashBookPage() {
   };
 
   const handleDeleteTransaction = async (transactionId) => {
-    setTransactionToDelete(transactionId);
-    setDeleteDialogOpen(true);
-  };
+    // Show confirmation alert
+    if (!window.confirm("Are you sure you want to delete this transaction?")) {
+      return;
+    }
 
-  const confirmDelete = async () => {
-    if (!transactionToDelete) return;
-
-    setLoadingState((prev) => ({ ...prev, actions: true }));
+    setLoadingDelete(true);
     try {
-      await deleteDailyCashTransaction(transactionToDelete);
+      // Delete from Firebase
+      await deleteDailyCashTransaction(transactionId);
+
+      // Update local state
+      const updatedTransactions = dailyCashTransactions.filter(
+        (transaction) => transaction.id !== transactionId
+      );
+      setDailyCashTransactions(updatedTransactions);
+
+      // Show success message
       toast({
         title: "Success",
         description: "Transaction deleted successfully",
+        duration: 2000,
       });
     } catch (error) {
       console.error("Error deleting transaction:", error);
@@ -373,9 +370,7 @@ export default function CashBookPage() {
         variant: "destructive",
       });
     } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
-      setDeleteDialogOpen(false);
-      setTransactionToDelete(null);
+      setLoadingDelete(false);
     }
   };
 
@@ -555,43 +550,7 @@ export default function CashBookPage() {
     </Card>
   );
 
-  // Add this new component for the delete confirmation dialog
-  const DeleteConfirmationDialog = () => (
-    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-      <AlertDialogContent
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="delete-dialog-title"
-        aria-describedby="delete-dialog-description"
-        className="focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-      >
-        <AlertDialogHeader>
-          <AlertDialogTitle id="delete-dialog-title">
-            Delete Transaction
-          </AlertDialogTitle>
-          <AlertDialogDescription id="delete-dialog-description">
-            Are you sure you want to delete this transaction? This action cannot
-            be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel
-            aria-label="Cancel deletion"
-            className="focus:ring-2 focus:ring-offset-2"
-          >
-            Cancel
-          </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={confirmDelete}
-            className="bg-red-600 hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-            aria-label="Confirm deletion"
-          >
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
+
 
   // Add this new component for the financial summary
   const FinancialSummary = () => {
@@ -934,7 +893,6 @@ export default function CashBookPage() {
                 aria-label="Search transactions"
                 role="searchbox"
                 aria-controls="transactions-table"
-                aria-expanded="false"
               />
             </div>
             <div
@@ -1489,9 +1447,6 @@ export default function CashBookPage() {
           aria-modal="true"
         />
       )}
-
-      {/* Add the Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog />
 
       {/* Add the printable content div */}
       <div id="printable-content" className="hidden">

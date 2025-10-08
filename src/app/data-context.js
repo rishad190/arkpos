@@ -603,6 +603,10 @@ export function DataProvider({ children }) {
         throw error;
       }
     },
+
+    setDailyCashTransactions: (transactions) => {
+      dispatch({ type: "SET_DAILY_CASH_TRANSACTIONS", payload: transactions });
+    },
   };
 
   const updateSettings = async (newSettings) => {
