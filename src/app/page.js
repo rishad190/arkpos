@@ -231,6 +231,38 @@ export default function Dashboard() {
     }
   }, [customers, transactions]);
 
+  const filteredCustomers = useMemo(() => {
+    return (customers || []).filter((customer) => {
+      if (!customer) return false;
+
+      const matchesSearch =
+        customer.name
+          ?.toLowerCase()
+          .includes(debouncedSearchTerm.toLowerCase()) ||
+        customer.phone?.includes(debouncedSearchTerm);
+
+      const currentDue = getCustomerDue(customer.id);
+      const matchesFilter =
+        selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL ||
+        (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.DUE &&
+          currentDue > 0) ||
+        (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.PAID &&
+          currentDue === 0);
+
+      const matchesTags =
+        selectedTags.length === 0 ||
+        selectedTags.every((tag) => customer.tags?.includes(tag));
+
+      return matchesSearch && matchesFilter && matchesTags;
+    });
+  }, [
+    customers,
+    debouncedSearchTerm,
+    selectedFilter,
+    selectedTags,
+    getCustomerDue,
+  ]);
+
   if (error) {
     return (
       <div className="p-8 text-center">
@@ -285,32 +317,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const filteredCustomers = useMemo(() => {
-    return (customers || []).filter((customer) => {
-      if (!customer) return false;
-
-      const matchesSearch =
-        customer.name
-          ?.toLowerCase()
-          .includes(debouncedSearchTerm.toLowerCase()) ||
-        customer.phone?.includes(debouncedSearchTerm);
-
-      const currentDue = getCustomerDue(customer.id);
-    const matchesFilter =
-      selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL ||
-      (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.DUE &&
-        currentDue > 0) ||
-      (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.PAID &&
-        currentDue === 0);
-
-    const matchesTags =
-      selectedTags.length === 0 ||
-      selectedTags.every((tag) => customer.tags?.includes(tag));
-
-    return matchesSearch && matchesFilter && matchesTags;
-    });
-  }, [customers, debouncedSearchTerm, selectedFilter, selectedTags, getCustomerDue]);
 
   return (
     <ErrorBoundary>
