@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useData } from "@/app/data-context";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { subDays } from "date-fns";
 import {
   Card,
   CardContent,
@@ -39,16 +41,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ExpenseReportPage() {
   const { dailyCashTransactions, getExpenseCategories } = useData();
-  const [selectedMonth, setSelectedMonth] = useState(
-    new Date().toISOString().slice(0, 7)
-  );
+  const [dateRange, setDateRange] = useState({
+    from: subDays(new Date(), 2),
+    to: new Date(),
+  });
   const [categoryTotals, setCategoryTotals] = useState({});
   const [bankTotals, setBankTotals] = useState({
     deposits: 0,
     withdrawals: 0,
   });
   const [expenseTransactions, setExpenseTransactions] = useState([]);
-  const [viewMode, setViewMode] = useState("monthly"); // monthly, yearly, all-time
   const [loading, setLoading] = useState(true);
   const [allCategories, setAllCategories] = useState([]);
 
@@ -63,18 +65,14 @@ export default function ExpenseReportPage() {
   useEffect(() => {
     if (!allCategories.length) return; // Don't calculate until categories are loaded
 
-    // Filter transactions based on view mode
-    let filteredTransactions = dailyCashTransactions;
-    if (viewMode === "monthly") {
-      filteredTransactions = dailyCashTransactions.filter((t) =>
-        t.date.startsWith(selectedMonth)
+    // Filter transactions based on date range
+    const filteredTransactions = dailyCashTransactions.filter((t) => {
+      if (!dateRange || !dateRange.from || !dateRange.to) return true;
+      const transactionDate = new Date(t.date);
+      return (
+        transactionDate >= dateRange.from && transactionDate <= dateRange.to
       );
-    } else if (viewMode === "yearly") {
-      const year = selectedMonth.slice(0, 4);
-      filteredTransactions = dailyCashTransactions.filter((t) =>
-        t.date.startsWith(year)
-      );
-    }
+    });
 
     // Initialize with all categories, then add amounts
     const initialTotals = allCategories.reduce((acc, cat) => {
@@ -111,25 +109,13 @@ export default function ExpenseReportPage() {
     setBankTotals(bankData);
     setExpenseTransactions(expenses);
     setLoading(false);
-  }, [dailyCashTransactions, selectedMonth, viewMode, allCategories]);
+  }, [dailyCashTransactions, dateRange, allCategories]);
 
   // Get total expenses
   const totalExpenses = Object.values(categoryTotals).reduce(
     (sum, amount) => sum + amount,
     0
   );
-
-  // Generate months for dropdown
-  const months = Array.from({ length: 12 }, (_, i) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    return date.toISOString().slice(0, 7);
-  });
-
-  // Generate years for dropdown
-  const years = Array.from(
-    new Set(dailyCashTransactions.map((t) => t.date.slice(0, 4)))
-  ).sort((a, b) => b - a);
 
   const handleExportCSV = () => {
     const data = Object.entries(categoryTotals).map(([category, amount]) => ({
@@ -250,39 +236,24 @@ export default function ExpenseReportPage() {
         </div>
       </div>
 
-      {/* View Mode and Date Selection */}
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-        <Tabs value={viewMode} onValueChange={setViewMode}>
-          <TabsList>
-            <TabsTrigger value="monthly">Monthly</TabsTrigger>
-            <TabsTrigger value="yearly">Yearly</TabsTrigger>
-            <TabsTrigger value="all-time">All Time</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {viewMode !== "all-time" && (
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent>
-              {viewMode === "monthly"
-                ? months.map((month) => (
-                    <SelectItem key={month} value={month}>
-                      {new Date(month).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                      })}
-                    </SelectItem>
-                  ))
-                : years.map((year) => (
-                    <SelectItem key={year} value={year}>
-                      {year}
-                    </SelectItem>
-                  ))}
-            </SelectContent>
-          </Select>
-        )}
+      {/* Date Range Selection */}
+      <div className="flex items-center gap-4">
+        <DateRangePicker
+          value={dateRange}
+          onChange={setDateRange}
+          className="w-full md:w-auto"
+        />
+        <Button
+          variant="outline"
+          onClick={() =>
+            setDateRange({
+              from: subDays(new Date(), 2),
+              to: new Date(),
+            })
+          }
+        >
+          Reset to Last 2 Days
+        </Button>
       </div>
 
       {/* Summary Cards */}
