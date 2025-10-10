@@ -38,7 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ExpenseReportPage() {
-  const { dailyCashTransactions } = useData();
+  const { dailyCashTransactions, getExpenseCategories } = useData();
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7)
   );
@@ -47,10 +47,22 @@ export default function ExpenseReportPage() {
     deposits: 0,
     withdrawals: 0,
   });
+  const [expenseTransactions, setExpenseTransactions] = useState([]);
   const [viewMode, setViewMode] = useState("monthly"); // monthly, yearly, all-time
   const [loading, setLoading] = useState(true);
+  const [allCategories, setAllCategories] = useState([]);
 
   useEffect(() => {
+    const fetchCategories = async () => {
+      const categories = await getExpenseCategories();
+      setAllCategories(categories);
+    };
+    fetchCategories();
+  }, [getExpenseCategories]);
+
+  useEffect(() => {
+    if (!allCategories.length) return; // Don't calculate until categories are loaded
+
     // Filter transactions based on view mode
     let filteredTransactions = dailyCashTransactions;
     if (viewMode === "monthly") {
@@ -64,14 +76,19 @@ export default function ExpenseReportPage() {
       );
     }
 
-    // Calculate category totals
+    // Initialize with all categories, then add amounts
+    const initialTotals = allCategories.reduce((acc, cat) => {
+      acc[cat] = 0;
+      return acc;
+    }, {});
+
     const categoryData = filteredTransactions.reduce((acc, transaction) => {
       if (transaction.transactionType === "cash" && transaction.cashOut > 0) {
         const category = transaction.category || "Uncategorized";
         acc[category] = (acc[category] || 0) + transaction.cashOut;
       }
       return acc;
-    }, {});
+    }, initialTotals);
 
     // Calculate bank totals
     const bankData = filteredTransactions.reduce(
@@ -86,10 +103,15 @@ export default function ExpenseReportPage() {
       { deposits: 0, withdrawals: 0 }
     );
 
+    const expenses = filteredTransactions.filter(
+      (t) => t.transactionType === "cash" && t.cashOut > 0
+    );
+
     setCategoryTotals(categoryData);
     setBankTotals(bankData);
+    setExpenseTransactions(expenses);
     setLoading(false);
-  }, [dailyCashTransactions, selectedMonth, viewMode]);
+  }, [dailyCashTransactions, selectedMonth, viewMode, allCategories]);
 
   // Get total expenses
   const totalExpenses = Object.values(categoryTotals).reduce(
@@ -345,6 +367,46 @@ export default function ExpenseReportPage() {
                 </div>
               ))}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Detailed Expense Transactions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Detailed Expense Transactions</CardTitle>
+          <CardDescription>
+            A detailed list of all cash expenses
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {expenseTransactions
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .map((transaction) => (
+                  <TableRow key={transaction.id}>
+                    <TableCell>
+                      {new Date(transaction.date).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      {transaction.category || "Uncategorized"}
+                    </TableCell>
+                    <TableCell>{transaction.description}</TableCell>
+                    <TableCell className="text-right text-red-500">
+                      - ৳{transaction.cashOut.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
