@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ import { LoadingState, TableSkeleton } from "@/components/LoadingState";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useData } from "@/app/data-context";
 import { useToast } from "@/hooks/use-toast";
+import { useDebounce } from "@/hooks/use-debounce";
 import {
   CUSTOMER_CONSTANTS,
   ERROR_MESSAGES,
@@ -65,6 +66,7 @@ export default function Dashboard() {
   });
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [selectedFilter, setSelectedFilter] = useState(
     CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL
   );
@@ -284,14 +286,17 @@ export default function Dashboard() {
     );
   }
 
-  const filteredCustomers = (customers || []).filter((customer) => {
-    if (!customer) return false;
+  const filteredCustomers = useMemo(() => {
+    return (customers || []).filter((customer) => {
+      if (!customer) return false;
 
-    const matchesSearch =
-      customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone?.includes(searchTerm);
+      const matchesSearch =
+        customer.name
+          ?.toLowerCase()
+          .includes(debouncedSearchTerm.toLowerCase()) ||
+        customer.phone?.includes(debouncedSearchTerm);
 
-    const currentDue = getCustomerDue(customer.id);
+      const currentDue = getCustomerDue(customer.id);
     const matchesFilter =
       selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL ||
       (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.DUE &&
@@ -304,7 +309,8 @@ export default function Dashboard() {
       selectedTags.every((tag) => customer.tags?.includes(tag));
 
     return matchesSearch && matchesFilter && matchesTags;
-  });
+    });
+  }, [customers, debouncedSearchTerm, selectedFilter, selectedTags, getCustomerDue]);
 
   return (
     <ErrorBoundary>
@@ -723,7 +729,7 @@ export default function Dashboard() {
 }
 
 // Loading skeleton components
-function SummaryCardSkeleton() {
+const SummaryCardSkeleton = memo(function SummaryCardSkeleton() {
   return (
     <Card className="overflow-hidden border-none shadow-md">
       <CardContent className="p-0">
@@ -740,9 +746,9 @@ function SummaryCardSkeleton() {
       </CardContent>
     </Card>
   );
-}
+});
 
-function QuickStatSkeleton() {
+const QuickStatSkeleton = memo(function QuickStatSkeleton() {
   return (
     <Card className="border-none shadow-md">
       <CardContent className="p-6">
@@ -755,9 +761,15 @@ function QuickStatSkeleton() {
       </CardContent>
     </Card>
   );
-}
+});
 
-function QuickStatCard({ title, value, icon: Icon, trend, trendValue }) {
+const QuickStatCard = memo(function QuickStatCard({
+  title,
+  value,
+  icon: Icon,
+  trend,
+  trendValue,
+}) {
   return (
     <Card className="border-none shadow-md">
       <CardContent className="p-6">
@@ -783,4 +795,4 @@ function QuickStatCard({ title, value, icon: Icon, trend, trendValue }) {
       </CardContent>
     </Card>
   );
-}
+});
