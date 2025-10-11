@@ -25,30 +25,39 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 
-export function AddCashTransactionDialog({
-  onAddTransaction,
+export function CashTransactionDialog({
+  transaction,
+  onTransactionSubmit,
   children,
   expenseCategories,
   onAddCategory,
+  open,
+  onOpenChange,
 }) {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategory, setNewCategory] = useState("");
   const [savedAccounts, setSavedAccounts] = useState([]);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [saveAccount, setSaveAccount] = useState(false);
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split("T")[0],
-    description: "",
-    reference: "",
-    cashIn: "",
-    cashOut: "",
-    category: "",
-    transactionType: "regular",
-  });
+  const [formData, setFormData] = useState({});
   const [errors, setErrors] = useState({});
+
+  const mode = transaction ? "edit" : "add";
+
+  useEffect(() => {
+    const initialFormData = {
+      date: new Date().toISOString().split("T")[0],
+      description: "",
+      reference: "",
+      cashIn: "",
+      cashOut: "",
+      category: "",
+      transactionType: "regular",
+    };
+    setFormData(transaction || initialFormData);
+  }, [transaction, open]);
 
   // Load saved bank accounts from localStorage
   useEffect(() => {
@@ -57,25 +66,6 @@ export function AddCashTransactionDialog({
       setSavedAccounts(JSON.parse(savedAccounts));
     }
   }, []);
-
-  // Reset form only when dialog is closed
-  useEffect(() => {
-    if (!open) {
-      // Full reset only when closing the dialog
-      setFormData({
-        date: new Date().toISOString().split("T")[0],
-        description: "",
-        reference: "",
-        cashIn: "",
-        cashOut: "",
-        category: "",
-        transactionType: "regular",
-      });
-      setErrors({});
-      setNewCategory("");
-      setShowAddCategory(false);
-    }
-  }, [open]);
 
   const handleSaveAccount = () => {
     if (!formData.bankName || !formData.bankAccount || !formData.accountName) {
@@ -107,7 +97,7 @@ export function AddCashTransactionDialog({
     setFormData((prev) => ({
       ...prev,
       bankName: account.bankName,
-      bankAccount: account.accountNumber,
+      accountNumber: account.accountNumber,
       accountName: account.accountName,
     }));
   };
@@ -159,26 +149,34 @@ export function AddCashTransactionDialog({
         category: formData.cashOut ? formData.category : "Income",
       };
 
-      await onAddTransaction(transactionData);
-      // Reset form while keeping the selected date
-      setFormData((prev) => ({
-        date: prev.date, // Keep the same date
-        description: "",
-        reference: "",
-        cashIn: "",
-        cashOut: "",
-        category: "",
-        transactionType: "regular",
-      }));
+      await onTransactionSubmit(transactionData);
+
+      if (mode === "add") {
+        // Reset form for adding another transaction
+        setFormData((prev) => ({
+          date: prev.date,
+          description: "",
+          reference: "",
+          cashIn: "",
+          cashOut: "",
+          category: "",
+          transactionType: "regular",
+        }));
+        toast({
+          title: "Success",
+          description: "Transaction added successfully.",
+        });
+      } else {
+        onOpenChange(false); // Close dialog on successful edit
+        toast({
+          title: "Success",
+          description: "Transaction updated successfully.",
+        });
+      }
       setErrors({});
-      toast({
-        title: "Success",
-        description:
-          "Transaction added successfully. You can add another transaction for the same date.",
-      });
     } catch (error) {
-      console.error("Error adding transaction:", error);
-      setErrors({ submit: "Failed to add transaction. Please try again." });
+      console.error(`Error ${mode === "add" ? "adding" : "updating"} transaction:`, error);
+      setErrors({ submit: `Failed to ${mode} transaction. Please try again.` });
     } finally {
       setIsSubmitting(false);
     }
@@ -233,23 +231,22 @@ export function AddCashTransactionDialog({
     { value: "from_bank", label: "From Bank" },
     { value: "other", label: "Other" },
   ];
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent
-        className="sm:max-w-[425px] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-transaction-title"
-        aria-describedby="add-transaction-description"
-      >
-        <DialogHeader>
-          <DialogTitle id="add-transaction-title">Add Transaction</DialogTitle>
-          <DialogDescription id="add-transaction-description">
-            Enter the transaction details below.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+  const dialogContent = (
+    <DialogContent
+      className="sm:max-w-[425px] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="transaction-dialog-title"
+    >
+      <DialogHeader>
+        <DialogTitle id="transaction-dialog-title">
+          {mode === "add" ? "Add" : "Edit"} Transaction
+        </DialogTitle>
+        <DialogDescription>
+          Enter the transaction details below.
+        </DialogDescription>
+      </DialogHeader>
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="date">Date</Label>
@@ -446,7 +443,7 @@ export function AddCashTransactionDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
               Cancel
@@ -455,15 +452,29 @@ export function AddCashTransactionDialog({
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
+                  {mode === "add" ? "Adding..." : "Saving..."}
                 </>
               ) : (
-                "Add Transaction"
+                mode === "add" ? "Add Transaction" : "Save Changes"
               )}
             </Button>
           </div>
         </form>
-      </DialogContent>
+    </DialogContent>
+  );
+
+  if (mode === "add") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogTrigger asChild>{children}</DialogTrigger>
+        {dialogContent}
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {dialogContent}
     </Dialog>
   );
 }
