@@ -25,12 +25,24 @@ import {
   Database,
   Save,
   RefreshCw,
+  Download,
 } from "lucide-react";
+import { downloadJson } from "@/lib/utils";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { settings, updateSettings, updateExpenseCategories } = useData();
+  const {
+    settings,
+    updateSettings,
+    updateExpenseCategories,
+    customers,
+    transactions,
+    fabrics,
+    suppliers,
+    dailyCashTransactions,
+    supplierTransactions,
+  } = useData();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
@@ -113,6 +125,19 @@ export default function SettingsPage() {
     setExpenseCategories(
       expenseCategories.filter((category) => category !== categoryToRemove)
     );
+  };
+
+  const handleBackupData = () => {
+    const backupData = {
+      customers,
+      transactions,
+      fabrics,
+      suppliers,
+      dailyCashTransactions,
+      supplierTransactions,
+      settings,
+    };
+    downloadJson(backupData, "backup-data");
   };
 
   if (loading) {
@@ -315,6 +340,21 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Data Backup</CardTitle>
+              <CardDescription>
+                Download a JSON file of all your application data.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={handleBackupData}>
+                <Download className="mr-2 h-4 w-4" />
+                Backup All Data
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
