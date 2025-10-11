@@ -26,7 +26,7 @@ import {
   onChildRemoved,
 } from "firebase/database";
 import { doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { realtimeDb, firestore } from "@/lib/firebase";
 
 // Create context
 const DataContext = createContext(null);
@@ -177,7 +177,7 @@ export function DataProvider({ children }) {
   // Firebase Subscriptions with granular updates
   useEffect(() => {
     const setupListener = (path, actions) => {
-      const collectionRef = ref(db, path);
+      const collectionRef = ref(realtimeDb, path);
       const unsubscribers = [
         onChildAdded(collectionRef, (snapshot) => {
           dispatch({
@@ -240,7 +240,7 @@ export function DataProvider({ children }) {
     ];
 
     collectionsToFetch.forEach(({ path, setter }) => {
-      const collectionRef = ref(db, path);
+      const collectionRef = ref(realtimeDb, path);
       const unsubscribe = onValue(collectionRef, (snapshot) => {
         const data = snapshot.exists()
           ? Object.entries(snapshot.val()).map(([id, value]) => ({
@@ -278,7 +278,7 @@ export function DataProvider({ children }) {
   const getExpenseCategories = useCallback(async () => {
     try {
       const categoriesRef = ref(
-        db,
+        realtimeDb,
         `${COLLECTION_REFS.SETTINGS}/expense_categories`
       );
       const snapshot = await get(categoriesRef);
@@ -299,7 +299,7 @@ export function DataProvider({ children }) {
   const updateExpenseCategories = async (categories) => {
     try {
       const categoriesRef = ref(
-        db,
+        realtimeDb,
         `${COLLECTION_REFS.SETTINGS}/expense_categories`
       );
       await set(categoriesRef, { categories });
@@ -318,7 +318,7 @@ export function DataProvider({ children }) {
   // Customer Operations
   const customerOperations = {
     addCustomer: async (customerData) => {
-      const customersRef = ref(db, COLLECTION_REFS.CUSTOMERS);
+      const customersRef = ref(realtimeDb, COLLECTION_REFS.CUSTOMERS);
       const newCustomerRef = push(customersRef);
       await set(newCustomerRef, {
         ...customerData,
@@ -328,7 +328,7 @@ export function DataProvider({ children }) {
     },
 
     updateCustomer: async (customerId, updatedData) => {
-      const customerRef = ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`);
+      const customerRef = ref(realtimeDb, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`);
       await update(customerRef, {
         ...updatedData,
         updatedAt: serverTimestamp(),
@@ -342,11 +342,11 @@ export function DataProvider({ children }) {
       );
       for (const transaction of customerTransactions) {
         await remove(
-          ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transaction.id}`)
+          ref(realtimeDb, `${COLLECTION_REFS.TRANSACTIONS}/${transaction.id}`)
         );
       }
       // Then delete the customer
-      await remove(ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`));
+      await remove(ref(realtimeDb, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`));
     },
 
     getCustomerDue,
@@ -355,7 +355,7 @@ export function DataProvider({ children }) {
   // Transaction Operations
   const transactionOperations = {
     addTransaction: async (transactionData) => {
-      const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
+      const transactionsRef = ref(realtimeDb, COLLECTION_REFS.TRANSACTIONS);
       const newTransactionRef = push(transactionsRef);
       await set(newTransactionRef, {
         ...transactionData,
@@ -367,7 +367,7 @@ export function DataProvider({ children }) {
 
     updateTransaction: async (transactionId, updatedData) => {
       const transactionRef = ref(
-        db,
+        realtimeDb,
         `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`
       );
       await update(transactionRef, {
@@ -377,29 +377,29 @@ export function DataProvider({ children }) {
     },
 
     deleteTransaction: async (transactionId) => {
-      await remove(ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`));
+      await remove(ref(realtimeDb, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`));
     },
   };
 
   // Fabric Operations
   const fabricOperations = {
     addFabric: async (fabricData) => {
-      await push(ref(db, COLLECTION_REFS.FABRICS), fabricData);
+      await push(ref(realtimeDb, COLLECTION_REFS.FABRICS), fabricData);
     },
 
     updateFabric: async (fabricId, updatedData) => {
-      await update(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`), {
+      await update(ref(realtimeDb, `${COLLECTION_REFS.FABRICS}/${fabricId}`), {
         ...updatedData,
         updatedAt: serverTimestamp(),
       });
     },
 
     deleteFabric: async (fabricId) => {
-      await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
+      await remove(ref(realtimeDb, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
     },
 
     addFabricBatch: async (batchData) => {
-      await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
+      await push(ref(realtimeDb, COLLECTION_REFS.FABRIC_BATCHES), {
         ...batchData,
         createdAt: serverTimestamp(),
       });
@@ -409,7 +409,7 @@ export function DataProvider({ children }) {
       try {
         // Get the batch data first to update fabric totals
         const batchRef = ref(
-          db,
+          realtimeDb,
           `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`
         );
         const batchSnapshot = await get(batchRef);
@@ -431,7 +431,7 @@ export function DataProvider({ children }) {
   const supplierOperations = {
     addSupplier: async (supplierData) => {
       try {
-        const suppliersRef = ref(db, COLLECTION_REFS.SUPPLIERS);
+        const suppliersRef = ref(realtimeDb, COLLECTION_REFS.SUPPLIERS);
         const newSupplierRef = push(suppliersRef);
         await set(newSupplierRef, {
           ...supplierData,
@@ -448,7 +448,7 @@ export function DataProvider({ children }) {
     updateSupplier: async (supplierId, updatedData) => {
       try {
         const supplierRef = ref(
-          db,
+          realtimeDb,
           `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
         );
         await update(supplierRef, {
@@ -471,14 +471,14 @@ export function DataProvider({ children }) {
         for (const transaction of supplierTransactions) {
           await remove(
             ref(
-              db,
+              realtimeDb,
               `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transaction.id}`
             )
           );
         }
 
         // Then delete the supplier
-        await remove(ref(db, `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`));
+        await remove(ref(realtimeDb, `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`));
       } catch (error) {
         console.error("Error deleting supplier:", error);
         throw error;
@@ -488,7 +488,7 @@ export function DataProvider({ children }) {
     addSupplierTransaction: async (transaction) => {
       try {
         const newTransactionRef = push(
-          ref(db, COLLECTION_REFS.SUPPLIER_TRANSACTIONS)
+          ref(realtimeDb, COLLECTION_REFS.SUPPLIER_TRANSACTIONS)
         );
         const due = transaction.totalAmount - (transaction.paidAmount || 0);
 
@@ -502,7 +502,7 @@ export function DataProvider({ children }) {
         await set(newTransactionRef, newTransaction);
 
         const supplierRef = ref(
-          db,
+          realtimeDb,
           `${COLLECTION_REFS.SUPPLIERS}/${transaction.supplierId}`
         );
         await runTransaction(supplierRef, (supplier) => {
@@ -529,12 +529,12 @@ export function DataProvider({ children }) {
       try {
         // Delete transaction
         await remove(
-          ref(db, `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transactionId}`)
+          ref(realtimeDb, `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transactionId}`)
         );
 
         // Update supplier's total due
         const supplierRef = ref(
-          db,
+          realtimeDb,
           `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
         );
         const supplierSnapshot = await get(supplierRef);
@@ -559,7 +559,7 @@ export function DataProvider({ children }) {
   const dailyCashOperations = {
     addDailyCashTransaction: async (transaction) => {
       try {
-        const dailyCashRef = ref(db, COLLECTION_REFS.DAILY_CASH);
+        const dailyCashRef = ref(realtimeDb, COLLECTION_REFS.DAILY_CASH);
         const newTransactionRef = push(dailyCashRef);
         await set(newTransactionRef, {
           ...transaction,
@@ -570,7 +570,7 @@ export function DataProvider({ children }) {
         // Update related customer transaction if it's a sale
         if (transaction.type === "sale" && transaction.reference) {
           const customerTransactionRef = query(
-            ref(db, "transactions"),
+            ref(realtimeDb, "transactions"),
             orderByChild("memoNumber"),
             equalTo(transaction.reference)
           );
@@ -580,7 +580,7 @@ export function DataProvider({ children }) {
             const [transactionId, transactionData] = Object.entries(
               snapshot.val()
             )[0];
-            await update(ref(db, `transactions/${transactionId}`), {
+            await update(ref(realtimeDb, `transactions/${transactionId}`), {
               deposit:
                 (transactionData.deposit || 0) + (transaction.cashIn || 0),
               due:
@@ -600,7 +600,7 @@ export function DataProvider({ children }) {
     deleteDailyCashTransaction: async (transactionId) => {
       try {
         const transactionRef = ref(
-          db,
+          realtimeDb,
           `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
         );
         await remove(transactionRef);
@@ -613,7 +613,7 @@ export function DataProvider({ children }) {
     updateDailyCashTransaction: async (transactionId, updatedData) => {
       try {
         const transactionRef = ref(
-          db,
+          realtimeDb,
           `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
         );
         await update(transactionRef, {
@@ -634,7 +634,7 @@ export function DataProvider({ children }) {
   const updateSettings = async (newSettings) => {
     try {
       // Update settings in Firebase
-      await updateDoc(doc(db, "settings", "app"), newSettings);
+      await updateDoc(doc(firestore, "settings", "app"), newSettings);
 
       // Update local state
       dispatch({
