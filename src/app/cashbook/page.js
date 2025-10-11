@@ -350,12 +350,6 @@ export default function CashBookPage() {
       // Delete from Firebase
       await deleteDailyCashTransaction(transactionId);
 
-      // Update local state
-      const updatedTransactions = dailyCashTransactions.filter(
-        (transaction) => transaction.id !== transactionId
-      );
-      setDailyCashTransactions(updatedTransactions);
-
       // Show success message
       toast({
         title: "Success",
@@ -1442,6 +1436,7 @@ export default function CashBookPage() {
             handleEditTransaction(editingTransaction.id, updated);
             setEditingTransaction(null);
           }}
+          expenseCategories={expenseCategories}
           aria-label="Edit transaction"
           role="dialog"
           aria-modal="true"

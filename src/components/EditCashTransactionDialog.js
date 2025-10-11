@@ -7,6 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
@@ -16,12 +23,14 @@ export function EditCashTransactionDialog({
   open,
   onOpenChange,
   onEditTransaction,
+  expenseCategories,
 }) {
   const [formData, setFormData] = useState({
     date: transaction.date,
     description: transaction.description,
     cashIn: transaction.cashIn || 0,
     cashOut: transaction.cashOut || 0,
+    category: transaction.category || "",
   });
 
   const [transactionType, setTransactionType] = useState(
@@ -34,6 +43,7 @@ export function EditCashTransactionDialog({
       description: transaction.description,
       cashIn: transaction.cashIn || 0,
       cashOut: transaction.cashOut || 0,
+      category: transaction.category || "",
     });
     setTransactionType(transaction.cashIn > 0 ? "in" : "out");
   }, [transaction]);
@@ -203,6 +213,28 @@ export function EditCashTransactionDialog({
                 />
               </div>
             </div>
+            {transactionType === "out" && (
+              <div className="space-y-2">
+                <Label htmlFor="transaction-category">Category</Label>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, category: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {expenseCategories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
