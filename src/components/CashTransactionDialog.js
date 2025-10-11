@@ -56,7 +56,9 @@ export function CashTransactionDialog({
       category: "",
       transactionType: "regular",
     };
-    setFormData(transaction || initialFormData);
+    if (open) {
+      setFormData(transaction || initialFormData);
+    }
   }, [transaction, open]);
 
   // Load saved bank accounts from localStorage

@@ -1435,8 +1435,8 @@ export default function CashBookPage() {
           onOpenChange={(open) => {
             if (!open) setEditingTransaction(null);
           }}
-          onTransactionSubmit={(updated) => {
-            handleEditTransaction(editingTransaction.id, updated);
+          onTransactionSubmit={async (updated) => {
+            await handleEditTransaction(editingTransaction.id, updated);
             setEditingTransaction(null);
           }}
           expenseCategories={expenseCategories}

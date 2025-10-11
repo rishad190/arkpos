@@ -8,7 +8,7 @@ import {
   update,
   serverTimestamp,
 } from "firebase/database";
-import { realtimeDb } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 /**
@@ -38,12 +38,12 @@ export function useFirebaseCrud(collectionPath, options = {}) {
   const create = useCallback(
     async (data) => {
       try {
-        const collectionRef = ref(realtimeDb, collectionPath);
+        const collectionRef = ref(db, collectionPath);
         const newItemRef = push(collectionRef);
 
         await set(newItemRef, {
           ...data,
-          createdAt: serverTimestamp(),
+          createdAt: new Date().toISOString(),
         });
 
         if (showToasts) {
@@ -83,7 +83,7 @@ export function useFirebaseCrud(collectionPath, options = {}) {
   const update = useCallback(
     async (id, data) => {
       try {
-        const itemRef = ref(realtimeDb, `${collectionPath}/${id}`);
+        const itemRef = ref(db, `${collectionPath}/${id}`);
 
         await update(itemRef, {
           ...data,
@@ -125,7 +125,7 @@ export function useFirebaseCrud(collectionPath, options = {}) {
   const deleteItem = useCallback(
     async (id) => {
       try {
-        await remove(ref(realtimeDb, `${collectionPath}/${id}`));
+        await remove(ref(db, `${collectionPath}/${id}`));
 
         if (showToasts) {
           toast({

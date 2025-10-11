@@ -25,24 +25,12 @@ import {
   Database,
   Save,
   RefreshCw,
-  Download,
 } from "lucide-react";
-import { downloadJson } from "@/lib/utils";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const {
-    settings,
-    updateSettings,
-    updateExpenseCategories,
-    customers,
-    transactions,
-    fabrics,
-    suppliers,
-    dailyCashTransactions,
-    supplierTransactions,
-  } = useData();
+  const { settings, updateSettings } = useData();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
@@ -75,16 +63,12 @@ export default function SettingsPage() {
     backupEnabled: true,
   });
 
-  const [expenseCategories, setExpenseCategories] = useState([]);
-  const [newCategory, setNewCategory] = useState("");
-
   useEffect(() => {
     if (settings) {
       setStoreSettings(settings.store || storeSettings);
       setNotificationSettings(settings.notifications || notificationSettings);
       setAppearanceSettings(settings.appearance || appearanceSettings);
       setSecuritySettings(settings.security || securitySettings);
-      setExpenseCategories(settings.expenseCategories || []);
       setLoading(false);
     }
   }, [settings]);
@@ -98,7 +82,6 @@ export default function SettingsPage() {
         appearance: appearanceSettings,
         security: securitySettings,
       });
-      await updateExpenseCategories(expenseCategories);
       toast({
         title: "Success",
         description: "Settings saved successfully",
@@ -112,32 +95,6 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleAddCategory = () => {
-    if (newCategory && !expenseCategories.includes(newCategory)) {
-      setExpenseCategories([...expenseCategories, newCategory]);
-      setNewCategory("");
-    }
-  };
-
-  const handleRemoveCategory = (categoryToRemove) => {
-    setExpenseCategories(
-      expenseCategories.filter((category) => category !== categoryToRemove)
-    );
-  };
-
-  const handleBackupData = () => {
-    const backupData = {
-      customers,
-      transactions,
-      fabrics,
-      suppliers,
-      dailyCashTransactions,
-      supplierTransactions,
-      settings,
-    };
-    downloadJson(backupData, "backup-data");
   };
 
   if (loading) {
@@ -215,10 +172,6 @@ export default function SettingsPage() {
           <TabsTrigger value="security">
             <Lock className="mr-2 h-4 w-4" />
             Security
-          </TabsTrigger>
-          <TabsTrigger value="data">
-            <Database className="mr-2 h-4 w-4" />
-            Data
           </TabsTrigger>
         </TabsList>
 
@@ -300,61 +253,6 @@ export default function SettingsPage() {
                   }
                 />
               </div>
-            </CardContent>
-          </Card>
-
-        </TabsContent>
-
-        {/* Data Settings */}
-        <TabsContent value="data" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Expense Categories</CardTitle>
-              <CardDescription>
-                Manage your expense categories for tracking
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="New category name"
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                />
-                <Button onClick={handleAddCategory}>Add</Button>
-              </div>
-              <div className="space-y-2">
-                {expenseCategories.map((category) => (
-                  <div
-                    key={category}
-                    className="flex items-center justify-between rounded-md border p-2"
-                  >
-                    <span>{category}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveCategory(category)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Data Backup</CardTitle>
-              <CardDescription>
-                Download a JSON file of all your application data.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={handleBackupData}>
-                <Download className="mr-2 h-4 w-4" />
-                Backup All Data
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
