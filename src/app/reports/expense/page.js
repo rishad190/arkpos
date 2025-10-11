@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useData } from "@/app/data-context";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { subDays } from "date-fns";
@@ -45,12 +45,6 @@ export default function ExpenseReportPage() {
     from: subDays(new Date(), 2),
     to: new Date(),
   });
-  const [categoryTotals, setCategoryTotals] = useState({});
-  const [bankTotals, setBankTotals] = useState({
-    deposits: 0,
-    withdrawals: 0,
-  });
-  const [expenseTransactions, setExpenseTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [allCategories, setAllCategories] = useState([]);
 
@@ -62,34 +56,37 @@ export default function ExpenseReportPage() {
     fetchCategories();
   }, [getExpenseCategories]);
 
-  useEffect(() => {
-    if (!allCategories.length) return; // Don't calculate until categories are loaded
+  // --- Memoized Selectors for Data Processing ---
 
-    // Filter transactions based on date range
-    const filteredTransactions = dailyCashTransactions.filter((t) => {
+  // Filtered transactions for summaries
+  const filteredTransactions = useMemo(() => {
+    if (!dailyCashTransactions) return [];
+    return dailyCashTransactions.filter((t) => {
       if (!dateRange || !dateRange.from || !dateRange.to) return true;
       const transactionDate = new Date(t.date);
-      return (
-        transactionDate >= dateRange.from && transactionDate <= dateRange.to
-      );
+      return transactionDate >= dateRange.from && transactionDate <= dateRange.to;
     });
+  }, [dailyCashTransactions, dateRange]);
 
-    // Initialize with all categories, then add amounts
+  // Totals for summary cards, based on filtered data
+  const categoryTotals = useMemo(() => {
+    if (!allCategories.length || !filteredTransactions) return {};
     const initialTotals = allCategories.reduce((acc, cat) => {
       acc[cat] = 0;
       return acc;
     }, {});
-
-    const categoryData = filteredTransactions.reduce((acc, transaction) => {
+    return filteredTransactions.reduce((acc, transaction) => {
       if (transaction.transactionType === "cash" && transaction.cashOut > 0) {
         const category = transaction.category || "Uncategorized";
         acc[category] = (acc[category] || 0) + transaction.cashOut;
       }
       return acc;
     }, initialTotals);
+  }, [filteredTransactions, allCategories]);
 
-    // Calculate bank totals
-    const bankData = filteredTransactions.reduce(
+  const bankTotals = useMemo(() => {
+    if (!filteredTransactions) return { deposits: 0, withdrawals: 0 };
+    return filteredTransactions.reduce(
       (acc, transaction) => {
         if (transaction.transactionType === "bank_deposit") {
           acc.deposits += transaction.cashIn || 0;
@@ -100,16 +97,31 @@ export default function ExpenseReportPage() {
       },
       { deposits: 0, withdrawals: 0 }
     );
+  }, [filteredTransactions]);
 
-    const expenses = filteredTransactions.filter(
+  // Unfiltered data for detailed tables
+  const allExpenseTransactions = useMemo(() => {
+    if (!dailyCashTransactions) return [];
+    return dailyCashTransactions.filter(
       (t) => t.transactionType === "cash" && t.cashOut > 0
     );
+  }, [dailyCashTransactions]);
 
-    setCategoryTotals(categoryData);
-    setBankTotals(bankData);
-    setExpenseTransactions(expenses);
-    setLoading(false);
-  }, [dailyCashTransactions, dateRange, allCategories]);
+  const allBankTransactions = useMemo(() => {
+    if (!dailyCashTransactions) return [];
+    return dailyCashTransactions.filter(
+      (t) =>
+        t.transactionType === "bank_deposit" ||
+        t.transactionType === "bank_withdrawal"
+    );
+  }, [dailyCashTransactions]);
+
+  // Effect for loading state
+  useEffect(() => {
+    if (dailyCashTransactions && allCategories.length) {
+      setLoading(false);
+    }
+  }, [dailyCashTransactions, allCategories]);
 
   // Get total expenses
   const totalExpenses = Object.values(categoryTotals).reduce(
@@ -360,7 +372,7 @@ export default function ExpenseReportPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {expenseTransactions
+              {allExpenseTransactions
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
                 .map((transaction) => (
                   <TableRow key={transaction.id}>
@@ -398,14 +410,8 @@ export default function ExpenseReportPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {dailyCashTransactions
-                .filter(
-                  (t) =>
-                    t.transactionType === "bank_deposit" ||
-                    t.transactionType === "bank_withdrawal"
-                )
+              {allBankTransactions
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .slice(0, 10)
                 .map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>
