@@ -77,33 +77,30 @@ export default function CustomerDetail() {
 
   const customer = customers?.find((c) => c.id === params.id);
 
-  const customerTransactionsWithBalance = useMemo(() => {
+  // Step 1: Memoize the filtering and sorting of transactions for the specific customer.
+  const customerTransactions = useMemo(() => {
     if (!transactions) return [];
-
     return transactions
       .filter((t) => t.customerId === params.id)
-      .filter(
-        (t) =>
-          storeFilter === TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL ||
-          t.storeId === storeFilter
-      )
-      .sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateA - dateB; // Sort by date ascending (oldest to newest)
-      })
-      .reduce((acc, transaction) => {
-        const previousBalance =
-          acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
-        return [
-          ...acc,
-          {
-            ...transaction,
-            cumulativeBalance: previousBalance + (transaction.due || 0),
-          },
-        ];
-      }, []);
-  }, [transactions, params.id, storeFilter]);
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+  }, [transactions, params.id]);
+
+  // Step 2: Further filter by store, and then calculate the cumulative balance efficiently.
+  const customerTransactionsWithBalance = useMemo(() => {
+    const filteredByStore =
+      storeFilter === TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL
+        ? customerTransactions
+        : customerTransactions.filter((t) => t.storeId === storeFilter);
+
+    let balance = 0;
+    return filteredByStore.map((transaction) => {
+      balance += transaction.due || 0;
+      return {
+        ...transaction,
+        cumulativeBalance: balance,
+      };
+    });
+  }, [customerTransactions, storeFilter]);
 
   useEffect(() => {
     if (customer && transactions) {
@@ -265,17 +262,29 @@ export default function CustomerDetail() {
     });
   }, [customerTransactionsWithBalance, searchTerm, dateRange]);
 
-  const paymentProgress = useMemo(() => {
-    if (!customerTransactionsWithBalance.length) return 0;
-    const totalBill = customerTransactionsWithBalance.reduce(
-      (sum, t) => sum + (t.total || 0),
-      0
+  const { totalBill, totalDeposit, totalDue, paymentProgress } = useMemo(() => {
+    const summary = customerTransactionsWithBalance.reduce(
+      (acc, t) => {
+        acc.totalBill += t.total || 0;
+        acc.totalDeposit += t.deposit || 0;
+        return acc;
+      },
+      { totalBill: 0, totalDeposit: 0 }
     );
-    const totalDeposit = customerTransactionsWithBalance.reduce(
-      (sum, t) => sum + (t.deposit || 0),
-      0
-    );
-    return (totalDeposit / totalBill) * 100;
+
+    const totalDue =
+      customerTransactionsWithBalance.length > 0
+        ? customerTransactionsWithBalance[
+            customerTransactionsWithBalance.length - 1
+          ].cumulativeBalance
+        : 0;
+
+    const paymentProgress =
+      summary.totalBill > 0
+        ? (summary.totalDeposit / summary.totalBill) * 100
+        : 0;
+
+    return { ...summary, totalDue, paymentProgress };
   }, [customerTransactionsWithBalance]);
 
   if (loadingState.initial) {
@@ -301,13 +310,6 @@ export default function CustomerDetail() {
       </div>
     );
   }
-
-  const totalDue =
-    customerTransactionsWithBalance.length > 0
-      ? customerTransactionsWithBalance[
-          customerTransactionsWithBalance.length - 1
-        ].cumulativeBalance
-      : 0;
 
   return (
     <ErrorBoundary>
@@ -423,10 +425,7 @@ export default function CustomerDetail() {
                       <DollarSign className="h-4 w-4 text-blue-600" />
                     </div>
                     <div className="text-2xl font-bold text-blue-700">
-                      ৳
-                      {customerTransactionsWithBalance
-                        .reduce((sum, t) => sum + (t.total || 0), 0)
-                        .toLocaleString()}
+                      ৳{totalBill.toLocaleString()}
                     </div>
                   </CardContent>
                 </Card>
@@ -440,10 +439,7 @@ export default function CustomerDetail() {
                       <CreditCard className="h-4 w-4 text-green-600" />
                     </div>
                     <div className="text-2xl font-bold text-green-700">
-                      ৳
-                      {customerTransactionsWithBalance
-                        .reduce((sum, t) => sum + (t.deposit || 0), 0)
-                        .toLocaleString()}
+                      ৳{totalDeposit.toLocaleString()}
                     </div>
                   </CardContent>
                 </Card>

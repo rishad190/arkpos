@@ -20,6 +20,10 @@ import {
   query,
   orderByChild,
   equalTo,
+  runTransaction,
+  onChildAdded,
+  onChildChanged,
+  onChildRemoved,
 } from "firebase/database";
 import { doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -92,65 +96,75 @@ const initialState = {
   },
 };
 
-// Add settings reducer cases
+// Reducer with granular updates
 function reducer(state, action) {
-  switch (action.type) {
+  const { type, payload } = action;
+  const itemExists = (collection, id) =>
+    collection.some((item) => item.id === id);
+
+  switch (type) {
+    // Customer actions
+    case "ADD_CUSTOMER":
+      return {
+        ...state,
+        customers: !itemExists(state.customers, payload.id)
+          ? [...state.customers, payload]
+          : state.customers,
+      };
+    case "UPDATE_CUSTOMER":
+      return {
+        ...state,
+        customers: state.customers.map((c) =>
+          c.id === payload.id ? { ...c, ...payload } : c
+        ),
+      };
+    case "REMOVE_CUSTOMER":
+      return {
+        ...state,
+        customers: state.customers.filter((c) => c.id !== payload),
+      };
+
+    // Transaction actions
+    case "ADD_TRANSACTION":
+      return {
+        ...state,
+        transactions: !itemExists(state.transactions, payload.id)
+          ? [...state.transactions, payload]
+          : state.transactions,
+      };
+    case "UPDATE_TRANSACTION":
+      return {
+        ...state,
+        transactions: state.transactions.map((t) =>
+          t.id === payload.id ? { ...t, ...payload } : t
+        ),
+      };
+    case "REMOVE_TRANSACTION":
+      return {
+        ...state,
+        transactions: state.transactions.filter((t) => t.id !== payload),
+      };
+
+    // Other collection setters (can be refactored similarly if needed)
     case "SET_CUSTOMERS":
-      return {
-        ...state,
-        customers: action.payload,
-        loading: false,
-      };
+      return { ...state, customers: payload, loading: false };
     case "SET_TRANSACTIONS":
-      return {
-        ...state,
-        transactions: action.payload,
-        loading: false,
-      };
+      return { ...state, transactions: payload, loading: false };
     case "SET_DAILY_CASH_TRANSACTIONS":
-      return {
-        ...state,
-        dailyCashTransactions: action.payload,
-        loading: false,
-      };
+      return { ...state, dailyCashTransactions: payload, loading: false };
     case "SET_FABRIC_BATCHES":
-      return {
-        ...state,
-        fabricBatches: action.payload,
-        loading: false,
-      };
+      return { ...state, fabricBatches: payload, loading: false };
     case "SET_FABRICS":
-      return {
-        ...state,
-        fabrics: action.payload,
-        loading: false,
-      };
+      return { ...state, fabrics: payload, loading: false };
     case "SET_SUPPLIERS":
-      return {
-        ...state,
-        suppliers: action.payload,
-        loading: false,
-      };
+      return { ...state, suppliers: payload, loading: false };
     case "SET_SUPPLIER_TRANSACTIONS":
-      return {
-        ...state,
-        supplierTransactions: action.payload,
-        loading: false,
-      };
+      return { ...state, supplierTransactions: payload, loading: false };
+
     case "SET_ERROR":
-      return {
-        ...state,
-        error: action.payload,
-        loading: false,
-      };
+      return { ...state, error: payload, loading: false };
     case "UPDATE_SETTINGS":
-      return {
-        ...state,
-        settings: {
-          ...state.settings,
-          ...action.payload,
-        },
-      };
+      return { ...state, settings: { ...state.settings, ...payload } };
     default:
       return state;
   }
@@ -160,18 +174,46 @@ function reducer(state, action) {
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Firebase Subscriptions
+  // Firebase Subscriptions with granular updates
   useEffect(() => {
-    const unsubscribers = [];
-    const collections = [
-      {
-        path: COLLECTION_REFS.CUSTOMERS,
-        setter: (data) => dispatch({ type: "SET_CUSTOMERS", payload: data }),
-      },
-      {
-        path: COLLECTION_REFS.TRANSACTIONS,
-        setter: (data) => dispatch({ type: "SET_TRANSACTIONS", payload: data }),
-      },
+    const setupListener = (path, actions) => {
+      const collectionRef = ref(db, path);
+      const unsubscribers = [
+        onChildAdded(collectionRef, (snapshot) => {
+          dispatch({
+            type: actions.add,
+            payload: { id: snapshot.key, ...snapshot.val() },
+          });
+        }),
+        onChildChanged(collectionRef, (snapshot) => {
+          dispatch({
+            type: actions.update,
+            payload: { id: snapshot.key, ...snapshot.val() },
+          });
+        }),
+        onChildRemoved(collectionRef, (snapshot) => {
+          dispatch({ type: actions.remove, payload: snapshot.key });
+        }),
+      ];
+      return () => unsubscribers.forEach((unsub) => unsub());
+    };
+
+    const unsubscribers = [
+      setupListener(COLLECTION_REFS.CUSTOMERS, {
+        add: "ADD_CUSTOMER",
+        update: "UPDATE_CUSTOMER",
+        remove: "REMOVE_CUSTOMER",
+      }),
+      setupListener(COLLECTION_REFS.TRANSACTIONS, {
+        add: "ADD_TRANSACTION",
+        update: "UPDATE_TRANSACTION",
+        remove: "REMOVE_TRANSACTION",
+      }),
+      // Fallback for other collections - can be updated to granular listeners as well
+    ];
+
+    // Keep onValue for collections that don't need granular updates yet
+    const collectionsToFetch = [
       {
         path: COLLECTION_REFS.DAILY_CASH,
         setter: (data) =>
@@ -190,48 +232,29 @@ export function DataProvider({ children }) {
         path: COLLECTION_REFS.SUPPLIERS,
         setter: (data) => dispatch({ type: "SET_SUPPLIERS", payload: data }),
       },
+      {
+        path: COLLECTION_REFS.SUPPLIER_TRANSACTIONS,
+        setter: (data) =>
+          dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: data }),
+      },
     ];
 
-    try {
-      collections.forEach(({ path, setter }) => {
-        const collectionRef = ref(db, path);
-        const unsubscribe = onValue(collectionRef, (snapshot) => {
-          if (snapshot.exists()) {
-            const data = Object.entries(snapshot.val()).map(([id, value]) => ({
+    collectionsToFetch.forEach(({ path, setter }) => {
+      const collectionRef = ref(db, path);
+      const unsubscribe = onValue(collectionRef, (snapshot) => {
+        const data = snapshot.exists()
+          ? Object.entries(snapshot.val()).map(([id, value]) => ({
               id,
               ...value,
-            }));
-            setter(data);
-          } else {
-            setter([]);
-          }
-        });
-        unsubscribers.push(unsubscribe);
+            }))
+          : [];
+        setter(data);
       });
-    } catch (err) {
-      console.error("Error setting up Firebase listeners:", err);
-      dispatch({ type: "SET_ERROR", payload: err.message });
-    }
-
-    const supplierTransactionsRef = ref(
-      db,
-      COLLECTION_REFS.SUPPLIER_TRANSACTIONS
-    );
-    const unsubscribe = onValue(supplierTransactionsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = Object.entries(snapshot.val()).map(([id, value]) => ({
-          id,
-          ...value,
-        }));
-        dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: data });
-      } else {
-        dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: [] });
-      }
+      unsubscribers.push(unsubscribe);
     });
-    unsubscribers.push(unsubscribe);
 
     return () => unsubscribers.forEach((unsub) => unsub());
-  }, [dispatch]);
+  }, []);
 
   // Add memoization for customer dues
   const customerDues = useMemo(() => {
@@ -299,7 +322,7 @@ export function DataProvider({ children }) {
       const newCustomerRef = push(customersRef);
       await set(newCustomerRef, {
         ...customerData,
-        createdAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
       });
       return newCustomerRef.key;
     },
@@ -336,7 +359,7 @@ export function DataProvider({ children }) {
       const newTransactionRef = push(transactionsRef);
       await set(newTransactionRef, {
         ...transactionData,
-        createdAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
       });
 
       return newTransactionRef.key;
@@ -464,32 +487,31 @@ export function DataProvider({ children }) {
 
     addSupplierTransaction: async (transaction) => {
       try {
-        const transactionsRef = ref(db, COLLECTION_REFS.SUPPLIER_TRANSACTIONS);
-        const newTransactionRef = push(transactionsRef);
+        const newTransactionRef = push(
+          ref(db, COLLECTION_REFS.SUPPLIER_TRANSACTIONS)
+        );
+        const due = transaction.totalAmount - (transaction.paidAmount || 0);
 
         const newTransaction = {
           ...transaction,
           id: newTransactionRef.key,
-          due: transaction.totalAmount - (transaction.paidAmount || 0),
+          due,
           createdAt: serverTimestamp(),
         };
 
         await set(newTransactionRef, newTransaction);
 
-        // Update supplier's total due
         const supplierRef = ref(
           db,
           `${COLLECTION_REFS.SUPPLIERS}/${transaction.supplierId}`
         );
-        const supplierSnapshot = await get(supplierRef);
-
-        if (supplierSnapshot.exists()) {
-          const currentDue = supplierSnapshot.val().totalDue || 0;
-          await update(supplierRef, {
-            totalDue: currentDue + newTransaction.due,
-            updatedAt: serverTimestamp(),
-          });
-        }
+        await runTransaction(supplierRef, (supplier) => {
+          if (supplier) {
+            supplier.totalDue = (supplier.totalDue || 0) + due;
+            supplier.updatedAt = serverTimestamp();
+          }
+          return supplier;
+        });
 
         return newTransactionRef.key;
       } catch (error) {

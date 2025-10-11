@@ -1,6 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useData } from "@/app/data-context";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { subDays } from "date-fns";
 import {
   Card,
   CardContent,
@@ -38,43 +40,53 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ExpenseReportPage() {
-  const { dailyCashTransactions } = useData();
-  const [selectedMonth, setSelectedMonth] = useState(
-    new Date().toISOString().slice(0, 7)
-  );
-  const [categoryTotals, setCategoryTotals] = useState({});
-  const [bankTotals, setBankTotals] = useState({
-    deposits: 0,
-    withdrawals: 0,
+  const { dailyCashTransactions, getExpenseCategories } = useData();
+  const [dateRange, setDateRange] = useState({
+    from: subDays(new Date(), 2),
+    to: new Date(),
   });
-  const [viewMode, setViewMode] = useState("monthly"); // monthly, yearly, all-time
   const [loading, setLoading] = useState(true);
+  const [allCategories, setAllCategories] = useState([]);
 
   useEffect(() => {
-    // Filter transactions based on view mode
-    let filteredTransactions = dailyCashTransactions;
-    if (viewMode === "monthly") {
-      filteredTransactions = dailyCashTransactions.filter((t) =>
-        t.date.startsWith(selectedMonth)
-      );
-    } else if (viewMode === "yearly") {
-      const year = selectedMonth.slice(0, 4);
-      filteredTransactions = dailyCashTransactions.filter((t) =>
-        t.date.startsWith(year)
-      );
-    }
+    const fetchCategories = async () => {
+      const categories = await getExpenseCategories();
+      setAllCategories(categories);
+    };
+    fetchCategories();
+  }, [getExpenseCategories]);
 
-    // Calculate category totals
-    const categoryData = filteredTransactions.reduce((acc, transaction) => {
+  // --- Memoized Selectors for Data Processing ---
+
+  // Filtered transactions for summaries
+  const filteredTransactions = useMemo(() => {
+    if (!dailyCashTransactions) return [];
+    return dailyCashTransactions.filter((t) => {
+      if (!dateRange || !dateRange.from || !dateRange.to) return true;
+      const transactionDate = new Date(t.date);
+      return transactionDate >= dateRange.from && transactionDate <= dateRange.to;
+    });
+  }, [dailyCashTransactions, dateRange]);
+
+  // Totals for summary cards, based on filtered data
+  const categoryTotals = useMemo(() => {
+    if (!allCategories.length || !filteredTransactions) return {};
+    const initialTotals = allCategories.reduce((acc, cat) => {
+      acc[cat] = 0;
+      return acc;
+    }, {});
+    return filteredTransactions.reduce((acc, transaction) => {
       if (transaction.transactionType === "cash" && transaction.cashOut > 0) {
         const category = transaction.category || "Uncategorized";
         acc[category] = (acc[category] || 0) + transaction.cashOut;
       }
       return acc;
-    }, {});
+    }, initialTotals);
+  }, [filteredTransactions, allCategories]);
 
-    // Calculate bank totals
-    const bankData = filteredTransactions.reduce(
+  const bankTotals = useMemo(() => {
+    if (!filteredTransactions) return { deposits: 0, withdrawals: 0 };
+    return filteredTransactions.reduce(
       (acc, transaction) => {
         if (transaction.transactionType === "bank_deposit") {
           acc.deposits += transaction.cashIn || 0;
@@ -85,29 +97,37 @@ export default function ExpenseReportPage() {
       },
       { deposits: 0, withdrawals: 0 }
     );
+  }, [filteredTransactions]);
 
-    setCategoryTotals(categoryData);
-    setBankTotals(bankData);
-    setLoading(false);
-  }, [dailyCashTransactions, selectedMonth, viewMode]);
+  // Unfiltered data for detailed tables
+  const allExpenseTransactions = useMemo(() => {
+    if (!dailyCashTransactions) return [];
+    return dailyCashTransactions.filter(
+      (t) => t.transactionType === "cash" && t.cashOut > 0
+    );
+  }, [dailyCashTransactions]);
+
+  const allBankTransactions = useMemo(() => {
+    if (!dailyCashTransactions) return [];
+    return dailyCashTransactions.filter(
+      (t) =>
+        t.transactionType === "bank_deposit" ||
+        t.transactionType === "bank_withdrawal"
+    );
+  }, [dailyCashTransactions]);
+
+  // Effect for loading state
+  useEffect(() => {
+    if (dailyCashTransactions && allCategories.length) {
+      setLoading(false);
+    }
+  }, [dailyCashTransactions, allCategories]);
 
   // Get total expenses
   const totalExpenses = Object.values(categoryTotals).reduce(
     (sum, amount) => sum + amount,
     0
   );
-
-  // Generate months for dropdown
-  const months = Array.from({ length: 12 }, (_, i) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    return date.toISOString().slice(0, 7);
-  });
-
-  // Generate years for dropdown
-  const years = Array.from(
-    new Set(dailyCashTransactions.map((t) => t.date.slice(0, 4)))
-  ).sort((a, b) => b - a);
 
   const handleExportCSV = () => {
     const data = Object.entries(categoryTotals).map(([category, amount]) => ({
@@ -228,39 +248,24 @@ export default function ExpenseReportPage() {
         </div>
       </div>
 
-      {/* View Mode and Date Selection */}
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-        <Tabs value={viewMode} onValueChange={setViewMode}>
-          <TabsList>
-            <TabsTrigger value="monthly">Monthly</TabsTrigger>
-            <TabsTrigger value="yearly">Yearly</TabsTrigger>
-            <TabsTrigger value="all-time">All Time</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {viewMode !== "all-time" && (
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent>
-              {viewMode === "monthly"
-                ? months.map((month) => (
-                    <SelectItem key={month} value={month}>
-                      {new Date(month).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                      })}
-                    </SelectItem>
-                  ))
-                : years.map((year) => (
-                    <SelectItem key={year} value={year}>
-                      {year}
-                    </SelectItem>
-                  ))}
-            </SelectContent>
-          </Select>
-        )}
+      {/* Date Range Selection */}
+      <div className="flex items-center gap-4">
+        <DateRangePicker
+          value={dateRange}
+          onChange={setDateRange}
+          className="w-full md:w-auto"
+        />
+        <Button
+          variant="outline"
+          onClick={() =>
+            setDateRange({
+              from: subDays(new Date(), 2),
+              to: new Date(),
+            })
+          }
+        >
+          Reset to Last 2 Days
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -348,6 +353,46 @@ export default function ExpenseReportPage() {
         </CardContent>
       </Card>
 
+      {/* Detailed Expense Transactions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Detailed Expense Transactions</CardTitle>
+          <CardDescription>
+            A detailed list of all cash expenses
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {allExpenseTransactions
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .map((transaction) => (
+                  <TableRow key={transaction.id}>
+                    <TableCell>
+                      {new Date(transaction.date).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      {transaction.category || "Uncategorized"}
+                    </TableCell>
+                    <TableCell>{transaction.description}</TableCell>
+                    <TableCell className="text-right text-red-500">
+                      - ৳{transaction.cashOut.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       {/* Bank Transactions */}
       <Card>
         <CardHeader>
@@ -365,14 +410,8 @@ export default function ExpenseReportPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {dailyCashTransactions
-                .filter(
-                  (t) =>
-                    t.transactionType === "bank_deposit" ||
-                    t.transactionType === "bank_withdrawal"
-                )
+              {allBankTransactions
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .slice(0, 10)
                 .map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>
