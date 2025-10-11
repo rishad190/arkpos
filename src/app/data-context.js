@@ -20,6 +20,9 @@ import {
   query,
   orderByChild,
   equalTo,
+  onChildAdded,
+  onChildChanged,
+  onChildRemoved,
 } from "firebase/database";
 import { doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -107,6 +110,28 @@ function reducer(state, action) {
         transactions: action.payload,
         loading: false,
       };
+    case "ADD_DAILY_CASH_TRANSACTION":
+      return {
+        ...state,
+        dailyCashTransactions: [
+          ...state.dailyCashTransactions,
+          action.payload,
+        ],
+      };
+    case "UPDATE_DAILY_CASH_TRANSACTION":
+      return {
+        ...state,
+        dailyCashTransactions: state.dailyCashTransactions.map((t) =>
+          t.id === action.payload.id ? action.payload : t
+        ),
+      };
+    case "REMOVE_DAILY_CASH_TRANSACTION":
+      return {
+        ...state,
+        dailyCashTransactions: state.dailyCashTransactions.filter(
+          (t) => t.id !== action.payload
+        ),
+      };
     case "SET_DAILY_CASH_TRANSACTIONS":
       return {
         ...state,
@@ -173,11 +198,6 @@ export function DataProvider({ children }) {
         setter: (data) => dispatch({ type: "SET_TRANSACTIONS", payload: data }),
       },
       {
-        path: COLLECTION_REFS.DAILY_CASH,
-        setter: (data) =>
-          dispatch({ type: "SET_DAILY_CASH_TRANSACTIONS", payload: data }),
-      },
-      {
         path: COLLECTION_REFS.FABRIC_BATCHES,
         setter: (data) =>
           dispatch({ type: "SET_FABRIC_BATCHES", payload: data }),
@@ -229,6 +249,32 @@ export function DataProvider({ children }) {
       }
     });
     unsubscribers.push(unsubscribe);
+
+    const dailyCashRef = ref(db, COLLECTION_REFS.DAILY_CASH);
+    unsubscribers.push(
+      onChildAdded(dailyCashRef, (snapshot) => {
+        dispatch({
+          type: "ADD_DAILY_CASH_TRANSACTION",
+          payload: { id: snapshot.key, ...snapshot.val() },
+        });
+      })
+    );
+    unsubscribers.push(
+      onChildChanged(dailyCashRef, (snapshot) => {
+        dispatch({
+          type: "UPDATE_DAILY_CASH_TRANSACTION",
+          payload: { id: snapshot.key, ...snapshot.val() },
+        });
+      })
+    );
+    unsubscribers.push(
+      onChildRemoved(dailyCashRef, (snapshot) => {
+        dispatch({
+          type: "REMOVE_DAILY_CASH_TRANSACTION",
+          payload: snapshot.key,
+        });
+      })
+    );
 
     return () => unsubscribers.forEach((unsub) => unsub());
   }, [dispatch]);

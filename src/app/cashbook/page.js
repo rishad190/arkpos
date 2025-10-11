@@ -11,7 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { CashTransactionDialog } from "@/components/CashTransactionDialog";
+import { AddCashTransactionDialog } from "@/components/AddCashTransactionDialog";
+import { EditCashTransactionDialog } from "@/components/EditCashTransactionDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,7 +72,6 @@ export default function CashBookPage() {
     deleteDailyCashTransaction,
     getExpenseCategories,
     updateExpenseCategories,
-    setDailyCashTransactions, // Add this
   } = useData();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
@@ -87,7 +87,6 @@ export default function CashBookPage() {
   });
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [editingTransaction, setEditingTransaction] = useState(null);
-  const [isAddingTransaction, setIsAddingTransaction] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [viewMode, setViewMode] = useState("daily"); // daily, monthly, yearly
   const [loadingState, setLoadingState] = useState({
@@ -768,24 +767,21 @@ export default function CashBookPage() {
           role="toolbar"
           aria-label="Actions"
         >
-          <CashTransactionDialog
-            onTransactionSubmit={handleAddTransaction}
+          <AddCashTransactionDialog
+            onAddTransaction={handleAddTransaction}
             expenseCategories={expenseCategories}
             onAddCategory={handleAddCategory}
-            open={isAddingTransaction}
-            onOpenChange={setIsAddingTransaction}
           >
             <Button
               className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white focus:ring-2 focus:ring-offset-2"
               disabled={loadingState.actions}
               aria-label="Add new transaction"
               role="button"
-              onClick={() => setIsAddingTransaction(true)}
             >
               <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
               Add Transaction
             </Button>
-          </CashTransactionDialog>
+          </AddCashTransactionDialog>
           <Button
             onClick={handlePrint}
             className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
@@ -1429,18 +1425,16 @@ export default function CashBookPage() {
 
       {/* Edit Transaction Dialog */}
       {editingTransaction && (
-        <CashTransactionDialog
+        <EditCashTransactionDialog
           transaction={editingTransaction}
           open={!!editingTransaction}
           onOpenChange={(open) => {
             if (!open) setEditingTransaction(null);
           }}
-          onTransactionSubmit={async (updated) => {
-            await handleEditTransaction(editingTransaction.id, updated);
+          onEditTransaction={(updated) => {
+            handleEditTransaction(editingTransaction.id, updated);
             setEditingTransaction(null);
           }}
-          expenseCategories={expenseCategories}
-          onAddCategory={handleAddCategory}
           aria-label="Edit transaction"
           role="dialog"
           aria-modal="true"
