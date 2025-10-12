@@ -125,7 +125,7 @@ export default function CashBookPage() {
 
   // Debug logging only in development
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === "development") {
       console.log("Loading state:", loadingState);
       console.log("Daily cash transactions:", dailyCashTransactions);
     }
@@ -134,13 +134,13 @@ export default function CashBookPage() {
   // Calculate daily cash summary from transactions
   const { dailyCash, financials, monthlyTotals } = useMemo(() => {
     const transactions = dailyCashTransactions || [];
-    
+
     // Return empty data if no valid transactions
     if (!Array.isArray(transactions) || transactions.length === 0) {
       return {
         dailyCash: [],
         financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
-        monthlyTotals: []
+        monthlyTotals: [],
       };
     }
 
@@ -150,7 +150,7 @@ export default function CashBookPage() {
     const monthly = {};
 
     // Process transactions once for all calculations
-    dailyCashTransactions.forEach(item => {
+    dailyCashTransactions.forEach((item) => {
       // Daily summary calculation
       const date = item.date;
       if (!dailySummary[date]) {
@@ -176,7 +176,8 @@ export default function CashBookPage() {
         dailySummary[date].cashOut += cashOut;
       }
 
-      dailySummary[date].balance = dailySummary[date].cashIn - dailySummary[date].cashOut;
+      dailySummary[date].balance =
+        dailySummary[date].cashIn - dailySummary[date].cashOut;
       dailySummary[date].dailyCash.push(item);
 
       // Update overall totals
@@ -199,8 +200,9 @@ export default function CashBookPage() {
     });
 
     // Convert daily summary to sorted array
-    const dailyCash = Object.values(dailySummary)
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const dailyCash = Object.values(dailySummary).sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
 
     // Calculate financial summary
     const financials = {
@@ -319,12 +321,18 @@ export default function CashBookPage() {
   };
 
   const handleEditTransaction = async (transactionId, updatedData) => {
-    setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
+      // Update in Firebase and context state
       await updateDailyCashTransaction(transactionId, updatedData);
+
+      // Reset editing state
+      setEditingTransaction(null);
+
+      // Show success message
       toast({
         title: "Success",
         description: "Transaction updated successfully",
+        duration: 2000,
       });
     } catch (error) {
       console.error("Error updating transaction:", error);
@@ -333,8 +341,9 @@ export default function CashBookPage() {
         description: "Failed to update transaction. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
+
+      // Re-open the dialog on error
+      setEditingTransaction((prev) => prev);
     }
   };
 
@@ -542,8 +551,6 @@ export default function CashBookPage() {
       </CardContent>
     </Card>
   );
-
-
 
   // Add this new component for the financial summary
   const FinancialSummary = () => {
