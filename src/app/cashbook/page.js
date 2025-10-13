@@ -150,108 +150,85 @@ export default function CashBookPage() {
 
   // Add debug logging
   useEffect(() => {
-<<<<<<< HEAD
     console.log("Loading state:", loadingState);
     console.log("Daily cash transactions:", dailyCashTransactions);
-=======
     if (process.env.NODE_ENV === "development") {
       console.log("Loading state:", loadingState);
       console.log("Daily cash transactions:", dailyCashTransactions);
     }
->>>>>>> feat/performance-and-bug-fixes
   }, [loadingState, dailyCashTransactions]);
 
   // Memoize calculations for better performance
   const { dailyCash, financials, monthlyTotals } = useMemo(() => {
-<<<<<<< HEAD
     const dailySummary = dailyCashTransactions.reduce((acc, item) => {
-=======
-    const transactions = dailyCashTransactions || [];
+      const transactions = dailyCashTransactions || [];
 
-    // Return empty data if no valid transactions
-    if (!Array.isArray(transactions) || transactions.length === 0) {
-      return {
-        dailyCash: [],
-        financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
-        monthlyTotals: [],
-      };
-    }
-
-    const dailySummary = {};
-    let totalCashIn = 0;
-    let totalCashOut = 0;
-    const monthly = {};
-
-    // Process transactions once for all calculations
-    dailyCashTransactions.forEach((item) => {
-      // Daily summary calculation
->>>>>>> feat/performance-and-bug-fixes
-      const date = item.date;
-      if (!acc[date]) {
-        acc[date] = {
-          date,
-          cashIn: 0,
-          cashOut: 0,
-          balance: 0,
+      // Return empty data if no valid transactions
+      if (!Array.isArray(transactions) || transactions.length === 0) {
+        return {
           dailyCash: [],
+          financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
+          monthlyTotals: [],
         };
       }
 
-      // Handle bank deposits and withdrawals
-      if (item.transactionType === "bank_deposit") {
-        acc[date].cashIn += item.cashIn || 0;
-      } else if (item.transactionType === "bank_withdrawal") {
-        acc[date].cashOut += item.cashOut || 0;
-      } else {
-        acc[date].cashIn += item.cashIn || 0;
-        acc[date].cashOut += item.cashOut || 0;
-      }
+      const dailySummary = {};
+      let totalCashIn = 0;
+      let totalCashOut = 0;
+      const monthly = {};
 
-<<<<<<< HEAD
-      acc[date].balance = acc[date].cashIn - acc[date].cashOut;
-      acc[date].dailyCash.push(item);
-=======
-      dailySummary[date].balance =
-        dailySummary[date].cashIn - dailySummary[date].cashOut;
-      dailySummary[date].dailyCash.push(item);
->>>>>>> feat/performance-and-bug-fixes
+      // Process transactions once for all calculations
+      dailyCashTransactions.forEach((item) => {
+        // Daily summary calculation
+        const date = item.date;
+        if (!acc[date]) {
+          acc[date] = {
+            date,
+            cashIn: 0,
+            cashOut: 0,
+            balance: 0,
+            dailyCash: [],
+          };
+        }
 
-      return acc;
-    }, {});
+        // Handle bank deposits and withdrawals
+        if (item.transactionType === "bank_deposit") {
+          acc[date].cashIn += item.cashIn || 0;
+        } else if (item.transactionType === "bank_withdrawal") {
+          acc[date].cashOut += item.cashOut || 0;
+        } else {
+          acc[date].cashIn += item.cashIn || 0;
+          acc[date].cashOut += item.cashOut || 0;
+        }
 
-    const dailyCash = Object.values(dailySummary).sort(
-      (a, b) => new Date(b.date) - new Date(a.date)
-    );
+        acc[date].balance = acc[date].cashIn - acc[date].cashOut;
+        acc[date].dailyCash.push(item);
+        dailySummary[date].balance =
+          dailySummary[date].cashIn - dailySummary[date].cashOut;
+        dailySummary[date].dailyCash.push(item);
 
-<<<<<<< HEAD
-=======
-    // Convert daily summary to sorted array
-    const dailyCash = Object.values(dailySummary).sort(
-      (a, b) => new Date(b.date) - new Date(a.date)
-    );
+        return acc;
+      }, {});
 
-    // Calculate financial summary
->>>>>>> feat/performance-and-bug-fixes
-    const financials = {
-      totalCashIn: dailyCashTransactions.reduce(
-        (sum, t) => sum + (t.cashIn || 0),
-        0
-      ),
-      totalCashOut: dailyCashTransactions.reduce(
-        (sum, t) => sum + (t.cashOut || 0),
-        0
-      ),
-      availableCash: dailyCashTransactions.reduce(
-        (sum, t) => sum + ((t.cashIn || 0) - (t.cashOut || 0)),
-        0
-      ),
-    };
+      const dailyCash = Object.values(dailySummary).sort(
+        (a, b) => new Date(b.date) - new Date(a.date)
+      );
 
-    const monthly = dailyCashTransactions.reduce((acc, transaction) => {
-      const month = transaction.date.substring(0, 7);
-      if (!acc[month]) {
-        acc[month] = { cashIn: 0, cashOut: 0 };
-      }
+      // Calculate financial summary
+      const financials = {
+        totalCashIn: dailyCashTransactions.reduce(
+          (sum, t) => sum + (t.cashIn || 0),
+          0
+        ),
+        totalCashOut: dailyCashTransactions.reduce(
+          (sum, t) => sum + (t.cashOut || 0),
+          0
+        ),
+        availableCash: dailyCashTransactions.reduce(
+          (sum, t) => sum + ((t.cashIn || 0) - (t.cashOut || 0)),
+          0
+        ),
+      };
 
       // Handle bank deposits and withdrawals in monthly totals
       if (transaction.transactionType === "bank_deposit") {
