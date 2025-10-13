@@ -414,16 +414,13 @@ export default function CashBookPage() {
       // First delete from Firebase
       await deleteDailyCashTransaction(transactionToDelete);
 
-<<<<<<< HEAD
       // Then update the local state using the setter from useData hook
       const updatedTransactions = dailyCashTransactions.filter(
         (transaction) => transaction.id !== transactionToDelete
       );
       setDailyCashTransactions(updatedTransactions);
 
-=======
       // Show success message
->>>>>>> feat/performance-and-bug-fixes
       toast({
         title: "Success",
         description: "Transaction deleted successfully",
@@ -621,7 +618,6 @@ export default function CashBookPage() {
     </Card>
   );
 
-<<<<<<< HEAD
   // Add this new component for the delete confirmation dialog
   const DeleteConfirmationDialog = () => (
     <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -648,8 +644,6 @@ export default function CashBookPage() {
     </AlertDialog>
   );
 
-=======
->>>>>>> feat/performance-and-bug-fixes
   // Add this new component for the financial summary
   const FinancialSummary = () => {
     // Calculate transaction totals
