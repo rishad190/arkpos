@@ -158,91 +158,87 @@ export default function CashBookPage() {
     }
   }, [loadingState, dailyCashTransactions]);
 
-  // Memoize calculations for better performance
+  // Calculate daily cash summary from transactions
   const { dailyCash, financials, monthlyTotals } = useMemo(() => {
-    const dailySummary = dailyCashTransactions.reduce((acc, item) => {
-      const transactions = dailyCashTransactions || [];
+    const transactions = dailyCashTransactions || [];
 
-      // Return empty data if no valid transactions
-      if (!Array.isArray(transactions) || transactions.length === 0) {
-        return {
+    // Return empty data if no valid transactions
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return {
+        dailyCash: [],
+        financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
+        monthlyTotals: [],
+      };
+    }
+
+    const dailySummary = {};
+    let totalCashIn = 0;
+    let totalCashOut = 0;
+    const monthly = {};
+
+    // Process transactions once for all calculations
+    dailyCashTransactions.forEach((item) => {
+      // Daily summary calculation
+      const date = item.date;
+      if (!dailySummary[date]) {
+        dailySummary[date] = {
+          date,
+          cashIn: 0,
+          cashOut: 0,
+          balance: 0,
           dailyCash: [],
-          financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
-          monthlyTotals: [],
         };
       }
 
-      const dailySummary = {};
-      let totalCashIn = 0;
-      let totalCashOut = 0;
-      const monthly = {};
+      const cashIn = item.cashIn || 0;
+      const cashOut = item.cashOut || 0;
 
-      // Process transactions once for all calculations
-      dailyCashTransactions.forEach((item) => {
-        // Daily summary calculation
-        const date = item.date;
-        if (!acc[date]) {
-          acc[date] = {
-            date,
-            cashIn: 0,
-            cashOut: 0,
-            balance: 0,
-            dailyCash: [],
-          };
-        }
-
-        // Handle bank deposits and withdrawals
-        if (item.transactionType === "bank_deposit") {
-          acc[date].cashIn += item.cashIn || 0;
-        } else if (item.transactionType === "bank_withdrawal") {
-          acc[date].cashOut += item.cashOut || 0;
-        } else {
-          acc[date].cashIn += item.cashIn || 0;
-          acc[date].cashOut += item.cashOut || 0;
-        }
-
-        acc[date].balance = acc[date].cashIn - acc[date].cashOut;
-        acc[date].dailyCash.push(item);
-        dailySummary[date].balance =
-          dailySummary[date].cashIn - dailySummary[date].cashOut;
-        dailySummary[date].dailyCash.push(item);
-
-        return acc;
-      }, {});
-
-      const dailyCash = Object.values(dailySummary).sort(
-        (a, b) => new Date(b.date) - new Date(a.date)
-      );
-
-      // Calculate financial summary
-      const financials = {
-        totalCashIn: dailyCashTransactions.reduce(
-          (sum, t) => sum + (t.cashIn || 0),
-          0
-        ),
-        totalCashOut: dailyCashTransactions.reduce(
-          (sum, t) => sum + (t.cashOut || 0),
-          0
-        ),
-        availableCash: dailyCashTransactions.reduce(
-          (sum, t) => sum + ((t.cashIn || 0) - (t.cashOut || 0)),
-          0
-        ),
-      };
-
-      // Handle bank deposits and withdrawals in monthly totals
-      if (transaction.transactionType === "bank_deposit") {
-        acc[month].cashIn += transaction.cashIn || 0;
-      } else if (transaction.transactionType === "bank_withdrawal") {
-        acc[month].cashOut += transaction.cashOut || 0;
+      // Update daily totals
+      if (item.transactionType === "bank_deposit") {
+        dailySummary[date].cashIn += cashIn;
+      } else if (item.transactionType === "bank_withdrawal") {
+        dailySummary[date].cashOut += cashOut;
       } else {
-        acc[month].cashIn += transaction.cashIn || 0;
-        acc[month].cashOut += transaction.cashOut || 0;
+        dailySummary[date].cashIn += cashIn;
+        dailySummary[date].cashOut += cashOut;
       }
 
-      return acc;
-    }, {});
+      dailySummary[date].balance =
+        dailySummary[date].cashIn - dailySummary[date].cashOut;
+      dailySummary[date].dailyCash.push(item);
 
+      // Update overall totals
+      totalCashIn += cashIn;
+      totalCashOut += cashOut;
+
+      // Monthly totals calculation
+      const month = date.substring(0, 7);
+      if (!monthly[month]) {
+        monthly[month] = { cashIn: 0, cashOut: 0 };
+      }
+      if (item.transactionType === "bank_deposit") {
+        monthly[month].cashIn += cashIn;
+      } else if (item.transactionType === "bank_withdrawal") {
+        monthly[month].cashOut += cashOut;
+      } else {
+        monthly[month].cashIn += cashIn;
+        monthly[month].cashOut += cashOut;
+      }
+    });
+
+    // Convert daily summary to sorted array
+    const dailyCash = Object.values(dailySummary).sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
+
+    // Calculate financial summary
+    const financials = {
+      totalCashIn,
+      totalCashOut,
+      availableCash: totalCashIn - totalCashOut,
+    };
+
+    // Convert and sort monthly totals
     const monthlyTotals = Object.entries(monthly)
       .map(([month, totals]) => ({
         month,
@@ -252,7 +248,7 @@ export default function CashBookPage() {
       .sort((a, b) => b.month.localeCompare(a.month));
 
     return { dailyCash, financials, monthlyTotals };
-  }, [dailyCashTransactions]);
+  }, [dailyCashTransactions]); // Recalculate when transactions change
   // Filter transactions based on search term, date, active tab, year, category, and view mode
   const filteredCash = useMemo(() => {
     return dailyCash.filter((day) => {
@@ -965,7 +961,6 @@ export default function CashBookPage() {
                 aria-label="Search transactions"
                 role="searchbox"
                 aria-controls="transactions-table"
-                aria-expanded="false"
               />
             </div>
             <div
