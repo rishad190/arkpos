@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, memo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,6 @@ import { LoadingState, TableSkeleton } from "@/components/LoadingState";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useData } from "@/app/data-context";
 import { useToast } from "@/hooks/use-toast";
-import { useDebounce } from "@/hooks/use-debounce";
 import {
   CUSTOMER_CONSTANTS,
   ERROR_MESSAGES,
@@ -66,7 +65,6 @@ export default function Dashboard() {
   });
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [selectedFilter, setSelectedFilter] = useState(
     CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL
   );
@@ -87,50 +85,55 @@ export default function Dashboard() {
     });
   }, [customers, transactions, fabrics, suppliers, error]);
 
-  // Optimized statistics calculations
-  const totals = useMemo(() => {
-    if (!customers || !transactions) {
-      return { totalBill: 0, totalDeposit: 0, totalDue: 0 };
+  // Calculate totals and statistics
+  const stats = useMemo(() => {
+    if (!customers || !transactions || !fabrics || !suppliers) {
+      return {
+        totalBill: 0,
+        totalDeposit: 0,
+        totalDue: 0,
+        totalCustomers: 0,
+        totalFabrics: 0,
+        totalSuppliers: 0,
+        recentTransactions: [],
+        lowStockItems: [],
+      };
     }
-    return customers.reduce(
+
+    const totals = customers.reduce(
       (acc, customer) => {
         const customerTransactions =
           transactions?.filter((t) => t.customerId === customer.id) || [];
-        acc.totalBill += customerTransactions.reduce(
-          (sum, t) => sum + (t.total || 0),
-          0
-        );
-        acc.totalDeposit += customerTransactions.reduce(
-          (sum, t) => sum + (t.deposit || 0),
-          0
-        );
-        acc.totalDue += getCustomerDue(customer.id);
-        return acc;
+        return {
+          totalBill:
+            acc.totalBill +
+            customerTransactions.reduce((sum, t) => sum + (t.total || 0), 0),
+          totalDeposit:
+            acc.totalDeposit +
+            customerTransactions.reduce((sum, t) => sum + (t.deposit || 0), 0),
+          totalDue: acc.totalDue + getCustomerDue(customer.id),
+        };
       },
       { totalBill: 0, totalDeposit: 0, totalDue: 0 }
     );
-  }, [customers, transactions, getCustomerDue]);
 
-  const recentTransactions = useMemo(() => {
-    if (!transactions) return [];
-    return [...transactions]
+    const recentTransactions = [...transactions]
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 5);
-  }, [transactions]);
 
-  const lowStockItems = useMemo(() => {
-    if (!fabrics) return [];
-    return fabrics.filter((f) => f.totalQuantity < 10).slice(0, 5);
-  }, [fabrics]);
+    const lowStockItems = fabrics
+      .filter((f) => f.totalQuantity < 10)
+      .slice(0, 5);
 
-  const stats = {
-    ...totals,
-    totalCustomers: customers?.length || 0,
-    totalFabrics: fabrics?.length || 0,
-    totalSuppliers: suppliers?.length || 0,
-    recentTransactions,
-    lowStockItems,
-  };
+    return {
+      ...totals,
+      totalCustomers: customers.length,
+      totalFabrics: fabrics.length,
+      totalSuppliers: suppliers.length,
+      recentTransactions,
+      lowStockItems,
+    };
+  }, [customers, transactions, fabrics, suppliers, getCustomerDue]);
 
   // Get all unique tags from customers
   const allTags = useMemo(() => {
@@ -139,11 +142,6 @@ export default function Dashboard() {
       customer.tags?.forEach((tag) => tags.add(tag));
     });
     return Array.from(tags).sort();
-  }, [customers]);
-
-  const customerNameMap = useMemo(() => {
-    if (!customers) return new Map();
-    return new Map(customers.map((c) => [c.id, c.name]));
   }, [customers]);
 
   const handleAddCustomer = async (customerData) => {
@@ -231,38 +229,6 @@ export default function Dashboard() {
     }
   }, [customers, transactions]);
 
-  const filteredCustomers = useMemo(() => {
-    return (customers || []).filter((customer) => {
-      if (!customer) return false;
-
-      const matchesSearch =
-        customer.name
-          ?.toLowerCase()
-          .includes(debouncedSearchTerm.toLowerCase()) ||
-        customer.phone?.includes(debouncedSearchTerm);
-
-      const currentDue = getCustomerDue(customer.id);
-      const matchesFilter =
-        selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL ||
-        (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.DUE &&
-          currentDue > 0) ||
-        (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.PAID &&
-          currentDue === 0);
-
-      const matchesTags =
-        selectedTags.length === 0 ||
-        selectedTags.every((tag) => customer.tags?.includes(tag));
-
-      return matchesSearch && matchesFilter && matchesTags;
-    });
-  }, [
-    customers,
-    debouncedSearchTerm,
-    selectedFilter,
-    selectedTags,
-    getCustomerDue,
-  ]);
-
   if (error) {
     return (
       <div className="p-8 text-center">
@@ -317,6 +283,28 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  const filteredCustomers = (customers || []).filter((customer) => {
+    if (!customer) return false;
+
+    const matchesSearch =
+      customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.phone?.includes(searchTerm);
+
+    const currentDue = getCustomerDue(customer.id);
+    const matchesFilter =
+      selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL ||
+      (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.DUE &&
+        currentDue > 0) ||
+      (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.PAID &&
+        currentDue === 0);
+
+    const matchesTags =
+      selectedTags.length === 0 ||
+      selectedTags.every((tag) => customer.tags?.includes(tag));
+
+    return matchesSearch && matchesFilter && matchesTags;
+  });
 
   return (
     <ErrorBoundary>
@@ -573,8 +561,9 @@ export default function Dashboard() {
                         >
                           <div>
                             <p className="font-medium">
-                              {customerNameMap.get(transaction.customerId) ||
-                                "Unknown Customer"}
+                              {customers.find(
+                                (c) => c.id === transaction.customerId
+                              )?.name || "Unknown Customer"}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {new Date(transaction.date).toLocaleDateString()}
@@ -734,7 +723,7 @@ export default function Dashboard() {
 }
 
 // Loading skeleton components
-const SummaryCardSkeleton = memo(function SummaryCardSkeleton() {
+function SummaryCardSkeleton() {
   return (
     <Card className="overflow-hidden border-none shadow-md">
       <CardContent className="p-0">
@@ -751,9 +740,9 @@ const SummaryCardSkeleton = memo(function SummaryCardSkeleton() {
       </CardContent>
     </Card>
   );
-});
+}
 
-const QuickStatSkeleton = memo(function QuickStatSkeleton() {
+function QuickStatSkeleton() {
   return (
     <Card className="border-none shadow-md">
       <CardContent className="p-6">
@@ -766,15 +755,9 @@ const QuickStatSkeleton = memo(function QuickStatSkeleton() {
       </CardContent>
     </Card>
   );
-});
+}
 
-const QuickStatCard = memo(function QuickStatCard({
-  title,
-  value,
-  icon: Icon,
-  trend,
-  trendValue,
-}) {
+function QuickStatCard({ title, value, icon: Icon, trend, trendValue }) {
   return (
     <Card className="border-none shadow-md">
       <CardContent className="p-6">
@@ -800,4 +783,4 @@ const QuickStatCard = memo(function QuickStatCard({
       </CardContent>
     </Card>
   );
-});
+}

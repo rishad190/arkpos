@@ -11,8 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { AddCashTransactionDialog } from "@/components/AddCashTransactionDialog";
-import { EditCashTransactionDialog } from "@/components/EditCashTransactionDialog";
+import { CashTransactionDialog } from "@/components/CashTransactionDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -81,7 +80,6 @@ export default function CashBookPage() {
     deleteDailyCashTransaction,
     getExpenseCategories,
     updateExpenseCategories,
-    setDailyCashTransactions, // Add this
   } = useData();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
@@ -97,6 +95,7 @@ export default function CashBookPage() {
   });
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [editingTransaction, setEditingTransaction] = useState(null);
+  const [isAddingTransaction, setIsAddingTransaction] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [viewMode, setViewMode] = useState("daily"); // daily, monthly, yearly
   const [loadingState, setLoadingState] = useState({
@@ -151,13 +150,42 @@ export default function CashBookPage() {
 
   // Add debug logging
   useEffect(() => {
+<<<<<<< HEAD
     console.log("Loading state:", loadingState);
     console.log("Daily cash transactions:", dailyCashTransactions);
+=======
+    if (process.env.NODE_ENV === "development") {
+      console.log("Loading state:", loadingState);
+      console.log("Daily cash transactions:", dailyCashTransactions);
+    }
+>>>>>>> feat/performance-and-bug-fixes
   }, [loadingState, dailyCashTransactions]);
 
   // Memoize calculations for better performance
   const { dailyCash, financials, monthlyTotals } = useMemo(() => {
+<<<<<<< HEAD
     const dailySummary = dailyCashTransactions.reduce((acc, item) => {
+=======
+    const transactions = dailyCashTransactions || [];
+
+    // Return empty data if no valid transactions
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return {
+        dailyCash: [],
+        financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
+        monthlyTotals: [],
+      };
+    }
+
+    const dailySummary = {};
+    let totalCashIn = 0;
+    let totalCashOut = 0;
+    const monthly = {};
+
+    // Process transactions once for all calculations
+    dailyCashTransactions.forEach((item) => {
+      // Daily summary calculation
+>>>>>>> feat/performance-and-bug-fixes
       const date = item.date;
       if (!acc[date]) {
         acc[date] = {
@@ -179,8 +207,14 @@ export default function CashBookPage() {
         acc[date].cashOut += item.cashOut || 0;
       }
 
+<<<<<<< HEAD
       acc[date].balance = acc[date].cashIn - acc[date].cashOut;
       acc[date].dailyCash.push(item);
+=======
+      dailySummary[date].balance =
+        dailySummary[date].cashIn - dailySummary[date].cashOut;
+      dailySummary[date].dailyCash.push(item);
+>>>>>>> feat/performance-and-bug-fixes
 
       return acc;
     }, {});
@@ -189,6 +223,15 @@ export default function CashBookPage() {
       (a, b) => new Date(b.date) - new Date(a.date)
     );
 
+<<<<<<< HEAD
+=======
+    // Convert daily summary to sorted array
+    const dailyCash = Object.values(dailySummary).sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
+
+    // Calculate financial summary
+>>>>>>> feat/performance-and-bug-fixes
     const financials = {
       totalCashIn: dailyCashTransactions.reduce(
         (sum, t) => sum + (t.cashIn || 0),
@@ -332,12 +375,18 @@ export default function CashBookPage() {
   };
 
   const handleEditTransaction = async (transactionId, updatedData) => {
-    setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
+      // Update in Firebase and context state
       await updateDailyCashTransaction(transactionId, updatedData);
+
+      // Reset editing state
+      setEditingTransaction(null);
+
+      // Show success message
       toast({
         title: "Success",
         description: "Transaction updated successfully",
+        duration: 2000,
       });
     } catch (error) {
       console.error("Error updating transaction:", error);
@@ -346,8 +395,9 @@ export default function CashBookPage() {
         description: "Failed to update transaction. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
+
+      // Re-open the dialog on error
+      setEditingTransaction((prev) => prev);
     }
   };
 
@@ -364,12 +414,16 @@ export default function CashBookPage() {
       // First delete from Firebase
       await deleteDailyCashTransaction(transactionToDelete);
 
+<<<<<<< HEAD
       // Then update the local state using the setter from useData hook
       const updatedTransactions = dailyCashTransactions.filter(
         (transaction) => transaction.id !== transactionToDelete
       );
       setDailyCashTransactions(updatedTransactions);
 
+=======
+      // Show success message
+>>>>>>> feat/performance-and-bug-fixes
       toast({
         title: "Success",
         description: "Transaction deleted successfully",
@@ -567,6 +621,7 @@ export default function CashBookPage() {
     </Card>
   );
 
+<<<<<<< HEAD
   // Add this new component for the delete confirmation dialog
   const DeleteConfirmationDialog = () => (
     <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -593,6 +648,8 @@ export default function CashBookPage() {
     </AlertDialog>
   );
 
+=======
+>>>>>>> feat/performance-and-bug-fixes
   // Add this new component for the financial summary
   const FinancialSummary = () => {
     // Calculate transaction totals
@@ -815,21 +872,24 @@ export default function CashBookPage() {
           role="toolbar"
           aria-label="Actions"
         >
-          <AddCashTransactionDialog
-            onAddTransaction={handleAddTransaction}
+          <CashTransactionDialog
+            onTransactionSubmit={handleAddTransaction}
             expenseCategories={expenseCategories}
             onAddCategory={handleAddCategory}
+            open={isAddingTransaction}
+            onOpenChange={setIsAddingTransaction}
           >
             <Button
               className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white focus:ring-2 focus:ring-offset-2"
               disabled={loadingState.actions}
               aria-label="Add new transaction"
               role="button"
+              onClick={() => setIsAddingTransaction(true)}
             >
               <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
               Add Transaction
             </Button>
-          </AddCashTransactionDialog>
+          </CashTransactionDialog>
           <Button
             onClick={handlePrint}
             className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
@@ -1209,22 +1269,28 @@ export default function CashBookPage() {
                             <div className="flex gap-2 justify-end">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    data-radix-dropdown-menu-trigger
+                                  >
                                     <MoreVertical className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem
-                                    onClick={(e) => {
+                                    onSelect={(e) => {
                                       e.stopPropagation();
-                                      setEditingTransaction(t);
+                                      requestAnimationFrame(() =>
+                                        setEditingTransaction(t)
+                                      );
                                     }}
                                   >
                                     Edit
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     className="text-red-500"
-                                    onClick={(e) => {
+                                    onSelect={(e) => {
                                       e.stopPropagation();
                                       handleDeleteTransaction(t.id);
                                     }}
@@ -1258,22 +1324,28 @@ export default function CashBookPage() {
                             <div className="flex gap-2 justify-end">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    data-radix-dropdown-menu-trigger
+                                  >
                                     <MoreVertical className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem
-                                    onClick={(e) => {
+                                    onSelect={(e) => {
                                       e.stopPropagation();
-                                      setEditingTransaction(t);
+                                      requestAnimationFrame(() =>
+                                        setEditingTransaction(t)
+                                      );
                                     }}
                                   >
                                     Edit
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     className="text-red-500"
-                                    onClick={(e) => {
+                                    onSelect={(e) => {
                                       e.stopPropagation();
                                       handleDeleteTransaction(t.id);
                                     }}
@@ -1380,22 +1452,25 @@ export default function CashBookPage() {
                                         variant="ghost"
                                         size="sm"
                                         className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
+                                        data-radix-dropdown-menu-trigger
                                       >
                                         <MoreVertical className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                       <DropdownMenuItem
-                                        onClick={(e) => {
+                                        onSelect={(e) => {
                                           e.stopPropagation();
-                                          setEditingTransaction(t);
+                                          requestAnimationFrame(() =>
+                                            setEditingTransaction(t)
+                                          );
                                         }}
                                       >
                                         Edit
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
                                         className="text-red-500"
-                                        onClick={(e) => {
+                                        onSelect={(e) => {
                                           e.stopPropagation();
                                           handleDeleteTransaction(t.id);
                                         }}
@@ -1434,22 +1509,25 @@ export default function CashBookPage() {
                                         variant="ghost"
                                         size="sm"
                                         className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
+                                        data-radix-dropdown-menu-trigger
                                       >
                                         <MoreVertical className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                       <DropdownMenuItem
-                                        onClick={(e) => {
+                                        onSelect={(e) => {
                                           e.stopPropagation();
-                                          setEditingTransaction(t);
+                                          requestAnimationFrame(() =>
+                                            setEditingTransaction(t)
+                                          );
                                         }}
                                       >
                                         Edit
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
                                         className="text-red-500"
-                                        onClick={(e) => {
+                                        onSelect={(e) => {
                                           e.stopPropagation();
                                           handleDeleteTransaction(t.id);
                                         }}
@@ -1474,16 +1552,18 @@ export default function CashBookPage() {
 
       {/* Edit Transaction Dialog */}
       {editingTransaction && (
-        <EditCashTransactionDialog
+        <CashTransactionDialog
           transaction={editingTransaction}
           open={!!editingTransaction}
           onOpenChange={(open) => {
             if (!open) setEditingTransaction(null);
           }}
-          onEditTransaction={(updated) => {
-            handleEditTransaction(editingTransaction.id, updated);
+          onTransactionSubmit={async (updated) => {
+            await handleEditTransaction(editingTransaction.id, updated);
             setEditingTransaction(null);
           }}
+          expenseCategories={expenseCategories}
+          onAddCategory={handleAddCategory}
           aria-label="Edit transaction"
           role="dialog"
           aria-modal="true"

@@ -15,36 +15,31 @@ const firebaseConfig = {
 
 // Initialize Firebase
 let app;
-let db;
-let auth;
+let db = null;
+let auth = null;
 
-try {
-  app = initializeApp(firebaseConfig);
-  db = getDatabase(app);
-  auth = getAuth(app);
-
-  // Monitor database connection
-  const connectedRef = ref(db, ".info/connected");
-  onValue(connectedRef, (snap) => {
-    if (snap.val() === true) {
-      console.log("Connected to Firebase");
-    } else {
-      console.warn("Not connected to Firebase");
-    }
-  });
-
-  // Test database access
-  const dbRef = ref(db);
-  get(dbRef)
-    .then(() => {
-      console.log("Firebase data access successful");
-    })
-    .catch((error) => {
-      console.error("Firebase data access error:", error);
-    });
-} catch (error) {
-  console.error("Firebase initialization error:", error);
-  throw new Error("Failed to initialize Firebase");
+// Only initialize Firebase if all environment variables are present
+if (
+  firebaseConfig.apiKey &&
+  firebaseConfig.authDomain &&
+  firebaseConfig.databaseURL &&
+  firebaseConfig.projectId &&
+  firebaseConfig.storageBucket &&
+  firebaseConfig.messagingSenderId &&
+  firebaseConfig.appId
+) {
+  try {
+    app = initializeApp(firebaseConfig);
+    db = getDatabase(app);
+    auth = getAuth(app);
+    console.log("Firebase initialized successfully.");
+  } catch (error) {
+    console.error("Firebase initialization error:", error);
+  }
+} else {
+  console.warn(
+    "Firebase environment variables are not fully configured. Firebase services will be disabled."
+  );
 }
 
 // Export database instance and auth
