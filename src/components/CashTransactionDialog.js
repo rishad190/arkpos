@@ -262,15 +262,14 @@ export function CashTransactionDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="transaction-dialog-title"
+      aria-describedby="transaction-dialog-description"
     >
-      <DialogHeader>
-        <DialogTitle id="transaction-dialog-title">
-          {mode === "add" ? "Add" : "Edit"} Transaction
-        </DialogTitle>
-        <DialogDescription>
-          Enter the transaction details below.
-        </DialogDescription>
-      </DialogHeader>
+      <DialogTitle id="transaction-dialog-title">
+        {mode === "add" ? "Add" : "Edit"} Transaction
+      </DialogTitle>
+      <DialogDescription id="transaction-dialog-description">
+        Enter the transaction details below.
+      </DialogDescription>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
