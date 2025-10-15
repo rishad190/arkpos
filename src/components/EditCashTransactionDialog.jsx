@@ -17,75 +17,38 @@ export function EditCashTransactionDialog({
   onOpenChange,
   onEditTransaction,
 }) {
-  const [formData, setFormData] = useState(() => ({
-    date: transaction?.date || new Date().toISOString().split("T")[0],
-    description: transaction?.description || "",
-    cashIn: transaction?.cashIn || 0,
-    cashOut: transaction?.cashOut || 0,
-  }));
+  const [formData, setFormData] = useState({
+    date: transaction.date,
+    description: transaction.description,
+    cashIn: transaction.cashIn || 0,
+    cashOut: transaction.cashOut || 0,
+  });
 
-  const [transactionType, setTransactionType] = useState(() =>
-    (transaction?.cashIn || 0) > 0 ? "in" : "out"
+  const [transactionType, setTransactionType] = useState(
+    transaction.cashIn > 0 ? "in" : "out"
   );
 
   useEffect(() => {
-    if (transaction && open) {
-      // Only update form data when dialog is opened
-      setFormData({
-        date: transaction.date,
-        description: transaction.description,
-        cashIn: transaction.cashIn || 0,
-        cashOut: transaction.cashOut || 0,
-      });
-      setTransactionType(transaction.cashIn > 0 ? "in" : "out");
-    }
-  }, [transaction, open]);
+    setFormData({
+      date: transaction.date,
+      description: transaction.description,
+      cashIn: transaction.cashIn || 0,
+      cashOut: transaction.cashOut || 0,
+    });
+    setTransactionType(transaction.cashIn > 0 ? "in" : "out");
+  }, [transaction]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    try {
-      // Create updated transaction data
-      const updatedTransaction = {
-        ...formData,
-        cashIn: transactionType === "in" ? Number(formData.cashIn) : 0,
-        cashOut: transactionType === "out" ? Number(formData.cashOut) : 0,
-      };
-
-      // Call the update function
-      await onEditTransaction(updatedTransaction);
-
-      // Close the dialog after successful update
-      onOpenChange(false);
-
-      // Reset form state
-      setFormData({
-        date: transaction.date,
-        description: transaction.description,
-        cashIn: transaction.cashIn || 0,
-        cashOut: transaction.cashOut || 0,
-      });
-    } catch (error) {
-      console.error("Error updating transaction:", error);
-      // You might want to show an error toast here
-    }
+    const updatedTransaction = {
+      ...formData,
+      cashIn: transactionType === "in" ? Number(formData.cashIn) : 0,
+      cashOut: transactionType === "out" ? Number(formData.cashOut) : 0,
+    };
+    onEditTransaction(updatedTransaction);
   };
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          // Reset form when dialog is closed
-          setFormData({
-            date: transaction?.date || new Date().toISOString().split("T")[0],
-            description: transaction?.description || "",
-            cashIn: transaction?.cashIn || 0,
-            cashOut: transaction?.cashOut || 0,
-          });
-          setTransactionType((transaction?.cashIn || 0) > 0 ? "in" : "out");
-        }
-        onOpenChange(isOpen);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="sm:max-w-[425px] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         role="dialog"

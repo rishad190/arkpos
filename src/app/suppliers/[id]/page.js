@@ -3,7 +3,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { ref, onValue, push, update, remove } from "firebase/database";
 import { db } from "@/lib/firebase";
-import { useData } from "@/app/data-context";
+import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
 import {
@@ -34,16 +34,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AddSupplierTransactionDialog } from "@/components/AddSupplierTransactionDialog";
+import { AddSupplierTransactionDialog } from "@/components/AddSupplierTransactionDialog.jsx";
 import { formatDate } from "@/lib/utils";
-import { EditSupplierTransactionDialog } from "@/components/EditSupplierTransactionDialog";
+import { EditSupplierTransactionDialog } from "@/components/EditSupplierTransactionDialog.jsx";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { exportToCSV, exportToPDF } from "@/utils/export";
+import { exportToCSV, exportToPDF } from "@/lib/utils";
 
 export default function SupplierDetail() {
   const params = useParams();
@@ -123,7 +123,6 @@ export default function SupplierDetail() {
         supplierId: params.id,
         createdAt: new Date().toISOString(),
       };
-      console.log(newTransaction);
 
       await update(newTransactionRef, newTransaction);
 
@@ -144,19 +143,12 @@ export default function SupplierDetail() {
 
   const handleDeleteTransaction = async (transactionId, amount, paidAmount) => {
     try {
-      const dueAmount = amount - (paidAmount || 0);
-      if (
-        window.confirm(
-          `Are you sure you want to delete this transaction?\nThis will reduce the total due by ৳${dueAmount.toLocaleString()}`
-        )
-      ) {
-        await deleteSupplierTransaction(
-          transactionId,
-          params.id,
-          amount,
-          paidAmount
-        );
-      }
+      await deleteSupplierTransaction(
+        transactionId,
+        params.id,
+        amount,
+        paidAmount
+      );
     } catch (error) {
       console.error("Error deleting transaction:", error);
       alert("Failed to delete transaction. Please try again.");
@@ -452,25 +444,38 @@ export default function SupplierDetail() {
                             onSave={handleEditTransaction}
                           />
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-500"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (
-                              window.confirm(
-                                "Are you sure you want to delete this transaction?"
-                              )
-                            ) {
-                              handleDeleteTransaction(
-                                transaction.id,
-                                transaction.totalAmount,
-                                transaction.paidAmount
-                              );
-                            }
-                          }}
-                        >
-                          Delete
-                        </DropdownMenuItem>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem
+                              className="text-red-500"
+                              onSelect={(e) => e.preventDefault()}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the transaction.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() =>
+                                  handleDeleteTransaction(
+                                    transaction.id,
+                                    transaction.totalAmount,
+                                    transaction.paidAmount
+                                  )
+                                }
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

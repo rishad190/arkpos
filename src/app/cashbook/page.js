@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { useData } from "@/app/data-context";
+import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { CashTransactionDialog } from "@/components/CashTransactionDialog";
+import { CashTransactionDialog } from "@/components/CashTransactionDialog.jsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +34,17 @@ import {
   Trash2,
 } from "lucide-react";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -52,16 +63,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+
 import {
   Tooltip,
   TooltipContent,
@@ -71,6 +73,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/common/PageHeader";
 
 export default function CashBookPage() {
   const {
@@ -103,8 +106,7 @@ export default function CashBookPage() {
     transactions: false,
     actions: false,
   });
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [transactionToDelete, setTransactionToDelete] = useState(null);
+  const [loadingDelete, setLoadingDelete] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [expenseCategories, setExpenseCategories] = useState([]);
 
@@ -126,37 +128,12 @@ export default function CashBookPage() {
     loadCategories();
   }, [getExpenseCategories, toast]);
 
-  // Add useEffect to handle initial loading state
+  // Handle initial loading state
   useEffect(() => {
-    const initializeData = async () => {
-      try {
-        // Wait for dailyCashTransactions to be available
-        if (dailyCashTransactions !== undefined) {
-          setLoadingState((prev) => ({ ...prev, initial: false }));
-        }
-      } catch (error) {
-        console.error("Error loading initial data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load data. Please refresh the page.",
-          variant: "destructive",
-        });
-        setLoadingState((prev) => ({ ...prev, initial: false }));
-      }
-    };
-
-    initializeData();
-  }, [dailyCashTransactions, toast]);
-
-  // Add debug logging
-  useEffect(() => {
-    console.log("Loading state:", loadingState);
-    console.log("Daily cash transactions:", dailyCashTransactions);
-    if (process.env.NODE_ENV === "development") {
-      console.log("Loading state:", loadingState);
-      console.log("Daily cash transactions:", dailyCashTransactions);
+    if (dailyCashTransactions !== undefined) {
+      setLoadingState((prev) => ({ ...prev, initial: false }));
     }
-  }, [loadingState, dailyCashTransactions]);
+  }, [dailyCashTransactions]);
 
   // Calculate daily cash summary from transactions
   const { dailyCash, financials, monthlyTotals } = useMemo(() => {
@@ -167,7 +144,7 @@ export default function CashBookPage() {
       return {
         dailyCash: [],
         financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
-        monthlyTotals: [],
+        monthlyTotals: []
       };
     }
 
@@ -177,7 +154,7 @@ export default function CashBookPage() {
     const monthly = {};
 
     // Process transactions once for all calculations
-    dailyCashTransactions.forEach((item) => {
+    dailyCashTransactions.forEach(item => {
       // Daily summary calculation
       const date = item.date;
       if (!dailySummary[date]) {
@@ -203,8 +180,7 @@ export default function CashBookPage() {
         dailySummary[date].cashOut += cashOut;
       }
 
-      dailySummary[date].balance =
-        dailySummary[date].cashIn - dailySummary[date].cashOut;
+      dailySummary[date].balance = dailySummary[date].cashIn - dailySummary[date].cashOut;
       dailySummary[date].dailyCash.push(item);
 
       // Update overall totals
@@ -227,9 +203,8 @@ export default function CashBookPage() {
     });
 
     // Convert daily summary to sorted array
-    const dailyCash = Object.values(dailySummary).sort(
-      (a, b) => new Date(b.date) - new Date(a.date)
-    );
+    const dailyCash = Object.values(dailySummary)
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // Calculate financial summary
     const financials = {
@@ -348,18 +323,12 @@ export default function CashBookPage() {
   };
 
   const handleEditTransaction = async (transactionId, updatedData) => {
+    setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      // Update in Firebase and context state
       await updateDailyCashTransaction(transactionId, updatedData);
-
-      // Reset editing state
-      setEditingTransaction(null);
-
-      // Show success message
       toast({
         title: "Success",
         description: "Transaction updated successfully",
-        duration: 2000,
       });
     } catch (error) {
       console.error("Error updating transaction:", error);
@@ -368,30 +337,21 @@ export default function CashBookPage() {
         description: "Failed to update transaction. Please try again.",
         variant: "destructive",
       });
-
-      // Re-open the dialog on error
-      setEditingTransaction((prev) => prev);
+    } finally {
+      setLoadingState((prev) => ({ ...prev, actions: false }));
     }
   };
 
   const handleDeleteTransaction = async (transactionId) => {
-    setTransactionToDelete(transactionId);
-    setDeleteDialogOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!transactionToDelete) return;
-
-    setLoadingState((prev) => ({ ...prev, actions: true }));
+    setLoadingDelete(true);
     try {
-      // First delete from Firebase
-      await deleteDailyCashTransaction(transactionToDelete);
-
-      // Then update the local state using the setter from useData hook
-      const updatedTransactions = dailyCashTransactions.filter(
-        (transaction) => transaction.id !== transactionToDelete
+      // Optimistically update the UI
+      setDailyCashTransactions((prev) =>
+        prev.filter((t) => t.id !== transactionId)
       );
-      setDailyCashTransactions(updatedTransactions);
+
+      // Delete from Firebase
+      await deleteDailyCashTransaction(transactionId);
 
       // Show success message
       toast({
@@ -399,10 +359,6 @@ export default function CashBookPage() {
         description: "Transaction deleted successfully",
         duration: 2000,
       });
-
-      // Reset dialog and transaction states after successful deletion
-      setDeleteDialogOpen(false);
-      setTransactionToDelete(null);
     } catch (error) {
       console.error("Error deleting transaction:", error);
       toast({
@@ -410,8 +366,9 @@ export default function CashBookPage() {
         description: "Failed to delete transaction. Please try again.",
         variant: "destructive",
       });
+      // If the delete fails, the real-time listener will eventually correct the state
     } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
+      setLoadingDelete(false);
     }
   };
 
@@ -591,31 +548,7 @@ export default function CashBookPage() {
     </Card>
   );
 
-  // Add this new component for the delete confirmation dialog
-  const DeleteConfirmationDialog = () => (
-    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
-          <AlertDialogDescription>
-            Are you sure you want to delete this transaction? This action cannot
-            be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel className="focus:ring-2 focus:ring-offset-2">
-            Cancel
-          </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={confirmDelete}
-            className="bg-red-600 hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-          >
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
+
 
   // Add this new component for the financial summary
   const FinancialSummary = () => {
@@ -820,77 +753,64 @@ export default function CashBookPage() {
         {loadingState.error && "An error occurred. Please try again."}
       </div>
 
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1
-            className="text-3xl font-bold tracking-tight"
-            role="heading"
-            aria-level="1"
-          >
-            Cash Book
-          </h1>
-          <p className="text-muted-foreground mt-1" role="contentinfo">
-            Manage and track all cash transactions
-          </p>
-        </div>
-        <div
-          className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto"
-          role="toolbar"
-          aria-label="Actions"
-        >
-          <CashTransactionDialog
-            onTransactionSubmit={handleAddTransaction}
-            expenseCategories={expenseCategories}
-            onAddCategory={handleAddCategory}
-            open={isAddingTransaction}
-            onOpenChange={setIsAddingTransaction}
-          >
-            <Button
-              className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white focus:ring-2 focus:ring-offset-2"
-              disabled={loadingState.actions}
-              aria-label="Add new transaction"
-              role="button"
-              onClick={() => setIsAddingTransaction(true)}
+      <PageHeader
+        title="Cash Book"
+        description="Manage and track all cash transactions"
+        actions={
+          <>
+            <CashTransactionDialog
+              onTransactionSubmit={handleAddTransaction}
+              expenseCategories={expenseCategories}
+              onAddCategory={handleAddCategory}
+              open={isAddingTransaction}
+              onOpenChange={setIsAddingTransaction}
             >
-              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-              Add Transaction
+              <Button
+                className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white focus:ring-2 focus:ring-offset-2"
+                disabled={loadingState.actions}
+                aria-label="Add new transaction"
+                role="button"
+                onClick={() => setIsAddingTransaction(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                Add Transaction
+              </Button>
+            </CashTransactionDialog>
+            <Button
+              onClick={handlePrint}
+              className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
+              variant="outline"
+              disabled={loadingState.actions || isPrinting}
+              aria-label={isPrinting ? "Printing cashbook report..." : "Print cashbook report"}
+              role="button"
+              aria-busy={isPrinting}
+            >
+              <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
+              {isPrinting ? "Printing..." : "Print Report"}
             </Button>
-          </CashTransactionDialog>
-          <Button
-            onClick={handlePrint}
-            className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
-            variant="outline"
-            disabled={loadingState.actions || isPrinting}
-            aria-label={isPrinting ? "Printing report..." : "Print report"}
-            role="button"
-            aria-busy={isPrinting}
-          >
-            <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
-            {isPrinting ? "Printing..." : "Print Report"}
-          </Button>
-          <Button
-            onClick={handleExportPDF}
-            className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
-            variant="outline"
-            disabled={loadingState.actions}
-            aria-label="Export as PDF"
-          >
-            <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
-            Export PDF
-          </Button>
-          <Button
-            onClick={handleExportCSV}
-            className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
-            variant="outline"
-            disabled={loadingState.actions}
-            aria-label="Export as CSV"
-          >
-            <Download className="mr-2 h-4 w-4" aria-hidden="true" />
-            Export CSV
-          </Button>
-        </div>
-      </div>
+            <Button
+              onClick={handleExportPDF}
+              className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
+              variant="outline"
+              disabled={loadingState.actions}
+              aria-label="Export cashbook report to PDF"
+            >
+              <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
+              Export PDF
+            </Button>
+            <Button
+              onClick={handleExportCSV}
+              className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
+              variant="outline"
+              disabled={loadingState.actions}
+              aria-label="Export cashbook report to CSV"
+            >
+              <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+              Export CSV
+            </Button>
+          </>
+        }
+      />
 
       {/* Financial Summary */}
       <FinancialSummary />
@@ -1235,34 +1155,43 @@ export default function CashBookPage() {
                             <div className="flex gap-2 justify-end">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    data-radix-dropdown-menu-trigger
-                                  >
+                                  <Button variant="ghost" size="sm">
                                     <MoreVertical className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem
-                                    onSelect={(e) => {
+                                    onClick={(e) => {
                                       e.stopPropagation();
-                                      requestAnimationFrame(() =>
-                                        setEditingTransaction(t)
-                                      );
+                                      setEditingTransaction(t);
                                     }}
                                   >
                                     Edit
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-red-500"
-                                    onSelect={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteTransaction(t.id);
-                                    }}
-                                  >
-                                    Delete
-                                  </DropdownMenuItem>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <DropdownMenuItem
+                                        className="text-red-500"
+                                        onSelect={(e) => e.preventDefault()}
+                                      >
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          This action cannot be undone. This will permanently delete the transaction.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteTransaction(t.id)}>
+                                          Delete
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
@@ -1290,28 +1219,22 @@ export default function CashBookPage() {
                             <div className="flex gap-2 justify-end">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    data-radix-dropdown-menu-trigger
-                                  >
+                                  <Button variant="ghost" size="sm">
                                     <MoreVertical className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem
-                                    onSelect={(e) => {
+                                    onClick={(e) => {
                                       e.stopPropagation();
-                                      requestAnimationFrame(() =>
-                                        setEditingTransaction(t)
-                                      );
+                                      setEditingTransaction(t);
                                     }}
                                   >
                                     Edit
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     className="text-red-500"
-                                    onSelect={(e) => {
+                                    onClick={(e) => {
                                       e.stopPropagation();
                                       handleDeleteTransaction(t.id);
                                     }}
@@ -1418,25 +1341,22 @@ export default function CashBookPage() {
                                         variant="ghost"
                                         size="sm"
                                         className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
-                                        data-radix-dropdown-menu-trigger
                                       >
                                         <MoreVertical className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                       <DropdownMenuItem
-                                        onSelect={(e) => {
+                                        onClick={(e) => {
                                           e.stopPropagation();
-                                          requestAnimationFrame(() =>
-                                            setEditingTransaction(t)
-                                          );
+                                          setEditingTransaction(t);
                                         }}
                                       >
                                         Edit
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
                                         className="text-red-500"
-                                        onSelect={(e) => {
+                                        onClick={(e) => {
                                           e.stopPropagation();
                                           handleDeleteTransaction(t.id);
                                         }}
@@ -1475,25 +1395,22 @@ export default function CashBookPage() {
                                         variant="ghost"
                                         size="sm"
                                         className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
-                                        data-radix-dropdown-menu-trigger
                                       >
                                         <MoreVertical className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                       <DropdownMenuItem
-                                        onSelect={(e) => {
+                                        onClick={(e) => {
                                           e.stopPropagation();
-                                          requestAnimationFrame(() =>
-                                            setEditingTransaction(t)
-                                          );
+                                          setEditingTransaction(t);
                                         }}
                                       >
                                         Edit
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
                                         className="text-red-500"
-                                        onSelect={(e) => {
+                                        onClick={(e) => {
                                           e.stopPropagation();
                                           handleDeleteTransaction(t.id);
                                         }}
@@ -1535,9 +1452,6 @@ export default function CashBookPage() {
           aria-modal="true"
         />
       )}
-
-      {/* Add the Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog />
 
       {/* Add the printable content div */}
       <div id="printable-content" className="hidden">

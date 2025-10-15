@@ -3,11 +3,16 @@ import { twMerge } from "tailwind-merge";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
+// Tailwind class merger
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
-// Format date to DD-MM-YYYY
+/**
+ * Format date to DD-MM-YYYY
+ * @param {string|Date} dateString - Date to format
+ * @returns {string} Formatted date
+ */
 export const formatDate = (dateString) => {
   try {
     const date = new Date(dateString);
@@ -24,46 +29,72 @@ export const formatDate = (dateString) => {
   }
 };
 
-// Format currency with proper error handling
-export const formatCurrency = (amount) => {
+/**
+ * Format currency with proper error handling
+ * @param {number|string} amount - Amount to format
+ * @param {string} currency - Currency symbol (default: ৳)
+ * @returns {string} Formatted currency
+ */
+export const formatCurrency = (amount, currency = "৳") => {
   try {
-    if (amount === undefined || amount === null) return "৳0";
+    if (amount === undefined || amount === null) return `${currency}0`;
     const numAmount = Number(amount);
     if (isNaN(numAmount)) {
       throw new Error("Invalid amount");
     }
-    return `৳${numAmount.toLocaleString("en-IN")}`;
+    return `${currency}${numAmount.toLocaleString("en-IN")}`;
   } catch (error) {
     console.error("Error formatting currency:", error);
-    return "৳0";
+    return `${currency}0`;
   }
 };
 
-// Export to CSV with better error handling
+/**
+ * Export data to CSV
+ * @param {Array} data - Data to export
+ * @param {string} filename - Filename without extension
+ * @returns {boolean} Success status
+ */
 export const exportToCSV = (data, filename) => {
   try {
     if (!Array.isArray(data) || data.length === 0) {
       throw new Error("Invalid data format");
     }
 
-    // Convert data to CSV string
+    const BOM = "\uFEFF"; // Add BOM for proper Unicode handling
     const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(","),
-      ...data.map((row) =>
-        headers
-          .map((header) => {
-            const value = row[header];
-            // Handle values that might contain commas
-            return typeof value === "string" && value.includes(",")
-              ? `"${value}"`
-              : value;
-          })
-          .join(",")
-      ),
-    ].join("\n");
 
-    // Create and trigger download
+    // Format value based on type
+    const formatValue = (value, header) => {
+      // Format dates
+      if (
+        value instanceof Date ||
+        (typeof value === "string" && !isNaN(Date.parse(value)))
+      ) {
+        return formatDate(value);
+      }
+
+      // Format numbers
+      if (typeof value === "number") {
+        return value.toLocaleString("en-IN");
+      }
+
+      // Handle strings with commas
+      return typeof value === "string" && value.includes(",")
+        ? `"${value}"`
+        : String(value || "");
+    };
+
+    const csvContent =
+      BOM +
+      [
+        headers.join(","),
+        ...data.map((row) =>
+          headers.map((header) => formatValue(row[header], header)).join(",")
+        ),
+      ].join("\n");
+
+    // Create download
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -73,6 +104,8 @@ export const exportToCSV = (data, filename) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
     return true;
   } catch (error) {
     console.error("Error exporting CSV:", error);
@@ -81,254 +114,105 @@ export const exportToCSV = (data, filename) => {
   }
 };
 
-export const exportToPDF = (entity, transactions, type = "customer") => {
+/**
+ * Export data to PDF
+ * @param {Array} data - Data to export
+ * @param {string} filename - Filename without extension
+ * @param {Object} options - PDF options
+ * @returns {boolean} Success status
+ */
+export const exportToPDF = (data, filename, options = {}) => {
   try {
-    // Create new document
-    const doc = new jsPDF();
-    let yPos = 15;
-
-    // Header with company name
-    doc.setFillColor(41, 128, 185);
-    doc.rect(0, 0, doc.internal.pageSize.width, 30, "F");
-
-    // Company name
-    doc.setFontSize(24);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.text("Sky Fabric's", 15, 20);
-
-    // Document type
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "normal");
-    doc.text(
-      `${type === "customer" ? "Customer" : "Supplier"} Statement`,
-      doc.internal.pageSize.width - 15,
-      20,
-      { align: "right" }
-    );
-
-    // Update starting position for rest of content
-    yPos = 40;
-
-    // Rest of the content
-    doc.setTextColor(0, 0, 0);
-
-    // Entity Info Section
-    const entityInfo = [
-      [
-        `${type === "customer" ? "Customer" : "Supplier"}: ${entity.name}`,
-        `ID: ${entity.id}`,
-      ],
-      [`Phone: ${entity.phone}`, `Store: ${entity.storeId || "Main Store"}`],
-      [`Report Date: ${formatDate(new Date())}`, ""],
-    ];
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [],
-      body: entityInfo,
-      theme: "plain",
-      styles: { fontSize: 10 },
-      columnStyles: {
-        0: { cellWidth: 100 },
-        1: { cellWidth: 90 },
-      },
-      didDrawPage: (data) => {
-        yPos = data.cursor.y + 10;
-      },
-    });
-
-    // Calculate totals
-    const totalAmount =
-      type === "customer"
-        ? transactions.reduce((sum, t) => sum + (Number(t.total) || 0), 0)
-        : transactions.reduce(
-            (sum, t) => sum + (Number(t.totalAmount) || 0),
-            0
-          );
-
-    const totalPaid =
-      type === "customer"
-        ? transactions.reduce((sum, t) => sum + (Number(t.deposit) || 0), 0)
-        : transactions.reduce((sum, t) => sum + (Number(t.paidAmount) || 0), 0);
-
-    const totalDue = transactions.reduce(
-      (sum, t) => sum + (Number(t.due) || 0),
-      0
-    );
-
-    // Financial Summary
-    const summaryData =
-      type === "customer"
-        ? [
-            ["Total Bill", "Total Deposit", "Total Due"],
-            [
-              formatCurrency(totalAmount),
-              formatCurrency(totalPaid),
-              formatCurrency(totalDue),
-            ],
-          ]
-        : [
-            ["Total Amount", "Total Paid", "Total Due"],
-            [
-              formatCurrency(totalAmount),
-              formatCurrency(totalPaid),
-              formatCurrency(totalDue),
-            ],
-          ];
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [summaryData[0]],
-      body: [summaryData[1]],
-      theme: "grid",
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: [255, 255, 255],
-        fontSize: 10,
-        fontStyle: "bold",
-      },
-      styles: {
-        fontSize: 10,
-        halign: "right",
-      },
-      didDrawPage: (data) => {
-        yPos = data.cursor.y + 10;
-      },
-    });
-
-    // Transactions Table Headers
-    const headers =
-      type === "customer"
-        ? [["Date", "Memo", "Details", "Total", "Deposit", "Due", "Balance"]]
-        : [["Date", "Invoice", "Details", "Total", "Paid", "Due", "Balance"]];
-
-    // Map transaction data
-    const data = transactions.map((t) =>
-      type === "customer"
-        ? [
-            formatDate(t.date),
-            t.memoNumber || "",
-            t.details || "",
-            formatCurrency(Number(t.total) || 0),
-            formatCurrency(Number(t.deposit) || 0),
-            formatCurrency(Number(t.due) || 0),
-            formatCurrency(Number(t.cumulativeBalance) || 0),
-          ]
-        : [
-            formatDate(t.date),
-            t.invoiceNumber || "",
-            t.details || "",
-            formatCurrency(Number(t.totalAmount) || 0),
-            formatCurrency(Number(t.paidAmount) || 0),
-            formatCurrency(Number(t.due) || 0),
-            formatCurrency(Number(t.cumulativeBalance) || 0),
-          ]
-    );
-
-    // Transactions Table
-    let finalY = 0;
-    autoTable(doc, {
-      startY: yPos,
-      head: headers,
-      body: data,
-      theme: "grid",
-      styles: {
-        fontSize: 9,
-        cellPadding: 2,
-      },
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: [255, 255, 255],
-        fontSize: 9,
-        fontStyle: "bold",
-      },
-      columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 20 },
-        2: { cellWidth: 40 },
-        3: { cellWidth: 25, halign: "right" },
-        4: { cellWidth: 25, halign: "right" },
-        5: { cellWidth: 25, halign: "right" },
-        6: { cellWidth: 25, halign: "right" },
-      },
-      margin: { left: 10 },
-      didDrawPage: (data) => {
-        finalY = data.cursor.y;
-        const pageNumber = doc.internal.getCurrentPageInfo().pageNumber;
-        const pageCount = doc.internal.getNumberOfPages();
-        doc.setFontSize(8);
-        doc.setTextColor(128);
-        doc.text(
-          `Page ${pageNumber} of ${pageCount}`,
-          doc.internal.pageSize.width / 2,
-          doc.internal.pageSize.height - 10,
-          { align: "center" }
-        );
-      },
-    });
-
-    // Check if there's enough space for the summary
-    const pageHeight = doc.internal.pageSize.height;
-    if (finalY > pageHeight - 50) {
-      doc.addPage();
-      finalY = 20;
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error("Invalid data format");
     }
 
-    // Calculate summary Y position
-    const summaryY = finalY + 20;
+    const {
+      title = filename,
+      subtitle = `Generated on ${formatDate(new Date())}`,
+      orientation = "portrait",
+      pageSize = "a4",
+      columns = Object.keys(data[0]).map((key) => ({
+        header: key.charAt(0).toUpperCase() + key.slice(1),
+        dataKey: key,
+      })),
+    } = options;
 
-    // Add final summary with proper positioning
-    doc.setDrawColor(41, 128, 185);
-    doc.setLineWidth(0.5);
-    doc.line(
-      doc.internal.pageSize.width - 80,
-      summaryY,
-      doc.internal.pageSize.width - 10,
-      summaryY
-    );
+    // Create PDF document
+    const doc = new jsPDF({
+      orientation,
+      unit: "mm",
+      format: pageSize,
+    });
 
-    // Add total due summary
-    doc.setFontSize(12);
-    doc.setTextColor(41, 128, 185);
-    doc.setFont("helvetica", "bold");
-    doc.text(
-      "Total Outstanding:",
-      doc.internal.pageSize.width - 80,
-      summaryY + 10
-    );
+    // Add title
+    doc.setFontSize(18);
+    doc.text(title, 14, 22);
 
-    doc.setTextColor(totalDue > 0 ? "#e74c3c" : "#27ae60");
-    doc.setFont("helvetica", "bold");
-    doc.text(
-      formatCurrency(totalDue),
-      doc.internal.pageSize.width - 10,
-      summaryY + 10,
-      { align: "right" }
-    );
+    // Add subtitle
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(subtitle, 14, 30);
 
-    // Add a note if there's due amount
-    if (totalDue > 0) {
-      doc.setFontSize(8);
-      doc.setTextColor(128);
-      doc.setFont("helvetica", "normal");
-      doc.text(
-        "* Please clear outstanding dues at your earliest convenience",
-        doc.internal.pageSize.width - 80,
-        doc.internal.pageSize.height - 25
-      );
-    }
+    // Add table
+    autoTable(doc, {
+      startY: 40,
+      head: [columns.map((col) => col.header)],
+      body: data.map((row) => columns.map((col) => row[col.dataKey])),
+      theme: "grid",
+      headStyles: {
+        fillColor: [51, 51, 51],
+        textColor: 255,
+        fontStyle: "bold",
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+    });
 
     // Save PDF
-    const fileName = `${entity.name.replace(
-      /\s+/g,
-      "-"
-    )}-${type}-statement-${formatDate(new Date())}.pdf`;
-    doc.save(fileName);
-    return fileName;
+    doc.save(`${filename}-${formatDate(new Date())}.pdf`);
+
+    return true;
   } catch (error) {
     console.error("Error exporting PDF:", error);
     alert("Failed to export PDF. Please try again.");
-    return null;
+    return false;
   }
+};
+
+/**
+ * Debounce function to limit function calls
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Delay in milliseconds
+ * @returns {Function} Debounced function
+ */
+export const debounce = (func, wait = 300) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
+/**
+ * Calculate weighted average cost
+ * @param {Array} items - Array of items with quantity and cost
+ * @returns {number} Weighted average
+ */
+export const calculateWeightedAverage = (items) => {
+  if (!items?.length) return 0;
+
+  const totalValue = items.reduce(
+    (sum, item) => sum + item.quantity * item.unitCost,
+    0
+  );
+
+  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  return totalQuantity > 0 ? totalValue / totalQuantity : 0;
 };

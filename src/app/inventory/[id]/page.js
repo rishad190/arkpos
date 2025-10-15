@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -12,9 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { SellFabricDialog } from "@/components/SellFabricDialog";
-import { PurchaseStockDialog } from "@/components/PurchaseStockDialog";
-import { EditFabricDialog } from "@/components/EditFabricDialog";
+import { SellFabricDialog } from "@/components/SellFabricDialog.jsx";
+import { PurchaseStockDialog } from "@/components/PurchaseStockDialog.jsx";
+import { EditFabricDialog } from "@/components/EditFabricDialog.jsx";
 import {
   calculateWeightedAverage,
   calculateFifoSale,
@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { EditBatchDialog } from "@/components/EditBatchDialog";
+import { EditBatchDialog } from "@/components/EditBatchDialog.jsx";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";

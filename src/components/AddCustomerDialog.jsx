@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { FormField } from "@/components/ui/form-field";
 import { useForm } from "@/hooks/use-form";
-import { useData } from "@/app/data-context";
+import { useData } from "@/contexts/data-context";
 import { useFirebaseCrud } from "@/hooks/use-firebase-crud";
 import { COLLECTION_REFS } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";

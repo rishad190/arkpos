@@ -113,13 +113,16 @@ function reducer(state, action) {
     case "ADD_DAILY_CASH_TRANSACTION":
       return {
         ...state,
-        dailyCashTransactions: [...state.dailyCashTransactions, action.payload],
+        dailyCashTransactions: [
+          ...state.dailyCashTransactions,
+          action.payload,
+        ],
       };
     case "UPDATE_DAILY_CASH_TRANSACTION":
       return {
         ...state,
         dailyCashTransactions: state.dailyCashTransactions.map((t) =>
-          t.id === action.payload.id ? { ...t, ...action.payload.data } : t
+          t.id === action.payload.id ? action.payload : t
         ),
       };
     case "REMOVE_DAILY_CASH_TRANSACTION":
@@ -178,10 +181,14 @@ function reducer(state, action) {
   }
 }
 
+// Export the provider component
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   // Firebase Subscriptions
+  // For production applications, it's recommended to use more granular queries
+  // to fetch only the data needed for a specific view. This will improve
+  // performance as the data grows.
   useEffect(() => {
     const unsubscribers = [];
     const collections = [
@@ -259,7 +266,7 @@ export function DataProvider({ children }) {
       onChildChanged(dailyCashRef, (snapshot) => {
         dispatch({
           type: "UPDATE_DAILY_CASH_TRANSACTION",
-          payload: { id: snapshot.key, data: snapshot.val() },
+          payload: { id: snapshot.key, ...snapshot.val() },
         });
       })
     );
@@ -576,28 +583,6 @@ export function DataProvider({ children }) {
     },
   };
 
-  // Daily Cash Operations
-  // Settings operations
-  const settingsOperations = {
-    updateSettings: async (newSettings) => {
-      try {
-        // Update settings in Firebase
-        await updateDoc(doc(db, "settings", "app"), newSettings);
-
-        // Update local state
-        dispatch({
-          type: "UPDATE_SETTINGS",
-          payload: newSettings,
-        });
-
-        return true;
-      } catch (error) {
-        console.error("Error updating settings:", error);
-        throw error;
-      }
-    },
-  };
-
   const dailyCashOperations = {
     addDailyCashTransaction: async (transaction) => {
       try {
@@ -667,6 +652,28 @@ export function DataProvider({ children }) {
         throw error;
       }
     },
+
+    setDailyCashTransactions: (transactions) => {
+      dispatch({ type: "SET_DAILY_CASH_TRANSACTIONS", payload: transactions });
+    },
+  };
+
+  const updateSettings = async (newSettings) => {
+    try {
+      // Update settings in Firebase
+      await updateDoc(doc(db, "settings", "app"), newSettings);
+
+      // Update local state
+      dispatch({
+        type: "UPDATE_SETTINGS",
+        payload: newSettings,
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Error updating settings:", error);
+      throw error;
+    }
   };
 
   const contextValue = {
@@ -678,8 +685,8 @@ export function DataProvider({ children }) {
     ...fabricOperations,
     ...supplierOperations,
     ...dailyCashOperations,
-    ...settingsOperations,
     settings: state.settings,
+    updateSettings,
     getExpenseCategories,
     updateExpenseCategories,
   };

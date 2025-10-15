@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useData } from "@/contexts/data-context";
 import {
   Table,
   TableBody,
@@ -29,12 +29,25 @@ import {
   ArrowDownRight,
   RefreshCw,
 } from "lucide-react";
+import { PageHeader } from "@/components/common/PageHeader";
+import { DataTable } from "@/components/common/DataTable";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function SuppliersPage() {
   const router = useRouter();
@@ -125,12 +138,7 @@ export default function SuppliersPage() {
     }
   };
 
-  const handleDeleteSupplier = async (e, supplierId) => {
-    e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this supplier?")) {
-      return;
-    }
-
+  const handleDeleteSupplier = async (supplierId) => {
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
       await deleteSupplier(supplierId);
@@ -260,46 +268,138 @@ export default function SuppliersPage() {
     );
   }
 
+  const columns = [
+    {
+      accessorKey: "name",
+      header: "Supplier Name",
+    },
+    {
+      accessorKey: "contact",
+      header: "Contact",
+      cell: ({ row }) => (
+        <div>
+          <div>{row.original.phone}</div>
+          <div className="text-sm text-gray-500">{row.original.email}</div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "address",
+      header: "Address",
+      cell: ({ row }) => <div className="truncate max-w-[200px]">{row.original.address}</div>,
+    },
+    {
+      accessorKey: "storeId",
+      header: "Store",
+      cell: ({ row }) => <Badge variant="outline">{row.original.storeId}</Badge>,
+    },
+    {
+      accessorKey: "totalDue",
+      header: "Total Due",
+      cell: ({ row }) => (
+        <div className={`text-right ${row.original.totalDue > 0 ? "text-red-500" : "text-green-500"}`}>
+          ৳{(row.original.totalDue || 0).toLocaleString()}
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <div className="flex justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingSupplier(row.original);
+                }}
+              >
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/suppliers/${row.original.id}`);
+                }}
+              >
+                View Details
+              </DropdownMenuItem>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem
+                                className="text-red-500"
+                                onSelect={(e) => e.preventDefault()}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the supplier and all associated data.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteSupplier(row.original.id)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Suppliers</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage and track all supplier information
-          </p>
-        </div>
-        <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
-          <AddSupplierDialog onAddSupplier={handleAddSupplier}>
+      <PageHeader
+        title="Suppliers"
+        description="Manage and track all supplier information"
+        actions={
+          <>
+            <AddSupplierDialog onAddSupplier={handleAddSupplier}>
+              <Button
+                className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
+                disabled={loadingState.actions}
+                aria-label="Add new supplier"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Supplier
+              </Button>
+            </AddSupplierDialog>
             <Button
-              className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
+              onClick={handleExportPDF}
+              className="w-full md:w-auto"
+              variant="outline"
               disabled={loadingState.actions}
+              aria-label="Export suppliers list to PDF"
             >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Supplier
+              <FileText className="mr-2 h-4 w-4" />
+              Export PDF
             </Button>
-          </AddSupplierDialog>
-          <Button
-            onClick={handleExportPDF}
-            className="w-full md:w-auto"
-            variant="outline"
-            disabled={loadingState.actions}
-          >
-            <FileText className="mr-2 h-4 w-4" />
-            Export PDF
-          </Button>
-          <Button
-            onClick={handleExportCSV}
-            className="w-full md:w-auto"
-            variant="outline"
-            disabled={loadingState.actions}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </Button>
-        </div>
-      </div>
+            <Button
+              onClick={handleExportCSV}
+              className="w-full md:w-auto"
+              variant="outline"
+              disabled={loadingState.actions}
+              aria-label="Export suppliers list to CSV"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
+          </>
+        }
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -397,120 +497,11 @@ export default function SuppliersPage() {
         </Card>
       </div>
 
-      {/* Search Section */}
-      <Card className="mb-8 border-none shadow-md">
-        <CardContent className="p-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search suppliers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-full"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Suppliers Table */}
-      <Card className="border-none shadow-md">
-        <CardContent className="p-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Supplier Name</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead>Store</TableHead>
-                <TableHead className="text-right">Total Due</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSuppliers.map((supplier) => (
-                <TableRow
-                  key={supplier.id}
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => router.push(`/suppliers/${supplier.id}`)}
-                >
-                  <TableCell>
-                    <div className="font-medium">{supplier.name}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div>{supplier.phone}</div>
-                    <div className="text-sm text-gray-500">
-                      {supplier.email}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div
-                      className="truncate max-w-[200px]"
-                      title={supplier.address}
-                    >
-                      {supplier.address}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{supplier.storeId}</Badge>
-                  </TableCell>
-                  <TableCell
-                    className={`text-right ${
-                      supplier.totalDue > 0 ? "text-red-500" : "text-green-500"
-                    }`}
-                  >
-                    ৳{(supplier.totalDue || 0).toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingSupplier(supplier);
-                            }}
-                          >
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/suppliers/${supplier.id}`);
-                            }}
-                          >
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-500"
-                            onClick={(e) =>
-                              handleDeleteSupplier(e, supplier.id)
-                            }
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!filteredSuppliers.length && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">
-                    No suppliers found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <DataTable
+        data={filteredSuppliers}
+        columns={columns}
+        filterColumn="name"
+      />
 
       {/* Edit Supplier Dialog */}
       {editingSupplier && (

@@ -37,8 +37,12 @@ export default function LoginPage() {
         return;
       }
 
-      if (password === "admin123") {
+      // In a real application, this should be a secure backend authentication call.
+      // For this example, we are using an environment variable for the password.
+      if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
         setIsLoading(true);
+        // Using localStorage is not recommended for secure session management.
+        // A more secure method like Firebase Authentication should be used.
         localStorage.setItem("isAuthenticated", "true");
         await router.push("/");
       } else {

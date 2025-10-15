@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -30,11 +30,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { calculateWeightedAverage } from "@/lib/inventory-utils";
-import { SellFabricDialog } from "@/components/SellFabricDialog";
+import { SellFabricDialog } from "@/components/SellFabricDialog.jsx";
 import { calculateFifoSale } from "@/lib/inventory-utils";
-import { AddFabricDialog } from "@/components/AddFabricDialog";
-import { PurchaseStockDialog } from "@/components/PurchaseStockDialog";
-import { EditFabricDialog } from "@/components/EditFabricDialog";
+import { AddFabricDialog } from "@/components/AddFabricDialog.jsx";
+import { PurchaseStockDialog } from "@/components/PurchaseStockDialog.jsx";
+import { EditFabricDialog } from "@/components/EditFabricDialog.jsx";
 import {
   Card,
   CardContent,
@@ -69,6 +69,8 @@ import {
 } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { PageHeader } from "@/components/common/PageHeader";
+import { DataTable } from "@/components/common/DataTable";
 
 export default function InventoryPage() {
   const router = useRouter();
@@ -232,13 +234,6 @@ export default function InventoryPage() {
   };
 
   const handleDeleteFabric = async (fabricId) => {
-    setFabricToDelete(fabricId);
-    setDeleteDialogOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!fabricToDelete) return;
-
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
       await deleteFabric(fabricToDelete);
@@ -387,29 +382,6 @@ export default function InventoryPage() {
     </Card>
   );
 
-  const DeleteConfirmationDialog = () => (
-    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete Fabric</AlertDialogTitle>
-          <AlertDialogDescription>
-            Are you sure you want to delete this fabric? This action cannot be
-            undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={confirmDelete}
-            className="bg-red-600 hover:bg-red-700"
-          >
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-
   const FinancialSummary = () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
       <Card className="overflow-hidden border-none shadow-md">
@@ -542,208 +514,151 @@ export default function InventoryPage() {
     );
   }
 
+  const columns = [
+    {
+      accessorKey: "code",
+      header: "Fabric Code",
+    },
+    {
+      accessorKey: "name",
+      header: "Name",
+    },
+    {
+      accessorKey: "totalQuantity",
+      header: "Stock Qty",
+      cell: ({ row }) => (
+        <Badge variant={row.original.totalQuantity > 0 ? "default" : "destructive"}>
+          {row.original.totalQuantity.toFixed(2)}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: "averageCost",
+      header: "Avg. Cost",
+      cell: ({ row }) => `৳${row.original.averageCost.toFixed(2)}`,
+    },
+    {
+      accessorKey: "currentValue",
+      header: "Current Value",
+      cell: ({ row }) => `৳${row.original.currentValue.toFixed(2)}`,
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <div className="flex space-x-2">
+          <EditFabricDialog
+            fabric={row.original}
+            onSave={handleEditFabric}
+            onDelete={handleDeleteFabric}
+          />
+          <SellFabricDialog
+            fabric={row.original}
+            onSellFabric={handleSellFabric}
+          />
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete the fabric and all associated data.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteFabric(row.original.id)}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Fabric Inventory
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage and track all fabric inventory
-          </p>
-        </div>
-        <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
-          <AddFabricDialog onAddFabric={handleAddFabric}>
-            <Button
-              className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
-              disabled={loadingState.actions}
+      <PageHeader
+        title="Fabric Inventory"
+        description="Manage and track all fabric inventory"
+        actions={
+          <>
+            <AddFabricDialog onAddFabric={handleAddFabric}>
+              <Button
+                className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
+                disabled={loadingState.actions}
+                aria-label="Add new fabric"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Fabric
+              </Button>
+            </AddFabricDialog>
+            <PurchaseStockDialog
+              fabrics={fabrics}
+              suppliers={suppliers}
+              onPurchaseStock={handlePurchaseStock}
             >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Fabric
-            </Button>
-          </AddFabricDialog>
-          <PurchaseStockDialog
-            fabrics={fabrics}
-            suppliers={suppliers}
-            onPurchaseStock={handlePurchaseStock}
-          >
+              <Button
+                className="w-full md:w-auto"
+                variant="outline"
+                disabled={loadingState.actions}
+                aria-label="Purchase new stock"
+              >
+                <Package className="mr-2 h-4 w-4" />
+                Purchase Stock
+              </Button>
+            </PurchaseStockDialog>
             <Button
+              onClick={handlePrint}
+              className="w-full md:w-auto"
+              variant="outline"
+              disabled={loadingState.actions || isPrinting}
+              aria-label="Print inventory report"
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              {isPrinting ? "Printing..." : "Print Report"}
+            </Button>
+            <Button
+              onClick={handleExportPDF}
               className="w-full md:w-auto"
               variant="outline"
               disabled={loadingState.actions}
+              aria-label="Export inventory report to PDF"
             >
-              <Package className="mr-2 h-4 w-4" />
-              Purchase Stock
+              <FileText className="mr-2 h-4 w-4" />
+              Export PDF
             </Button>
-          </PurchaseStockDialog>
-          <Button
-            onClick={handlePrint}
-            className="w-full md:w-auto"
-            variant="outline"
-            disabled={loadingState.actions || isPrinting}
-          >
-            <Printer className="mr-2 h-4 w-4" />
-            {isPrinting ? "Printing..." : "Print Report"}
-          </Button>
-          <Button
-            onClick={handleExportPDF}
-            className="w-full md:w-auto"
-            variant="outline"
-            disabled={loadingState.actions}
-          >
-            <FileText className="mr-2 h-4 w-4" />
-            Export PDF
-          </Button>
-          <Button
-            onClick={handleExportCSV}
-            className="w-full md:w-auto"
-            variant="outline"
-            disabled={loadingState.actions}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </Button>
-        </div>
-      </div>
+            <Button
+              onClick={handleExportCSV}
+              className="w-full md:w-auto"
+              variant="outline"
+              disabled={loadingState.actions}
+              aria-label="Export inventory report to CSV"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
+          </>
+        }
+      />
 
       {/* Financial Summary */}
       <FinancialSummary />
 
-      {/* Search & Filter Section */}
-      <Card className="mb-8 border-none shadow-md">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search fabrics..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-full"
-              />
-            </div>
-            <Select value={viewMode} onValueChange={setViewMode}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="View Mode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="average">Weighted Average</SelectItem>
-                <SelectItem value="fifo">FIFO</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Inventory Table */}
-      <Card className="border-none shadow-md">
-        <CardContent className="p-6">
-          {" "}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fabric Code</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead className="text-right">Stock Qty</TableHead>
-                <TableHead className="text-right">Avg. Cost</TableHead>
-                <TableHead className="text-right">Current Value</TableHead>
-                {viewMode === "fifo" && <TableHead>Batch Details</TableHead>}
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredFabrics.map((stock) => (
-                <TableRow
-                  key={stock.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/inventory/${stock.id}`)}
-                >
-                  <TableCell>
-                    <div className="font-medium">{stock.code}</div>
-                  </TableCell>
-                  <TableCell>{stock.name}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge
-                      variant={
-                        stock.totalQuantity > 0 ? "default" : "destructive"
-                      }
-                    >
-                      {stock.totalQuantity.toFixed(2)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    ৳{stock.averageCost.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    ৳{stock.currentValue.toFixed(2)}
-                  </TableCell>
-                  {viewMode === "fifo" && (
-                    <TableCell>
-                      {stock.batches?.map((batch) => (
-                        <div key={batch.id} className="text-sm">
-                          Qty: {batch.quantity} @ ৳{batch.unitCost}
-                        </div>
-                      ))}
-                    </TableCell>
-                  )}
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <div className="flex space-x-2">
-                      <EditFabricDialog
-                        fabric={stock}
-                        onSave={handleEditFabric}
-                        onDelete={handleDeleteFabric}
-                      />
-                      <SellFabricDialog
-                        fabric={stock}
-                        onSellFabric={handleSellFabric}
-                      />
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Fabric</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete &ldquo;
-                              {stock.name}&rdquo;? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-red-500 hover:bg-red-600"
-                              onClick={() => handleDeleteFabric(stock.id)}
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!filteredFabrics.length && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">
-                    No fabrics found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <DataTable
+        data={filteredFabrics}
+        columns={columns}
+        filterColumn="name"
+      />
 
       {/* Add the Delete Confirmation Dialog */}
       <DeleteConfirmationDialog />

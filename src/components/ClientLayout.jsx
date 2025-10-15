@@ -1,5 +1,5 @@
 "use client";
-import { DataProvider } from "@/app/data-context";
+import { DataProvider } from "@/contexts/data-context";
 import { useState, useEffect } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
 

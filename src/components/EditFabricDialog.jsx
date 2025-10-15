@@ -1,6 +1,17 @@
 "use client";
 import { useState } from "react";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -56,13 +67,11 @@ export function EditFabricDialog({ fabric, onSave, onDelete }) {
   };
 
   const handleDelete = async () => {
-    if (window.confirm("Are you sure you want to delete this fabric?")) {
-      try {
-        await onDelete(fabric.id);
-        setOpen(false);
-      } catch (error) {
-        setErrors({ submit: error.message });
-      }
+    try {
+      await onDelete(fabric.id);
+      setOpen(false);
+    } catch (error) {
+      setErrors({ submit: error.message });
     }
   };
 
@@ -176,9 +185,27 @@ export function EditFabricDialog({ fabric, onSave, onDelete }) {
           )}
 
           <div className="flex justify-between">
-            <Button type="button" variant="destructive" onClick={handleDelete}>
-              Delete Fabric
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button type="button" variant="destructive">
+                  Delete Fabric
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the fabric and all associated data.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete}>
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <div className="space-x-2">
               <Button
                 type="button"

@@ -9,16 +9,18 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { AddCustomerDialog } from "@/components/AddCustomerDialog";
-import { EditCustomerDialog } from "@/components/EditCustomerDialog";
-import { CustomerTable } from "@/components/CustomerTable";
-import { SummaryCards } from "@/components/SummaryCards";
-import { CustomerSearch } from "@/components/CustomerSearch";
-import { Pagination } from "@/components/Pagination";
-import { LoadingState, TableSkeleton } from "@/components/LoadingState";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { useData } from "@/app/data-context";
-import { useToast } from "@/hooks/use-toast";
+import { AddCustomerDialog } from "@/components/AddCustomerDialog.jsx";
+import { EditCustomerDialog } from "@/components/EditCustomerDialog.jsx";
+import { CustomerTable } from "@/components/CustomerTable.jsx";
+import { SummaryCards } from "@/components/SummaryCards.jsx";
+import { CustomerSearch } from "@/components/CustomerSearch.jsx";
+import { Pagination } from "@/components/Pagination.jsx";
+import { LoadingState, TableSkeleton } from "@/components/LoadingState.jsx";
+import { ErrorBoundary } from "@/components/ErrorBoundary.jsx";
+import { PageHeader } from "@/components/common/PageHeader";
+import { SkeletonLoader } from "@/components/common/SkeletonLoader";
+import { useData } from "@/contexts/data-context";
+import { useAppToast } from "@/hooks/use-app-toast";
 import {
   CUSTOMER_CONSTANTS,
   ERROR_MESSAGES,
@@ -38,6 +40,17 @@ import {
   History,
   Tag,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -55,7 +68,7 @@ export default function Dashboard() {
     deleteCustomer,
     getCustomerDue,
   } = useData();
-  const { toast } = useToast();
+  const { toastSuccess, toastError } = useAppToast();
 
   const [loadingState, setLoadingState] = useState({
     initial: true,
@@ -73,17 +86,6 @@ export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState("customers");
   const [selectedTags, setSelectedTags] = useState([]);
-
-  // Add debug logging
-  useEffect(() => {
-    console.log("Data Status:", {
-      customers: customers?.length || 0,
-      transactions: transactions?.length || 0,
-      fabrics: fabrics?.length || 0,
-      suppliers: suppliers?.length || 0,
-      error,
-    });
-  }, [customers, transactions, fabrics, suppliers, error]);
 
   // Calculate totals and statistics
   const stats = useMemo(() => {
@@ -149,17 +151,10 @@ export default function Dashboard() {
     try {
       await addCustomer(customerData);
       setIsAddingCustomer(false);
-      toast({
-        title: "Success",
-        description: "Customer added successfully",
-      });
+      toastSuccess("Customer added successfully");
     } catch (error) {
       console.error(ERROR_MESSAGES.ADD_ERROR, error);
-      toast({
-        title: "Error",
-        description: ERROR_MESSAGES.ADD_ERROR,
-        variant: "destructive",
-      });
+      toastError(ERROR_MESSAGES.ADD_ERROR);
     } finally {
       setLoadingState((prev) => ({ ...prev, actions: false }));
     }
@@ -170,17 +165,10 @@ export default function Dashboard() {
     try {
       await updateCustomer(customerId, updatedData);
       setEditingCustomer(null);
-      toast({
-        title: "Success",
-        description: "Customer updated successfully",
-      });
+      toastSuccess("Customer updated successfully");
     } catch (error) {
       console.error(ERROR_MESSAGES.UPDATE_ERROR, error);
-      toast({
-        title: "Error",
-        description: ERROR_MESSAGES.UPDATE_ERROR,
-        variant: "destructive",
-      });
+      toastError(ERROR_MESSAGES.UPDATE_ERROR);
     } finally {
       setLoadingState((prev) => ({ ...prev, actions: false }));
     }
@@ -191,24 +179,15 @@ export default function Dashboard() {
   };
 
   const handleDeleteCustomer = async (customerId) => {
-    if (window.confirm(ERROR_MESSAGES.DELETE_CONFIRMATION)) {
-      setLoadingState((prev) => ({ ...prev, actions: true }));
-      try {
-        await deleteCustomer(customerId);
-        toast({
-          title: "Success",
-          description: "Customer deleted successfully",
-        });
-      } catch (error) {
-        console.error(ERROR_MESSAGES.DELETE_ERROR, error);
-        toast({
-          title: "Error",
-          description: ERROR_MESSAGES.DELETE_ERROR,
-          variant: "destructive",
-        });
-      } finally {
-        setLoadingState((prev) => ({ ...prev, actions: false }));
-      }
+    setLoadingState((prev) => ({ ...prev, actions: true }));
+    try {
+      await deleteCustomer(customerId);
+      toastSuccess("Customer deleted successfully");
+    } catch (error) {
+      console.error(ERROR_MESSAGES.DELETE_ERROR, error);
+      toastError(ERROR_MESSAGES.DELETE_ERROR);
+    } finally {
+      setLoadingState((prev) => ({ ...prev, actions: false }));
     }
   };
 
@@ -238,50 +217,7 @@ export default function Dashboard() {
   }
 
   if (loadingState.initial || !customers) {
-    return (
-      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
-        {/* Header Skeleton */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-10 w-32" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <SummaryCardSkeleton />
-          <SummaryCardSkeleton />
-          <SummaryCardSkeleton />
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <QuickStatSkeleton />
-          <QuickStatSkeleton />
-          <QuickStatSkeleton />
-          <QuickStatSkeleton />
-        </div>
-
-        {/* Recent Activity */}
-        <Card className="border-none shadow-md">
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <SkeletonLoader />;
   }
 
   const filteredCustomers = (customers || []).filter((customer) => {
@@ -309,41 +245,38 @@ export default function Dashboard() {
   return (
     <ErrorBoundary>
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {PAGE_TITLES.CUSTOMER_MANAGEMENT}
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Welcome back! Here&apos;s an overview of your business
-            </p>
-          </div>
-          <div className="flex flex-col md:flex-row gap-2">
-            <AddCustomerDialog
-              isOpen={isAddingCustomer}
-              onClose={() => setIsAddingCustomer(false)}
-              onAddCustomer={handleAddCustomer}
-            >
-              <Button
-                className="w-full md:w-auto"
-                disabled={loadingState.actions}
+        <PageHeader
+          title={PAGE_TITLES.CUSTOMER_MANAGEMENT}
+          description="Welcome back! Here's an overview of your business"
+          actions={
+            <>
+              <AddCustomerDialog
+                isOpen={isAddingCustomer}
+                onClose={() => setIsAddingCustomer(false)}
+                onAddCustomer={handleAddCustomer}
               >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Customer
+                <Button
+                  className="w-full md:w-auto"
+                  disabled={loadingState.actions}
+                  aria-label="Add new customer"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Customer
+                </Button>
+              </AddCustomerDialog>
+              <Button
+                variant="outline"
+                className="w-full md:w-auto"
+                onClick={() => router.push("/cashmemo")}
+                disabled={loadingState.actions}
+                aria-label="Create new cash memo"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                New Cash Memo
               </Button>
-            </AddCustomerDialog>
-            <Button
-              variant="outline"
-              className="w-full md:w-auto"
-              onClick={() => router.push("/cashmemo")}
-              disabled={loadingState.actions}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              New Cash Memo
-            </Button>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -519,13 +452,6 @@ export default function Dashboard() {
                     />
                   )}
                 </div>
-                <Pagination
-                  currentPage={currentPage}
-                  totalItems={filteredCustomers.length}
-                  itemsPerPage={CUSTOMER_CONSTANTS.CUSTOMERS_PER_PAGE}
-                  onPageChange={setCurrentPage}
-                  className="mt-4"
-                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -719,41 +645,6 @@ export default function Dashboard() {
         )}
       </div>
     </ErrorBoundary>
-  );
-}
-
-// Loading skeleton components
-function SummaryCardSkeleton() {
-  return (
-    <Card className="overflow-hidden border-none shadow-md">
-      <CardContent className="p-0">
-        <div className="p-4 border-b">
-          <div className="flex justify-between items-center">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-4" />
-          </div>
-        </div>
-        <div className="p-4">
-          <Skeleton className="h-8 w-32 mb-2" />
-          <Skeleton className="h-3 w-24" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function QuickStatSkeleton() {
-  return (
-    <Card className="border-none shadow-md">
-      <CardContent className="p-6">
-        <div className="flex justify-between items-center mb-2">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-4" />
-        </div>
-        <Skeleton className="h-8 w-16 mb-2" />
-        <Skeleton className="h-3 w-20" />
-      </CardContent>
-    </Card>
   );
 }
 

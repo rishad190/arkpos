@@ -1,8 +1,9 @@
 "use client";
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
-import { CashMemoPrint } from "@/components/CashMemoPrint";
+import { useData } from "@/contexts/data-context";
+import { CashMemoPrint } from "@/components/CashMemoPrint.jsx";
+import { PageHeader } from "@/components/common/PageHeader";
 
 // Add Dialog imports for new customer creation
 import {
@@ -283,21 +284,6 @@ export default function CashMemoPage() {
       setIsSaving(true);
       const deposit = Number(memoData.deposit) || 0;
 
-      // Log transaction data for debugging
-      console.log("Saving transaction:", {
-        customerId,
-        date: memoData.date,
-        memoNumber: memoData.memoNumber,
-        total: grandTotal,
-        deposit: deposit,
-        due: grandTotal - deposit,
-        details: products
-          .map((p) => `${p.name} (${p.quality} x ৳${p.price})`)
-          .join(", "),
-        type: "SALE",
-        storeId: "STORE1",
-      });
-
       // Create transaction for customer
       const transaction = {
         customerId,
@@ -316,7 +302,6 @@ export default function CashMemoPage() {
 
       // Wait for transaction to be added
       const transactionResult = await addTransaction(transaction);
-      console.log("Transaction result:", transactionResult);
 
       // Only proceed with cash transaction if deposit exists and transaction was successful
       if (deposit > 0 && transactionResult) {
@@ -427,6 +412,10 @@ export default function CashMemoPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
+      <PageHeader
+        title="Cash Memo"
+        description="Create and manage customer cash memos"
+      />
       <Toaster />
       <Card className="p-4 md:p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

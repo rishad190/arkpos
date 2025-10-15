@@ -32,7 +32,6 @@ if (
     app = initializeApp(firebaseConfig);
     db = getDatabase(app);
     auth = getAuth(app);
-    console.log("Firebase initialized successfully.");
   } catch (error) {
     console.error("Firebase initialization error:", error);
   }
