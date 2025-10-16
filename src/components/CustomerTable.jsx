@@ -35,7 +35,7 @@ export function CustomerTable({ customers, getCustomerDue, onRowClick, onEdit, o
     {
       accessorKey: "address",
       header: "Address",
-      cell: ({ row }) => <div className="truncate max-w-[200px]">{row.original.address}</div>,
+      cell: ({ row }) => <div className="truncate max-w-[200px]">{row.original?.address}</div>,
     },
     {
       accessorKey: "storeId",

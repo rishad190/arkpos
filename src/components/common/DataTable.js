@@ -129,7 +129,7 @@ export function DataTable({ data, columns, filterColumn, itemsPerPage = 10, empt
           <TableBody>
             {paginatedData.length ? (
               paginatedData.map((row, rowIndex) => (
-                <TableRow key={rowIndex}>
+                <TableRow key={row.id || rowIndex}>
                   {columns.map((column) => (
                     <TableCell key={column.accessorKey}>
                       {column.cell ? column.cell({ row }) : row[column.accessorKey]}
