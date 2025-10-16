@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -32,7 +32,13 @@ import { EmptyState } from "@/components/common/EmptyState";
  * @param {object} [props.emptyState] - Configuration for the empty state component.
  * @returns {React.ReactNode} The rendered data table.
  */
-export function DataTable({ data, columns, filterColumn, itemsPerPage = 10, emptyState }) {
+export function DataTable({
+  data,
+  columns,
+  filterColumn,
+  itemsPerPage = 10,
+  emptyState,
+}) {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
   const [columnVisibility, setColumnVisibility] = useState({});
@@ -59,8 +65,11 @@ export function DataTable({ data, columns, filterColumn, itemsPerPage = 10, empt
     let filtered = data;
 
     if (globalFilter && filterColumn) {
-      filtered = filtered.filter(item =>
-        item[filterColumn]?.toString().toLowerCase().includes(globalFilter.toLowerCase())
+      filtered = filtered.filter((item) =>
+        item[filterColumn]
+          ?.toString()
+          .toLowerCase()
+          .includes(globalFilter.toLowerCase())
       );
     }
 
@@ -98,15 +107,16 @@ export function DataTable({ data, columns, filterColumn, itemsPerPage = 10, empt
             {columns
               .filter((column) => column.header)
               .map((column) => {
+                const columnKey = column.accessorKey || column.id;
                 return (
                   <DropdownMenuCheckboxItem
-                    key={column.accessorKey}
+                    key={columnKey}
                     className="capitalize"
-                    checked={!columnVisibility[column.accessorKey]}
+                    checked={!columnVisibility[columnKey]}
                     onCheckedChange={(value) =>
                       setColumnVisibility((prev) => ({
                         ...prev,
-                        [column.accessorKey]: !value,
+                        [columnKey]: !value,
                       }))
                     }
                   >
@@ -122,24 +132,32 @@ export function DataTable({ data, columns, filterColumn, itemsPerPage = 10, empt
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
-                <TableHead key={column.accessorKey}>{column.header}</TableHead>
+                <TableHead key={column.accessorKey || column.id}>
+                  {column.header}
+                </TableHead>
               ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedData.length ? (
               paginatedData.map((row, rowIndex) => (
-                <TableRow key={row.original?.id || rowIndex}>
+                <TableRow key={row.id || rowIndex}>
                   {columns.map((column) => (
-                    <TableCell key={column.accessorKey}>
-                      {column.cell ? column.cell({ row }) : row[column.accessorKey]}
+                    <TableCell key={column.accessorKey || column.id}>
+                      {column.cell
+                        ? // Pass the row data in the structure expected by the cell renderers (`row.original`)
+                          column.cell({ row: { original: row } })
+                        : row[column.accessorKey]}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   <EmptyState
                     title={emptyState?.title || "No results found"}
                     description={emptyState?.description}
