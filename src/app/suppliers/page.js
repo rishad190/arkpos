@@ -184,7 +184,7 @@ export default function SuppliersPage() {
       Name: s.name,
       Phone: s.phone,
       Email: s.email,
-      Address: s.address,
+      Address: s?.address || "",
       Store: s.storeId,
       "Total Due": s.totalDue || 0,
     }));
@@ -286,18 +286,28 @@ export default function SuppliersPage() {
     {
       accessorKey: "address",
       header: "Address",
-      cell: ({ row }) => <div className="truncate max-w-[200px]">{row.original.address}</div>,
+      cell: ({ row }) => (
+        <div className="truncate max-w-[200px]">
+          {row?.original?.address || ""}
+        </div>
+      ),
     },
     {
       accessorKey: "storeId",
       header: "Store",
-      cell: ({ row }) => <Badge variant="outline">{row.original.storeId}</Badge>,
+      cell: ({ row }) => (
+        <Badge variant="outline">{row.original.storeId}</Badge>
+      ),
     },
     {
       accessorKey: "totalDue",
       header: "Total Due",
       cell: ({ row }) => (
-        <div className={`text-right ${row.original.totalDue > 0 ? "text-red-500" : "text-green-500"}`}>
+        <div
+          className={`text-right ${
+            row.original.totalDue > 0 ? "text-red-500" : "text-green-500"
+          }`}
+        >
           ৳{(row.original.totalDue || 0).toLocaleString()}
         </div>
       ),
@@ -329,30 +339,33 @@ export default function SuppliersPage() {
               >
                 View Details
               </DropdownMenuItem>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem
-                                className="text-red-500"
-                                onSelect={(e) => e.preventDefault()}
-                              >
-                                Delete
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the supplier and all associated data.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteSupplier(row.original.id)}>
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem
+                    className="text-red-500"
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    Delete
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete
+                      the supplier and all associated data.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleDeleteSupplier(row.original.id)}
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

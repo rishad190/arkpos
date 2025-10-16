@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -32,7 +32,13 @@ import { EmptyState } from "@/components/common/EmptyState";
  * @param {object} [props.emptyState] - Configuration for the empty state component.
  * @returns {React.ReactNode} The rendered data table.
  */
-export function DataTable({ data, columns, filterColumn, itemsPerPage = 10, emptyState }) {
+export function DataTable({
+  data,
+  columns,
+  filterColumn,
+  itemsPerPage = 10,
+  emptyState,
+}) {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
   const [columnVisibility, setColumnVisibility] = useState({});
@@ -59,8 +65,11 @@ export function DataTable({ data, columns, filterColumn, itemsPerPage = 10, empt
     let filtered = data;
 
     if (globalFilter && filterColumn) {
-      filtered = filtered.filter(item =>
-        item[filterColumn]?.toString().toLowerCase().includes(globalFilter.toLowerCase())
+      filtered = filtered.filter((item) =>
+        item[filterColumn]
+          ?.toString()
+          .toLowerCase()
+          .includes(globalFilter.toLowerCase())
       );
     }
 
@@ -128,18 +137,34 @@ export function DataTable({ data, columns, filterColumn, itemsPerPage = 10, empt
           </TableHeader>
           <TableBody>
             {paginatedData.length ? (
-              paginatedData.map((row, rowIndex) => (
-                <TableRow key={rowIndex}>
-                  {columns.map((column) => (
-                    <TableCell key={column.accessorKey}>
-                      {column.cell ? column.cell({ row }) : row[column.accessorKey]}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              paginatedData.map((row, rowIndex) => {
+                // Prefer a stable id if available, otherwise fall back to a composite key
+                const rowKey =
+                  row?.id ??
+                  row?._id ??
+                  row?.key ??
+                  `${currentPage}-${rowIndex}`;
+                return (
+                  <TableRow key={rowKey}>
+                    {columns.map((column) => {
+                      const cellKey = `${rowKey}-${column.accessorKey}`;
+                      return (
+                        <TableCell key={cellKey}>
+                          {column.cell
+                            ? column.cell({ row })
+                            : row[column.accessorKey]}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   <EmptyState
                     title={emptyState?.title || "No results found"}
                     description={emptyState?.description}

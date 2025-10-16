@@ -1,7 +1,7 @@
 "use client";
 
-import React from 'react';
-import { DataTable } from '@/components/common/DataTable';
+import React from "react";
+import { DataTable } from "@/components/common/DataTable";
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
 import {
@@ -22,7 +22,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-export function CustomerTable({ customers, getCustomerDue, onRowClick, onEdit, onDelete }) {
+export function CustomerTable({
+  customers,
+  getCustomerDue,
+  onRowClick,
+  onEdit,
+  onDelete,
+}) {
   const columns = [
     {
       accessorKey: "name",
@@ -35,7 +41,11 @@ export function CustomerTable({ customers, getCustomerDue, onRowClick, onEdit, o
     {
       accessorKey: "address",
       header: "Address",
-      cell: ({ row }) => <div className="truncate max-w-[200px]">{row.original.address}</div>,
+      cell: ({ row }) => (
+        <div className="truncate max-w-[200px]">
+          {row?.original?.address || ""}
+        </div>
+      ),
     },
     {
       accessorKey: "storeId",
@@ -47,7 +57,9 @@ export function CustomerTable({ customers, getCustomerDue, onRowClick, onEdit, o
       cell: ({ row }) => {
         const dueAmount = getCustomerDue(row.original.id);
         return (
-          <div className={`text-right ${dueAmount > 1000 ? "text-red-500" : ""}`}>
+          <div
+            className={`text-right ${dueAmount > 1000 ? "text-red-500" : ""}`}
+          >
             ৳{dueAmount.toLocaleString()}
           </div>
         );
@@ -85,12 +97,15 @@ export function CustomerTable({ customers, getCustomerDue, onRowClick, onEdit, o
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the customer and all associated data.
+                      This action cannot be undone. This will permanently delete
+                      the customer and all associated data.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => onDelete(row.original.id)}>
+                    <AlertDialogAction
+                      onClick={() => onDelete(row.original.id)}
+                    >
                       Delete
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -103,11 +118,5 @@ export function CustomerTable({ customers, getCustomerDue, onRowClick, onEdit, o
     },
   ];
 
-  return (
-    <DataTable
-      data={customers}
-      columns={columns}
-      filterColumn="name"
-    />
-  );
+  return <DataTable data={customers} columns={columns} filterColumn="name" />;
 }
