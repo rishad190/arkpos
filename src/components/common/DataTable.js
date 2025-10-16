@@ -137,28 +137,17 @@ export function DataTable({
           </TableHeader>
           <TableBody>
             {paginatedData.length ? (
-              paginatedData.map((row, rowIndex) => {
-                // Prefer a stable id if available, otherwise fall back to a composite key
-                const rowKey =
-                  row?.id ??
-                  row?._id ??
-                  row?.key ??
-                  `${currentPage}-${rowIndex}`;
-                return (
-                  <TableRow key={rowKey}>
-                    {columns.map((column) => {
-                      const cellKey = `${rowKey}-${column.accessorKey}`;
-                      return (
-                        <TableCell key={cellKey}>
-                          {column.cell
-                            ? column.cell({ row })
-                            : row[column.accessorKey]}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                );
-              })
+              paginatedData.map((row, rowIndex) => (
+                <TableRow key={row.id || rowIndex}>
+                  {columns.map((column) => (
+                    <TableCell key={column.accessorKey}>
+                      {column.cell
+                        ? column.cell({ row })
+                        : row[column.accessorKey]}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
             ) : (
               <TableRow>
                 <TableCell

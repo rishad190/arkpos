@@ -42,9 +42,7 @@ export function CustomerTable({
       accessorKey: "address",
       header: "Address",
       cell: ({ row }) => (
-        <div className="truncate max-w-[200px]">
-          {row?.original?.address || ""}
-        </div>
+        <div className="truncate max-w-[200px]">{row.original?.address}</div>
       ),
     },
     {
