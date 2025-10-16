@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { DataTable } from "@/components/common/DataTable";
+import React from 'react';
+import { DataTable } from '@/components/common/DataTable';
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
 import {
@@ -22,13 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-export function CustomerTable({
-  customers,
-  getCustomerDue,
-  onRowClick,
-  onEdit,
-  onDelete,
-}) {
+export function CustomerTable({ customers, getCustomerDue, onRowClick, onEdit, onDelete }) {
   const columns = [
     {
       accessorKey: "name",
@@ -41,9 +35,7 @@ export function CustomerTable({
     {
       accessorKey: "address",
       header: "Address",
-      cell: ({ row }) => (
-        <div className="truncate max-w-[200px]">{row.original?.address}</div>
-      ),
+      cell: ({ row }) => <div className="truncate max-w-[200px]">{row.original?.address}</div>,
     },
     {
       accessorKey: "storeId",
@@ -53,11 +45,10 @@ export function CustomerTable({
       accessorKey: "due",
       header: "Due Amount",
       cell: ({ row }) => {
+        if (!row.original) return null;
         const dueAmount = getCustomerDue(row.original.id);
         return (
-          <div
-            className={`text-right ${dueAmount > 1000 ? "text-red-500" : ""}`}
-          >
+          <div className={`text-right ${dueAmount > 1000 ? "text-red-500" : ""}`}>
             ৳{dueAmount.toLocaleString()}
           </div>
         );
@@ -65,9 +56,11 @@ export function CustomerTable({
     },
     {
       id: "actions",
-      cell: ({ row }) => (
-        <div className="flex justify-end">
-          <DropdownMenu>
+      cell: ({ row }) => {
+        if (!row.original) return null;
+        return (
+          <div className="flex justify-end">
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm">
                 <MoreVertical className="h-4 w-4" />
@@ -95,15 +88,12 @@ export function CustomerTable({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete
-                      the customer and all associated data.
+                      This action cannot be undone. This will permanently delete the customer and all associated data.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => onDelete(row.original.id)}
-                    >
+                    <AlertDialogAction onClick={() => onDelete(row.original.id)}>
                       Delete
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -116,5 +106,15 @@ export function CustomerTable({
     },
   ];
 
-  return <DataTable data={customers} columns={columns} filterColumn="name" />;
+  if (!customers || !Array.isArray(customers)) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <DataTable
+      data={customers}
+      columns={columns}
+      filterColumn="name"
+    />
+  );
 }

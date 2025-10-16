@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -32,13 +32,7 @@ import { EmptyState } from "@/components/common/EmptyState";
  * @param {object} [props.emptyState] - Configuration for the empty state component.
  * @returns {React.ReactNode} The rendered data table.
  */
-export function DataTable({
-  data,
-  columns,
-  filterColumn,
-  itemsPerPage = 10,
-  emptyState,
-}) {
+export function DataTable({ data, columns, filterColumn, itemsPerPage = 10, emptyState }) {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
   const [columnVisibility, setColumnVisibility] = useState({});
@@ -65,11 +59,8 @@ export function DataTable({
     let filtered = data;
 
     if (globalFilter && filterColumn) {
-      filtered = filtered.filter((item) =>
-        item[filterColumn]
-          ?.toString()
-          .toLowerCase()
-          .includes(globalFilter.toLowerCase())
+      filtered = filtered.filter(item =>
+        item[filterColumn]?.toString().toLowerCase().includes(globalFilter.toLowerCase())
       );
     }
 
@@ -138,22 +129,17 @@ export function DataTable({
           <TableBody>
             {paginatedData.length ? (
               paginatedData.map((row, rowIndex) => (
-                <TableRow key={row.id || rowIndex}>
+                <TableRow key={row.original?.id || rowIndex}>
                   {columns.map((column) => (
                     <TableCell key={column.accessorKey}>
-                      {column.cell
-                        ? column.cell({ row })
-                        : row[column.accessorKey]}
+                      {column.cell ? column.cell({ row }) : row[column.accessorKey]}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
+                <TableCell colSpan={columns.length} className="h-24 text-center">
                   <EmptyState
                     title={emptyState?.title || "No results found"}
                     description={emptyState?.description}

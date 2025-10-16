@@ -251,16 +251,13 @@ export default function CashMemoPage() {
   };
 
   const handleSelectCustomer = (customer) => {
-    // Guard against undefined customer (defensive)
-    if (!customer) return;
-
     setMemoData({
       ...memoData,
-      customerPhone: customer.phone || "",
-      customerName: customer.name || "",
+      customerPhone: customer.phone,
+      customerName: customer.name,
       customerAddress: customer.address || "",
     });
-    setCustomerId(customer.id || "");
+    setCustomerId(customer.id);
     setOpenPhonePopover(false);
   };
 
@@ -635,7 +632,7 @@ export default function CashMemoPage() {
               </TableHeader>
               <TableBody>
                 {products.map((product, index) => (
-                  <TableRow key={`${product.name}-${product.quality}-${index}`}>
+                  <TableRow key={index}>
                     <TableCell className="whitespace-nowrap">
                       {product.name}
                     </TableCell>
