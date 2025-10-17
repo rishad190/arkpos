@@ -287,18 +287,26 @@ export default function SuppliersPage() {
     {
       accessorKey: "address",
       header: "Address",
-      cell: ({ row }) => <div className="truncate max-w-[200px]">{row.original.address}</div>,
+      cell: ({ row }) => (
+        <div className="truncate max-w-[200px]">{row.original.address}</div>
+      ),
     },
     {
       accessorKey: "storeId",
       header: "Store",
-      cell: ({ row }) => <Badge variant="outline">{row.original.storeId}</Badge>,
+      cell: ({ row }) => (
+        <Badge variant="outline">{row.original.storeId}</Badge>
+      ),
     },
     {
       accessorKey: "totalDue",
       header: "Total Due",
       cell: ({ row }) => (
-        <div className={`text-right ${row.original.totalDue > 0 ? "text-red-500" : "text-green-500"}`}>
+        <div
+          className={`text-right ${
+            row.original.totalDue > 0 ? "text-red-500" : "text-green-500"
+          }`}
+        >
           ৳{(row.original.totalDue || 0).toLocaleString()}
         </div>
       ),
@@ -307,10 +315,18 @@ export default function SuppliersPage() {
       id: "actions",
       cell: ({ row }) => (
         // Mark this cell to ignore row clicks and stop propagation
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()} data-row-click-ignore>
+        <div
+          className="flex justify-end"
+          onClick={(e) => e.stopPropagation()}
+          data-row-click-ignore
+        >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" data-radix-dropdown-menu-trigger>
+              <Button
+                variant="ghost"
+                size="sm"
+                data-radix-dropdown-menu-trigger
+              >
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -326,7 +342,9 @@ export default function SuppliersPage() {
               <DropdownMenuItem
                 onSelect={() => {
                   // Open route after menu closes
-                  requestAnimationFrame(() => router.push(`/suppliers/${row.original.id}`));
+                  requestAnimationFrame(() =>
+                    router.push(`/suppliers/${row.original.id}`)
+                  );
                 }}
               >
                 View Details
@@ -492,16 +510,22 @@ export default function SuppliersPage() {
       />
 
       {/* Controlled delete confirmation dialog */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the supplier and all associated data.
+              This action cannot be undone. This will permanently delete the
+              supplier and all associated data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.stopPropagation();
