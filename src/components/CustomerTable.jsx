@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { DataTable } from "@/components/common/DataTable";
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
@@ -77,7 +77,13 @@ export function CustomerTable({
         if (!row.original) return null;
 
         return (
-          <div className="flex justify-end">
+          // Prevent clicks inside the actions cell from bubbling to the table row
+          // and mark this cell so the DataTable can reliably ignore clicks here
+          <div
+            className="flex justify-end"
+            onClick={(e) => e.stopPropagation()}
+            data-row-click-ignore
+          >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -93,8 +99,10 @@ export function CustomerTable({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  onSelect={() => {
-                    // Menu will close automatically, then we can open dialog
+                  onSelect={(e) => {
+                    // Prevent the table row click from firing (which navigates away)
+                    e?.stopPropagation?.();
+                    // Menu will close automatically; open dialog on next frame
                     requestAnimationFrame(() => {
                       if (onEdit) onEdit(row.original);
                     });
@@ -102,43 +110,17 @@ export function CustomerTable({
                 >
                   Edit
                 </DropdownMenuItem>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    {/* The onSelect handler prevents the dropdown from closing when this item is clicked */}
-                    <DropdownMenuItem
-                      className="text-red-500"
-                      onSelect={(e) => e.preventDefault()}
-                    >
-                      Delete
-                    </DropdownMenuItem>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Are you absolutely sure?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently
-                        delete the customer and all associated data from our
-                        servers.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
-                        Cancel
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onDelete) onDelete(row.original.id);
-                        }}
-                        className="bg-red-500 hover:bg-red-600"
-                      >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                {/* Controlled delete dialog: set deleteTarget to open the dialog */}
+                <DropdownMenuItem
+                  className="text-red-500"
+                  onSelect={(e) => {
+                    e?.stopPropagation?.();
+                    // Allow the menu to close first, then open the dialog
+                    requestAnimationFrame(() => setDeleteTarget(row.original));
+                  }}
+                >
+                  Delete
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -147,16 +129,52 @@ export function CustomerTable({
     },
   ];
 
+  // Controlled AlertDialog state for delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
   if (!customers || !Array.isArray(customers)) {
     return <div>Loading...</div>;
   }
 
   return (
-    <DataTable
-      data={customers}
-      columns={columns}
-      filterColumn="name"
-      onRowClick={(row) => onRowClick(row.id)}
-    />
+    <>
+      <DataTable
+        data={customers}
+        columns={columns}
+        filterColumn="name"
+        onRowClick={(row) => onRowClick(row.id)}
+      />
+
+      {/* Delete confirmation dialog (controlled) */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              customer and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onDelete && deleteTarget) onDelete(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

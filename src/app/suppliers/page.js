@@ -61,6 +61,7 @@ export default function SuppliersPage() {
   } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [editingSupplier, setEditingSupplier] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [loadingState, setLoadingState] = useState({
     initial: true,
     actions: false,
@@ -305,54 +306,40 @@ export default function SuppliersPage() {
     {
       id: "actions",
       cell: ({ row }) => (
-        <div className="flex justify-end">
+        // Mark this cell to ignore row clicks and stop propagation
+        <div className="flex justify-end" onClick={(e) => e.stopPropagation()} data-row-click-ignore>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" data-radix-dropdown-menu-trigger>
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditingSupplier(row.original);
+                onSelect={(e) => {
+                  e?.stopPropagation?.();
+                  requestAnimationFrame(() => setEditingSupplier(row.original));
                 }}
               >
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  router.push(`/suppliers/${row.original.id}`);
+                onSelect={() => {
+                  // Open route after menu closes
+                  requestAnimationFrame(() => router.push(`/suppliers/${row.original.id}`));
                 }}
               >
                 View Details
               </DropdownMenuItem>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem
-                                className="text-red-500"
-                                onSelect={(e) => e.preventDefault()}
-                              >
-                                Delete
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the supplier and all associated data.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteSupplier(row.original.id)}>
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+              <DropdownMenuItem
+                className="text-red-500"
+                onSelect={(e) => {
+                  e?.stopPropagation?.();
+                  requestAnimationFrame(() => setDeleteTarget(row.original));
+                }}
+              >
+                Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -501,7 +488,32 @@ export default function SuppliersPage() {
         data={filteredSuppliers}
         columns={columns}
         filterColumn="name"
+        onRowClick={(row) => router.push(`/suppliers/${row.id}`)}
       />
+
+      {/* Controlled delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the supplier and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.stopPropagation();
+                if (deleteTarget) handleDeleteSupplier(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit Supplier Dialog */}
       {editingSupplier && (

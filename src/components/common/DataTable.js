@@ -145,7 +145,28 @@ export function DataTable({
               paginatedData.map((row, rowIndex) => (
                 <TableRow
                   key={row.id || rowIndex}
-                  onClick={() => onRowClick && onRowClick(row)}
+                  onClick={(event) => {
+                    if (!onRowClick) return;
+                    // If the click originated outside this row (for example,
+                    // from a modal rendered in a portal), ignore it — it shouldn't
+                    // trigger a row navigation.
+                    if (!event.currentTarget.contains(event.target)) return;
+
+                    // If the click originated from inside an element that should
+                    // ignore row clicks (e.g., action buttons/menus), do nothing.
+                    let el = event.target;
+                    while (el && el !== event.currentTarget) {
+                      if (
+                        el.getAttribute &&
+                        el.getAttribute("data-row-click-ignore") !== null
+                      ) {
+                        return;
+                      }
+                      el = el.parentElement;
+                    }
+
+                    onRowClick(row);
+                  }}
                   className={onRowClick ? "cursor-pointer" : ""}
                 >
                   {columns.map((column) => (
