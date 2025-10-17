@@ -29,6 +29,8 @@ const DropdownMenuRadioGroup = React.forwardRef(
     </DropdownMenuPrimitive.RadioGroup>
   )
 );
+DropdownMenuRadioGroup.displayName =
+  DropdownMenuPrimitive.RadioGroup.displayName;
 
 const DropdownMenuContent = React.forwardRef(
   ({ className, sideOffset = 4, inset, ...props }, ref) => (

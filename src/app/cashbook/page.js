@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { EditCashTransactionDialog } from "@/components/EditCashTransactionDialog.jsx";
 
 import {
   Tooltip,
@@ -144,7 +145,7 @@ export default function CashBookPage() {
       return {
         dailyCash: [],
         financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
-        monthlyTotals: []
+        monthlyTotals: [],
       };
     }
 
@@ -154,7 +155,7 @@ export default function CashBookPage() {
     const monthly = {};
 
     // Process transactions once for all calculations
-    dailyCashTransactions.forEach(item => {
+    dailyCashTransactions.forEach((item) => {
       // Daily summary calculation
       const date = item.date;
       if (!dailySummary[date]) {
@@ -180,7 +181,8 @@ export default function CashBookPage() {
         dailySummary[date].cashOut += cashOut;
       }
 
-      dailySummary[date].balance = dailySummary[date].cashIn - dailySummary[date].cashOut;
+      dailySummary[date].balance =
+        dailySummary[date].cashIn - dailySummary[date].cashOut;
       dailySummary[date].dailyCash.push(item);
 
       // Update overall totals
@@ -203,8 +205,9 @@ export default function CashBookPage() {
     });
 
     // Convert daily summary to sorted array
-    const dailyCash = Object.values(dailySummary)
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const dailyCash = Object.values(dailySummary).sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
 
     // Calculate financial summary
     const financials = {
@@ -346,9 +349,10 @@ export default function CashBookPage() {
     setLoadingDelete(true);
     try {
       // Optimistically update the UI
-      setDailyCashTransactions((prev) =>
-        prev.filter((t) => t.id !== transactionId)
-      );
+      // This is not available as we are not using useState for dailyCashTransactions
+      // setDailyCashTransactions((prev) =>
+      //   prev.filter((t) => t.id !== transactionId)
+      // );
 
       // Delete from Firebase
       await deleteDailyCashTransaction(transactionId);
@@ -548,8 +552,6 @@ export default function CashBookPage() {
     </Card>
   );
 
-
-
   // Add this new component for the financial summary
   const FinancialSummary = () => {
     // Calculate transaction totals
@@ -562,7 +564,7 @@ export default function CashBookPage() {
         },
         { totalCashIn: 0, totalCashOut: 0 }
       );
-    }, [dailyCashTransactions]);
+    }, []);
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -781,7 +783,11 @@ export default function CashBookPage() {
               className="w-full md:w-auto focus:ring-2 focus:ring-offset-2"
               variant="outline"
               disabled={loadingState.actions || isPrinting}
-              aria-label={isPrinting ? "Printing cashbook report..." : "Print cashbook report"}
+              aria-label={
+                isPrinting
+                  ? "Printing cashbook report..."
+                  : "Print cashbook report"
+              }
               role="button"
               aria-busy={isPrinting}
             >
@@ -1179,14 +1185,24 @@ export default function CashBookPage() {
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                       <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogTitle>
+                                          Are you sure?
+                                        </AlertDialogTitle>
                                         <AlertDialogDescription>
-                                          This action cannot be undone. This will permanently delete the transaction.
+                                          This action cannot be undone. This
+                                          will permanently delete the
+                                          transaction.
                                         </AlertDialogDescription>
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteTransaction(t.id)}>
+                                        <AlertDialogCancel>
+                                          Cancel
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() =>
+                                            handleDeleteTransaction(t.id)
+                                          }
+                                        >
                                           Delete
                                         </AlertDialogAction>
                                       </AlertDialogFooter>
@@ -1435,18 +1451,16 @@ export default function CashBookPage() {
 
       {/* Edit Transaction Dialog */}
       {editingTransaction && (
-        <CashTransactionDialog
+        <EditCashTransactionDialog
           transaction={editingTransaction}
           open={!!editingTransaction}
           onOpenChange={(open) => {
             if (!open) setEditingTransaction(null);
           }}
-          onTransactionSubmit={async (updated) => {
-            await handleEditTransaction(editingTransaction.id, updated);
+          onEditTransaction={async (updatedData) => {
+            await handleEditTransaction(editingTransaction.id, updatedData);
             setEditingTransaction(null);
           }}
-          expenseCategories={expenseCategories}
-          onAddCategory={handleAddCategory}
           aria-label="Edit transaction"
           role="dialog"
           aria-modal="true"

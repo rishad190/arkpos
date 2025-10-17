@@ -64,7 +64,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 export default function CustomerDetail() {
   const params = useParams();
   const router = useRouter();
-  const toast = useToast();
+  const { toast } = useToast();
   const {
     customers,
     transactions,
@@ -153,20 +153,19 @@ export default function CustomerDetail() {
     try {
       setLoadingState((prev) => ({ ...prev, action: true }));
       await deleteTransaction(transactionId);
-        toast({
-          title: "Success",
-          description: "Transaction deleted successfully",
-        });
-      } catch (error) {
-        console.error(ERROR_MESSAGES.DELETE_ERROR, error);
-        toast({
-          title: "Error",
-          description: ERROR_MESSAGES.DELETE_ERROR,
-          variant: "destructive",
-        });
-      } finally {
-        setLoadingState((prev) => ({ ...prev, action: false }));
-      }
+      toast({
+        title: "Success",
+        description: "Transaction deleted successfully",
+      });
+    } catch (error) {
+      console.error(ERROR_MESSAGES.DELETE_ERROR, error);
+      toast({
+        title: "Error",
+        description: ERROR_MESSAGES.DELETE_ERROR,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingState((prev) => ({ ...prev, action: false }));
     }
   };
 
@@ -483,7 +482,9 @@ export default function CustomerDetail() {
 
                 <div className="mt-6 pt-4 border-t">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium">Payment Progress</span>
+                    <span className="text-sm font-medium">
+                      Payment Progress
+                    </span>
                     <span className="text-sm text-muted-foreground">
                       {paymentProgress.toFixed(1)}%
                     </span>
@@ -564,7 +565,9 @@ export default function CustomerDetail() {
                       <TableHead className="whitespace-nowrap">
                         Memo Number
                       </TableHead>
-                      <TableHead className="whitespace-nowrap">Details</TableHead>
+                      <TableHead className="whitespace-nowrap">
+                        Details
+                      </TableHead>
                       <TableHead className="text-right whitespace-nowrap">
                         Total Bill
                       </TableHead>
@@ -578,7 +581,9 @@ export default function CustomerDetail() {
                         Balance
                       </TableHead>
                       <TableHead className="whitespace-nowrap">Store</TableHead>
-                      <TableHead className="whitespace-nowrap">Actions</TableHead>
+                      <TableHead className="whitespace-nowrap">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -656,14 +661,26 @@ export default function CustomerDetail() {
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                       <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogTitle>
+                                          Are you sure?
+                                        </AlertDialogTitle>
                                         <AlertDialogDescription>
-                                          This action cannot be undone. This will permanently delete the transaction.
+                                          This action cannot be undone. This
+                                          will permanently delete the
+                                          transaction.
                                         </AlertDialogDescription>
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteTransaction(transaction.id)}>
+                                        <AlertDialogCancel>
+                                          Cancel
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() =>
+                                            handleDeleteTransaction(
+                                              transaction.id
+                                            )
+                                          }
+                                        >
                                           Delete
                                         </AlertDialogAction>
                                       </AlertDialogFooter>

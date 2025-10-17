@@ -131,7 +131,7 @@ export default function LoginPage() {
 
         <div className="text-center">
           <p className="text-sm text-gray-500">
-            &copy; {new Date().getFullYear()} Sky Fabric's. All rights reserved.
+            &copy; {new Date().getFullYear()} ARK. All rights reserved.
           </p>
         </div>
       </div>

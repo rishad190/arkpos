@@ -30,6 +30,7 @@ import { EmptyState } from "@/components/common/EmptyState";
  * @param {string} [props.filterColumn] - The column to use for the global search filter.
  * @param {number} [props.itemsPerPage=10] - The number of items to display per page.
  * @param {object} [props.emptyState] - Configuration for the empty state component.
+ * @param {function} [props.onRowClick] - Function to handle row clicks.
  * @returns {React.ReactNode} The rendered data table.
  */
 export function DataTable({
@@ -38,6 +39,7 @@ export function DataTable({
   filterColumn,
   itemsPerPage = 10,
   emptyState,
+  onRowClick,
 }) {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
@@ -141,7 +143,11 @@ export function DataTable({
           <TableBody>
             {paginatedData.length ? (
               paginatedData.map((row, rowIndex) => (
-                <TableRow key={row.id || rowIndex}>
+                <TableRow
+                  key={row.id || rowIndex}
+                  onClick={() => onRowClick && onRowClick(row)}
+                  className={onRowClick ? "cursor-pointer" : ""}
+                >
                   {columns.map((column) => (
                     <TableCell key={column.accessorKey || column.id}>
                       {column.cell

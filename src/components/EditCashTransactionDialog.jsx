@@ -17,38 +17,68 @@ export function EditCashTransactionDialog({
   onOpenChange,
   onEditTransaction,
 }) {
-  const [formData, setFormData] = useState({
-    date: transaction.date,
-    description: transaction.description,
-    cashIn: transaction.cashIn || 0,
-    cashOut: transaction.cashOut || 0,
-  });
+  const [formData, setFormData] = useState(() => ({
+    date: transaction?.date || new Date().toISOString().split("T")[0],
+    description: transaction?.description || "",
+    cashIn: transaction?.cashIn || 0,
+    cashOut: transaction?.cashOut || 0,
+  }));
 
-  const [transactionType, setTransactionType] = useState(
-    transaction.cashIn > 0 ? "in" : "out"
+  const [transactionType, setTransactionType] = useState(() =>
+    (transaction?.cashIn || 0) > 0 ? "in" : "out"
   );
 
   useEffect(() => {
-    setFormData({
-      date: transaction.date,
-      description: transaction.description,
-      cashIn: transaction.cashIn || 0,
-      cashOut: transaction.cashOut || 0,
-    });
-    setTransactionType(transaction.cashIn > 0 ? "in" : "out");
-  }, [transaction]);
+    if (transaction && open) {
+      setFormData({
+        date: transaction.date,
+        description: transaction.description,
+        cashIn: transaction.cashIn || 0,
+        cashOut: transaction.cashOut || 0,
+      });
+      setTransactionType(transaction.cashIn > 0 ? "in" : "out");
+    }
+  }, [transaction, open]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const updatedTransaction = {
-      ...formData,
-      cashIn: transactionType === "in" ? Number(formData.cashIn) : 0,
-      cashOut: transactionType === "out" ? Number(formData.cashOut) : 0,
-    };
-    onEditTransaction(updatedTransaction);
+    try {
+      const updatedTransaction = {
+        ...formData,
+        cashIn: transactionType === "in" ? Number(formData.cashIn) : 0,
+        cashOut: transactionType === "out" ? Number(formData.cashOut) : 0,
+      };
+
+      await onEditTransaction(updatedTransaction);
+      onOpenChange(false);
+
+      setFormData({
+        date: transaction?.date || new Date().toISOString().split("T")[0],
+        description: transaction?.description || "",
+        cashIn: transaction?.cashIn || 0,
+        cashOut: transaction?.cashOut || 0,
+      });
+    } catch (error) {
+      console.error("Error updating transaction:", error);
+    }
   };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setFormData({
+            date: transaction?.date || new Date().toISOString().split("T")[0],
+            description: transaction?.description || "",
+            cashIn: transaction?.cashIn || 0,
+            cashOut: transaction?.cashOut || 0,
+          });
+          setTransactionType((transaction?.cashIn || 0) > 0 ? "in" : "out");
+        }
+        onOpenChange(isOpen);
+      }}
+    >
       <DialogContent
         className="sm:max-w-[425px] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         role="dialog"
@@ -70,10 +100,9 @@ export function EditCashTransactionDialog({
             Update the transaction details below.
           </p>
         </DialogHeader>
+
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Transaction Type Selection */}
           <div className="grid grid-cols-2 gap-4">
-            {" "}
             <Button
               type="button"
               variant={transactionType === "in" ? "default" : "outline"}
@@ -93,7 +122,8 @@ export function EditCashTransactionDialog({
                 aria-hidden="true"
               />
               <span>Cash In</span>
-            </Button>{" "}
+            </Button>
+
             <Button
               type="button"
               variant={transactionType === "out" ? "default" : "outline"}
@@ -117,7 +147,6 @@ export function EditCashTransactionDialog({
           </div>
 
           <div className="space-y-4">
-            {/* Date Input */}{" "}
             <div className="space-y-2">
               <Label htmlFor="transaction-date" className="text-sm font-medium">
                 Date
@@ -131,10 +160,9 @@ export function EditCashTransactionDialog({
                 }
                 className="w-full"
                 required
-                aria-required="true"
               />
             </div>
-            {/* Description Input */}{" "}
+
             <div className="space-y-2">
               <Label
                 htmlFor="transaction-description"
@@ -151,11 +179,10 @@ export function EditCashTransactionDialog({
                 }
                 className="w-full"
                 required
-                aria-required="true"
                 aria-invalid={!formData.description}
               />
             </div>
-            {/* Amount Input */}{" "}
+
             <div className="space-y-2">
               <Label
                 htmlFor="transaction-amount"
@@ -166,7 +193,7 @@ export function EditCashTransactionDialog({
               <div className="relative">
                 <span
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
-                  aria-hidden="true"
+                  aria-hidden
                 >
                   ৳
                 </span>
@@ -191,7 +218,6 @@ export function EditCashTransactionDialog({
                   }}
                   className="pl-8 w-full"
                   required
-                  aria-required="true"
                   aria-label={`${
                     transactionType === "in" ? "Cash in" : "Cash out"
                   } amount`}

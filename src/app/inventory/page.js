@@ -233,7 +233,8 @@ export default function InventoryPage() {
     }
   };
 
-  const handleDeleteFabric = async (fabricId) => {
+  const handleDeleteFabric = async () => {
+    if (!fabricToDelete) return;
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
       await deleteFabric(fabricToDelete);
@@ -485,6 +486,29 @@ export default function InventoryPage() {
     </div>
   );
 
+  const DeleteConfirmationDialog = () => (
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone. This will permanently delete the
+            fabric and all associated data.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDeleteFabric}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (loadingState.initial) {
     return (
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
@@ -527,7 +551,9 @@ export default function InventoryPage() {
       accessorKey: "totalQuantity",
       header: "Stock Qty",
       cell: ({ row }) => (
-        <Badge variant={row.original.totalQuantity > 0 ? "default" : "destructive"}>
+        <Badge
+          variant={row.original.totalQuantity > 0 ? "default" : "destructive"}
+        >
           {row.original.totalQuantity.toFixed(2)}
         </Badge>
       ),
@@ -546,11 +572,14 @@ export default function InventoryPage() {
       id: "actions",
       cell: ({ row }) => (
         <div className="flex space-x-2">
-          <EditFabricDialog
-            fabric={row.original}
-            onSave={handleEditFabric}
-            onDelete={handleDeleteFabric}
-          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 p-0"
+            onClick={() => router.push(`/inventory/${row.original.id}`)}
+          >
+            View
+          </Button>
           <SellFabricDialog
             fabric={row.original}
             onSellFabric={handleSellFabric}
@@ -561,24 +590,15 @@ export default function InventoryPage() {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFabricToDelete(row.original.id);
+                  setDeleteDialogOpen(true);
+                }}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the fabric and all associated data.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteFabric(row.original.id)}>
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
           </AlertDialog>
         </div>
       ),
@@ -658,6 +678,7 @@ export default function InventoryPage() {
         data={filteredFabrics}
         columns={columns}
         filterColumn="name"
+        onRowClick={(row) => router.push(`/inventory/${row.id}`)}
       />
 
       {/* Add the Delete Confirmation Dialog */}

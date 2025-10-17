@@ -1,31 +1,7 @@
 "use client";
-import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { ref, onValue, push, update, remove } from "firebase/database";
-import { db } from "@/lib/firebase";
+import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useData } from "@/contexts/data-context";
-import { Button } from "@/components/ui/button";
-import { MoreVertical } from "lucide-react";
-import {
-  ArrowLeft,
-  ArrowDownToLine,
-  Phone,
-  Mail,
-  Store,
-  DollarSign,
-  CreditCard,
-  FileText,
-  Printer,
-} from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -34,474 +10,524 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AddSupplierTransactionDialog } from "@/components/AddSupplierTransactionDialog.jsx";
-import { formatDate } from "@/lib/utils";
-import { EditSupplierTransactionDialog } from "@/components/EditSupplierTransactionDialog.jsx";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { AddSupplierDialog } from "@/components/AddSupplierDialog";
+import { EditSupplierDialog } from "@/components/EditSupplierDialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { exportToCSV, exportToPDF } from "@/lib/utils";
+import {
+  MoreVertical,
+  Search,
+  Plus,
+  Download,
+  FileText,
+  ArrowUpRight,
+  ArrowDownRight,
+  RefreshCw,
+} from "lucide-react";
+import { PageHeader } from "@/components/common/PageHeader";
+import { DataTable } from "@/components/common/DataTable";
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { exportToCSV, exportToPDF } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
-export default function SupplierDetail() {
-  const params = useParams();
+export default function SuppliersPage() {
   const router = useRouter();
-  const { suppliers, updateSupplier, deleteSupplierTransaction } = useData();
-  const [storeFilter, setStoreFilter] = useState("all");
-  const [supplier, setSupplier] = useState(null);
-  const [transactions, setTransactions] = useState([]);
+  const { toast } = useToast();
+  const {
+    suppliers,
+    supplierTransactions,
+    addSupplier,
+    updateSupplier,
+    deleteSupplier,
+  } = useData();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [editingSupplier, setEditingSupplier] = useState(null);
+  const [loadingState, setLoadingState] = useState({
+    initial: true,
+    actions: false,
+  });
 
-  // Format date to DD-MM-YYYY
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}-${month}-${year}`;
-  };
-
-  // Fetch supplier and transactions data
+  // Initialize loading state
   useEffect(() => {
-    const supplierRef = ref(db, `suppliers/${params.id}`);
-    const transactionsRef = ref(db, "supplierTransactions");
+    if (suppliers !== undefined) {
+      setLoadingState((prev) => ({ ...prev, initial: false }));
+    }
+  }, [suppliers]);
 
-    const unsubSupplier = onValue(supplierRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setSupplier({ id: params.id, ...snapshot.val() });
-      } else {
-        router.push("/suppliers");
-      }
-    });
+  // Memoize filtered suppliers and totals
+  const { filteredSuppliers, totals } = useMemo(() => {
+    const filtered =
+      suppliers?.filter(
+        (supplier) =>
+          supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          supplier.phone.includes(searchTerm)
+      ) || [];
 
-    const unsubTransactions = onValue(transactionsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const transactionsData = snapshot.val();
-        const supplierTransactions = Object.entries(transactionsData)
-          .map(([id, data]) => ({ id, ...data }))
-          .filter((t) => t.supplierId === params.id)
-          .filter((t) => storeFilter === "all" || t.storeId === storeFilter)
-          .sort((a, b) => {
-            const dateA = new Date(a.date);
-            const dateB = new Date(b.date);
-            return dateA - dateB; // Sort by date ascending (oldest to newest)
-          });
-        setTransactions(supplierTransactions);
-      } else {
-        setTransactions([]);
-      }
-    });
+    const totals = filtered.reduce(
+      (acc, supplier) => {
+        const supplierTxns =
+          supplierTransactions?.filter((t) => t.supplierId === supplier.id) ||
+          [];
 
-    return () => {
-      unsubSupplier();
-      unsubTransactions();
-    };
-  }, [params.id, router, storeFilter]);
+        const supplierTotal = supplierTxns.reduce(
+          (txnAcc, transaction) => ({
+            totalAmount:
+              txnAcc.totalAmount + (Number(transaction.totalAmount) || 0),
+            paidAmount:
+              txnAcc.paidAmount + (Number(transaction.paidAmount) || 0),
+          }),
+          { totalAmount: 0, paidAmount: 0 }
+        );
 
-  const handleExportCSV = () => {
-    const data = transactionsWithBalance.map((t) => ({
-      Date: formatDate(t.date),
-      Invoice: t.invoiceNumber,
-      Details: t.details,
-      Total: `${t.totalAmount.toLocaleString()}`,
-      Paid: `${t.paidAmount.toLocaleString()}`,
-      Due: `${t.due.toLocaleString()}`,
-      Balance: `${t.cumulativeBalance.toLocaleString()}`,
-      Store: t.storeId,
-    }));
-    exportToCSV(data, `${supplier?.name}-transactions-${params.id}.csv`);
-  };
+        acc.totalAmount += supplierTotal.totalAmount;
+        acc.paidAmount += supplierTotal.paidAmount;
+        acc.dueAmount = acc.totalAmount - acc.paidAmount;
 
-  const handleAddTransaction = async (transaction) => {
+        supplier.totalDue =
+          supplierTotal.totalAmount - supplierTotal.paidAmount;
+
+        return acc;
+      },
+      { totalAmount: 0, paidAmount: 0, dueAmount: 0 }
+    );
+
+    return { filteredSuppliers: filtered, totals };
+  }, [suppliers, supplierTransactions, searchTerm]);
+
+  const handleAddSupplier = async (supplierData) => {
+    setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      const transactionsRef = ref(db, "supplierTransactions");
-      const newTransactionRef = push(transactionsRef);
-      const newTransaction = {
-        ...transaction,
-        id: newTransactionRef.key,
-        supplierId: params.id,
+      const newSupplier = {
+        ...supplierData,
+        totalDue: 0,
         createdAt: new Date().toISOString(),
       };
-
-      await update(newTransactionRef, newTransaction);
-
-      // Update supplier's total due
-      const newTotalDue =
-        (supplier.totalDue || 0) +
-        (transaction.totalAmount - (transaction.paidAmount || 0));
-
-      await updateSupplier(params.id, {
-        totalDue: newTotalDue,
-        updatedAt: new Date().toISOString(),
+      await addSupplier(newSupplier);
+      toast({
+        title: "Success",
+        description: "Supplier added successfully",
       });
     } catch (error) {
-      console.error("Error adding transaction:", error);
-      throw error;
+      console.error("Error adding supplier:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add supplier. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingState((prev) => ({ ...prev, actions: false }));
     }
   };
 
-  const handleDeleteTransaction = async (transactionId, amount, paidAmount) => {
+  const handleDeleteSupplier = async (supplierId) => {
+    setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await deleteSupplierTransaction(
-        transactionId,
-        params.id,
-        amount,
-        paidAmount
-      );
-    } catch (error) {
-      console.error("Error deleting transaction:", error);
-      alert("Failed to delete transaction. Please try again.");
-    }
-  };
-
-  const handleEditTransaction = async (transactionId, updatedData) => {
-    try {
-      const oldTransaction = transactions.find((t) => t.id === transactionId);
-      const oldDue =
-        oldTransaction.totalAmount - (oldTransaction.paidAmount || 0);
-      const newDue = updatedData.totalAmount - (updatedData.paidAmount || 0);
-      const dueDifference = newDue - oldDue;
-
-      // Update transaction
-      const transactionRef = ref(db, `supplierTransactions/${transactionId}`);
-      await update(transactionRef, updatedData);
-
-      // Update supplier's total due
-      await updateSupplier(params.id, {
-        totalDue: Math.max(0, (supplier.totalDue || 0) + dueDifference),
-        updatedAt: new Date().toISOString(),
+      await deleteSupplier(supplierId);
+      toast({
+        title: "Success",
+        description: "Supplier deleted successfully",
       });
     } catch (error) {
-      console.error("Error updating transaction:", error);
-      throw error;
+      console.error("Error deleting supplier:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete supplier. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingState((prev) => ({ ...prev, actions: false }));
     }
   };
 
-  if (!supplier) {
-    return <div>Loading...</div>;
+  const handleEditSupplier = async (supplierId, updatedData) => {
+    setLoadingState((prev) => ({ ...prev, actions: true }));
+    try {
+      await updateSupplier(supplierId, updatedData);
+      setEditingSupplier(null);
+      toast({
+        title: "Success",
+        description: "Supplier updated successfully",
+      });
+    } catch (error) {
+      console.error("Error updating supplier:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update supplier. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingState((prev) => ({ ...prev, actions: false }));
+    }
+  };
+
+  const handleExportCSV = () => {
+    const data = filteredSuppliers.map((s) => ({
+      Name: s.name,
+      Phone: s.phone,
+      Email: s.email,
+      Address: s.address,
+      Store: s.storeId,
+      "Total Due": s.totalDue || 0,
+    }));
+    exportToCSV(data, "suppliers-report.csv");
+  };
+
+  const handleExportPDF = () => {
+    const data = {
+      title: "Suppliers Report",
+      date: new Date().toLocaleDateString(),
+      suppliers: filteredSuppliers,
+      summary: totals,
+    };
+    exportToPDF(data, "suppliers-report.pdf");
+  };
+
+  // Loading skeleton components
+  const SummaryCardSkeleton = () => (
+    <Card className="overflow-hidden border-none shadow-md">
+      <CardContent className="p-0">
+        <div className="p-4 border-b">
+          <div className="flex justify-between items-center">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-4" />
+          </div>
+        </div>
+        <div className="p-4">
+          <Skeleton className="h-8 w-32 mb-2" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const TableSkeleton = () => (
+    <Card className="border-none shadow-md">
+      <CardContent className="p-6">
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-center gap-4 py-4">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-10" />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  if (loadingState.initial) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <div>
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <SummaryCardSkeleton />
+          <SummaryCardSkeleton />
+          <SummaryCardSkeleton />
+        </div>
+
+        {/* Table */}
+        <TableSkeleton />
+      </div>
+    );
   }
 
-  // Update the transactionsWithBalance calculation
-  const transactionsWithBalance = transactions.reduce((acc, transaction) => {
-    const previousBalance =
-      acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
-    const currentDue = transaction.totalAmount - (transaction.paidAmount || 0);
-    const currentBalance = previousBalance + currentDue;
-
-    return [
-      ...acc,
-      {
-        ...transaction,
-        due: currentDue,
-        cumulativeBalance: currentBalance,
-      },
-    ];
-  }, []);
+  const columns = [
+    {
+      accessorKey: "name",
+      header: "Supplier Name",
+    },
+    {
+      accessorKey: "contact",
+      header: "Contact",
+      cell: ({ row }) => (
+        <div>
+          <div>{row.original.phone}</div>
+          <div className="text-sm text-gray-500">{row.original.email}</div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "address",
+      header: "Address",
+      cell: ({ row }) => (
+        <div className="truncate max-w-[200px]">{row.original.address}</div>
+      ),
+    },
+    {
+      accessorKey: "storeId",
+      header: "Store",
+      cell: ({ row }) => (
+        <Badge variant="outline">{row.original.storeId}</Badge>
+      ),
+    },
+    {
+      accessorKey: "totalDue",
+      header: "Total Due",
+      cell: ({ row }) => (
+        <div
+          className={`text-right ${
+            row.original.totalDue > 0 ? "text-red-500" : "text-green-500"
+          }`}
+        >
+          ৳{(row.original.totalDue || 0).toLocaleString()}
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <div className="flex justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingSupplier(row.original);
+                }}
+              >
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/suppliers/${row.original.id}`);
+                }}
+              >
+                View Details
+              </DropdownMenuItem>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem
+                    className="text-red-500"
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    Delete
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete
+                      the supplier and all associated data.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleDeleteSupplier(row.original.id)}
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header Section */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => router.back()}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="sr-only">Back</span>
-            </Button>
-            <h1 className="text-2xl font-bold tracking-tight">
-              Supplier Details
-            </h1>
-          </div>
-          <p className="text-muted-foreground">
-            View and manage supplier information and transactions
-          </p>
-        </div>
-      </div>
-
-      {/* Supplier Info and Financial Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Supplier Info Card */}
-        <Card className="lg:col-span-1 overflow-hidden border-none shadow-md">
-          <CardHeader className="bg-primary text-primary-foreground pb-4">
-            <div className="flex justify-between items-start">
-              <CardTitle>Supplier Profile</CardTitle>
-              <Badge
-                variant="secondary"
-                className="bg-primary-foreground text-primary"
+    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+      <PageHeader
+        title="Suppliers"
+        description="Manage and track all supplier information"
+        actions={
+          <>
+            <AddSupplierDialog onAddSupplier={handleAddSupplier}>
+              <Button
+                className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
+                disabled={loadingState.actions}
+                aria-label="Add new supplier"
               >
-                ID: {params.id}
-              </Badge>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Supplier
+              </Button>
+            </AddSupplierDialog>
+            <Button
+              onClick={handleExportPDF}
+              className="w-full md:w-auto"
+              variant="outline"
+              disabled={loadingState.actions}
+              aria-label="Export suppliers list to PDF"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Export PDF
+            </Button>
+            <Button
+              onClick={handleExportCSV}
+              className="w-full md:w-auto"
+              variant="outline"
+              disabled={loadingState.actions}
+              aria-label="Export suppliers list to CSV"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
+          </>
+        }
+      />
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <Card className="overflow-hidden border-none shadow-md">
+          <CardContent className="p-0">
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 border-b border-blue-100 dark:border-blue-800">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                  Total Amount
+                </h3>
+                <ArrowUpRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
             </div>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center mb-6">
-              <Avatar className="h-24 w-24 mb-4">
-                <AvatarFallback className="text-xl">
-                  {supplier.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
-              <h2 className="text-2xl font-bold text-center">
-                {supplier.name}
-              </h2>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{supplier.phone}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>{supplier.email}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Store className="h-4 w-4 text-muted-foreground" />
-                <span>Store ID: {supplier.storeId}</span>
-              </div>
+            <div className="p-4">
+              <p className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">
+                ৳{totals.totalAmount.toLocaleString()}
+              </p>
+              <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
+                All time transactions
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Financial Summary Card */}
-        <Card className="lg:col-span-2 border-none shadow-md">
-          <CardHeader className="bg-muted pb-4">
-            <CardTitle>Financial Summary</CardTitle>
-            <CardDescription>
-              Overview of suppliers financial status
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="bg-blue-50 border-none shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-blue-600">
-                      Total Amount
-                    </span>
-                    <DollarSign className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-blue-700">
-                    ৳
-                    {transactions
-                      .reduce((sum, t) => sum + (t.totalAmount || 0), 0)
-                      .toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-green-50 border-none shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-green-600">
-                      Total Paid
-                    </span>
-                    <CreditCard className="h-4 w-4 text-green-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-green-700">
-                    ৳
-                    {transactions
-                      .reduce((sum, t) => sum + (t.paidAmount || 0), 0)
-                      .toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card
-                className={`${
-                  supplier.totalDue > 0 ? "bg-red-50" : "bg-green-50"
-                } border-none shadow-sm`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span
-                      className={`text-sm font-medium ${
-                        supplier.totalDue > 0
-                          ? "text-red-600"
-                          : "text-green-600"
-                      }`}
-                    >
-                      Total Due
-                    </span>
-                    <FileText
-                      className={`h-4 w-4 ${
-                        supplier.totalDue > 0
-                          ? "text-red-600"
-                          : "text-green-600"
-                      }`}
-                    />
-                  </div>
-                  <div
-                    className={`text-2xl font-bold ${
-                      supplier.totalDue > 0 ? "text-red-700" : "text-green-700"
-                    }`}
-                  >
-                    ৳{supplier.totalDue.toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
+        <Card className="overflow-hidden border-none shadow-md">
+          <CardContent className="p-0">
+            <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-green-100 dark:border-green-800">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-medium text-green-800 dark:text-green-300">
+                  Total Paid
+                </h3>
+                <ArrowDownRight className="h-4 w-4 text-green-600 dark:text-green-400" />
+              </div>
             </div>
+            <div className="p-4">
+              <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
+                ৳{totals.paidAmount.toLocaleString()}
+              </p>
+              <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
+                All time payments
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t">
-              <select
-                className="w-full sm:w-[180px] border rounded-md px-4 py-2"
-                value={storeFilter}
-                onChange={(e) => setStoreFilter(e.target.value)}
-              >
-                <option value="all">All Stores</option>
-                <option value="STORE1">Store 1</option>
-                <option value="STORE2">Store 2</option>
-              </select>
-              <div className="flex gap-2 w-full sm:w-auto">
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    exportToPDF(supplier, transactionsWithBalance, "supplier")
-                  }
+        <Card className="overflow-hidden border-none shadow-md">
+          <CardContent className="p-0">
+            <div
+              className={`${
+                totals.dueAmount > 0
+                  ? "bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800"
+                  : "bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-800"
+              } p-4 border-b`}
+            >
+              <div className="flex justify-between items-center">
+                <h3
+                  className={`text-sm font-medium ${
+                    totals.dueAmount > 0
+                      ? "text-red-800 dark:text-red-300"
+                      : "text-green-800 dark:text-green-300"
+                  }`}
                 >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Export PDF
-                </Button>
-
-                <AddSupplierTransactionDialog
-                  supplierId={params.id}
-                  onAddTransaction={handleAddTransaction}
+                  Total Due
+                </h3>
+                <RefreshCw
+                  className={`h-4 w-4 ${
+                    totals.dueAmount > 0
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-green-600 dark:text-green-400"
+                  }`}
                 />
               </div>
             </div>
+            <div className="p-4">
+              <p
+                className={`text-2xl md:text-3xl font-bold ${
+                  totals.dueAmount > 0
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-green-600 dark:text-green-400"
+                }`}
+              >
+                ৳{totals.dueAmount.toLocaleString()}
+              </p>
+              <p
+                className={`text-xs ${
+                  totals.dueAmount > 0
+                    ? "text-red-600/70 dark:text-red-400/70"
+                    : "text-green-600/70 dark:text-green-400/70"
+                } mt-1`}
+              >
+                Current balance
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Transactions Table */}
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="whitespace-nowrap">Date</TableHead>
-              <TableHead className="whitespace-nowrap">
-                Invoice Number
-              </TableHead>
-              <TableHead className="whitespace-nowrap">Details</TableHead>
-              <TableHead className="text-right whitespace-nowrap">
-                Total Amount
-              </TableHead>
-              <TableHead className="text-right whitespace-nowrap">
-                Paid Amount
-              </TableHead>
-              <TableHead className="text-right whitespace-nowrap">
-                Due Amount
-              </TableHead>
-              <TableHead className="text-right whitespace-nowrap">
-                Balance
-              </TableHead>
-              <TableHead className="whitespace-nowrap">Actions</TableHead>{" "}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {transactionsWithBalance.map((transaction) => (
-              <TableRow key={transaction.id}>
-                <TableCell className="whitespace-nowrap">
-                  {formatDate(transaction.date)}
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {transaction.invoiceNumber}
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {transaction.details}
-                </TableCell>
-                <TableCell className="text-right whitespace-nowrap">
-                  ৳{(transaction.totalAmount || 0).toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right whitespace-nowrap">
-                  ৳{(transaction.paidAmount || 0).toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right whitespace-nowrap text-red-500">
-                  ৳{(transaction.due || 0).toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right font-medium whitespace-nowrap text-red-500">
-                  ৳{transaction.cumulativeBalance.toLocaleString()}
-                </TableCell>
-                <TableCell>
-                  <div className="flex justify-end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <EditSupplierTransactionDialog
-                            transaction={transaction}
-                            onSave={handleEditTransaction}
-                          />
-                        </DropdownMenuItem>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <DropdownMenuItem
-                              className="text-red-500"
-                              onSelect={(e) => e.preventDefault()}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the transaction.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() =>
-                                  handleDeleteTransaction(
-                                    transaction.id,
-                                    transaction.totalAmount,
-                                    transaction.paidAmount
-                                  )
-                                }
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable
+        data={filteredSuppliers}
+        columns={columns}
+        filterColumn="name"
+        onRowClick={(row) => router.push(`/suppliers/${row.id}`)}
+      />
 
-      {/* Update the footer section */}
-      <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="text-sm text-gray-500">
-          Total Transactions: {transactionsWithBalance.length}
-        </div>
-        <div className="bg-gray-100 p-4 rounded-lg w-full md:w-auto">
-          <span className="font-semibold">Current Balance: </span>
-          <span
-            className={`font-bold ${
-              supplier.totalDue > 0 ? "text-red-500" : "text-green-500"
-            }`}
-          >
-            ৳{supplier.totalDue.toLocaleString()}
-          </span>
-        </div>
-      </div>
+      {/* Edit Supplier Dialog */}
+      {editingSupplier && (
+        <EditSupplierDialog
+          supplier={editingSupplier}
+          isOpen={!!editingSupplier}
+          onClose={() => setEditingSupplier(null)}
+          onEditSupplier={handleEditSupplier}
+        />
+      )}
     </div>
   );
 }

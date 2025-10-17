@@ -87,6 +87,7 @@ export default function FabricViewPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [batchToDelete, setBatchToDelete] = useState(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isFabricDeleteOpen, setIsFabricDeleteOpen] = useState(false);
 
   // Initialize loading state
   useEffect(() => {
@@ -258,10 +259,10 @@ export default function FabricViewPage() {
     }
   };
 
-  const handleEditFabric = async (updates) => {
+  const handleEditFabric = async (fabricId, updates) => {
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await updateFabric(updates);
+      await updateFabric(fabricId, updates);
       toast({
         title: "Success",
         description: "Fabric updated successfully",
@@ -279,14 +280,6 @@ export default function FabricViewPage() {
   };
 
   const handleDeleteFabric = async () => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this fabric? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
-
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
       await deleteFabric(id);
@@ -304,6 +297,7 @@ export default function FabricViewPage() {
       });
     } finally {
       setLoadingState((prev) => ({ ...prev, actions: false }));
+      setIsFabricDeleteOpen(false);
     }
   };
 
@@ -493,18 +487,9 @@ export default function FabricViewPage() {
         <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
           <EditFabricDialog
             fabric={fabric}
-            onSave={handleEditFabric}
-            onDelete={handleDeleteFabric}
-          >
-            <Button
-              variant="outline"
-              className="w-full md:w-auto"
-              disabled={loadingState.actions}
-            >
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Fabric
-            </Button>
-          </EditFabricDialog>
+            onSave={(updatedData) => handleEditFabric(id, updatedData)}
+            onDelete={() => setIsFabricDeleteOpen(true)}
+          />
           <PurchaseStockDialog
             fabrics={[fabric]}
             suppliers={suppliers}
@@ -788,6 +773,31 @@ export default function FabricViewPage() {
 
       {/* Add the Delete Confirmation Dialog */}
       <DeleteConfirmationDialog />
+      <AlertDialog
+        open={isFabricDeleteOpen}
+        onOpenChange={setIsFabricDeleteOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Are you sure you want to delete this fabric?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              fabric and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteFabric}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Fabric
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Add the printable content div */}
       <div id="printable-content" className="hidden">

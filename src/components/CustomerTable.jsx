@@ -75,14 +75,17 @@ export function CustomerTable({
       // This cell provides action buttons (Edit, Delete) for each row
       cell: ({ row }) => {
         if (!row.original) return null;
-        // These handlers should be passed as props to the component using these columns
-        const { onEdit, onDelete } = row.original.actions || {};
 
         return (
           <div className="flex justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <span className="sr-only">Open menu</span>
                   <MoreVertical className="h-4 w-4" />
                 </Button>
@@ -118,9 +121,12 @@ export function CustomerTable({
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
+                        Cancel
+                      </AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           if (onDelete) onDelete(row.original.id);
                         }}
                         className="bg-red-500 hover:bg-red-600"
@@ -142,5 +148,12 @@ export function CustomerTable({
     return <div>Loading...</div>;
   }
 
-  return <DataTable data={customers} columns={columns} filterColumn="name" />;
+  return (
+    <DataTable
+      data={customers}
+      columns={columns}
+      filterColumn="name"
+      onRowClick={(row) => onRowClick(row.id)}
+    />
+  );
 }
