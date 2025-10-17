@@ -49,7 +49,7 @@ export function EditCashTransactionDialog({
         cashOut: transactionType === "out" ? Number(formData.cashOut) : 0,
       };
 
-      await onEditTransaction(updatedTransaction);
+      await onEditTransaction(transaction.id, updatedTransaction);
       onOpenChange(false);
 
       setFormData({

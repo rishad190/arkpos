@@ -63,7 +63,6 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { EditCashTransactionDialog } from "@/components/EditCashTransactionDialog.jsx";
 
 import {
   Tooltip,
@@ -329,10 +328,7 @@ export default function CashBookPage() {
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
       await updateDailyCashTransaction(transactionId, updatedData);
-      toast({
-        title: "Success",
-        description: "Transaction updated successfully",
-      });
+      setEditingTransaction(null); // Close the edit dialog
     } catch (error) {
       console.error("Error updating transaction:", error);
       toast({
@@ -340,6 +336,7 @@ export default function CashBookPage() {
         description: "Failed to update transaction. Please try again.",
         variant: "destructive",
       });
+      throw error; // Re-throw so the dialog can handle it
     } finally {
       setLoadingState((prev) => ({ ...prev, actions: false }));
     }
@@ -348,16 +345,7 @@ export default function CashBookPage() {
   const handleDeleteTransaction = async (transactionId) => {
     setLoadingDelete(true);
     try {
-      // Optimistically update the UI
-      // This is not available as we are not using useState for dailyCashTransactions
-      // setDailyCashTransactions((prev) =>
-      //   prev.filter((t) => t.id !== transactionId)
-      // );
-
-      // Delete from Firebase
       await deleteDailyCashTransaction(transactionId);
-
-      // Show success message
       toast({
         title: "Success",
         description: "Transaction deleted successfully",
@@ -370,7 +358,6 @@ export default function CashBookPage() {
         description: "Failed to delete transaction. Please try again.",
         variant: "destructive",
       });
-      // If the delete fails, the real-time listener will eventually correct the state
     } finally {
       setLoadingDelete(false);
     }
@@ -564,7 +551,7 @@ export default function CashBookPage() {
         },
         { totalCashIn: 0, totalCashOut: 0 }
       );
-    }, []);
+    }, [dailyCashTransactions]);
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -1140,128 +1127,94 @@ export default function CashBookPage() {
                       role="list"
                       aria-label="Transaction details"
                     >
-                      {day.dailyCash
-                        .filter((t) => t.cashIn > 0)
-                        .map((t) => (
-                          <div
-                            key={`in-${t.id}`}
-                            className="flex flex-col gap-2 py-2 px-4"
-                            role="listitem"
-                          >
-                            <div className="flex justify-between items-start">
-                              <span className="font-medium">
-                                {t.description}
-                              </span>
-                              <div className="flex gap-2 text-sm">
+                      {day.dailyCash.map((t) => (
+                        <div
+                          key={t.id}
+                          className="flex flex-col gap-2 py-2 px-4"
+                          role="listitem"
+                        >
+                          <div className="flex justify-between items-start">
+                            <span className="font-medium">{t.description}</span>
+                            <div className="flex gap-2 text-sm">
+                              {t.cashIn > 0 && (
                                 <span className="text-green-600">
                                   ৳+{t.cashIn.toLocaleString()}
                                 </span>
-                              </div>
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingTransaction(t);
-                                    }}
-                                  >
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <DropdownMenuItem
-                                        className="text-red-500"
-                                        onSelect={(e) => e.preventDefault()}
-                                      >
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>
-                                          Are you sure?
-                                        </AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          This action cannot be undone. This
-                                          will permanently delete the
-                                          transaction.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>
-                                          Cancel
-                                        </AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() =>
-                                            handleDeleteTransaction(t.id)
-                                          }
-                                        >
-                                          Delete
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-                        ))}
-
-                      {day.dailyCash
-                        .filter((t) => t.cashOut > 0)
-                        .map((t) => (
-                          <div
-                            key={`out-${t.id}`}
-                            className="flex flex-col gap-2 py-2 px-4"
-                            role="listitem"
-                          >
-                            <div className="flex justify-between items-start">
-                              <span className="font-medium">
-                                {t.description}
-                              </span>
-                              <div className="flex gap-2 text-sm">
+                              )}
+                              {t.cashOut > 0 && (
                                 <span className="text-red-600">
                                   ৳-{t.cashOut.toLocaleString()}
                                 </span>
-                              </div>
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingTransaction(t);
-                                    }}
-                                  >
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-red-500"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteTransaction(t.id);
-                                    }}
-                                  >
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              )}
                             </div>
                           </div>
-                        ))}
+                          <div className="flex gap-2 justify-end">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingTransaction(t);
+                                  }}
+                                >
+                                  Edit
+                                </DropdownMenuItem>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem
+                                      className="text-red-500"
+                                      onSelect={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        Are you sure?
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This action cannot be undone. This will
+                                        permanently delete the transaction.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        Cancel
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteTransaction(t.id);
+                                        }}
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -1330,113 +1283,109 @@ export default function CashBookPage() {
                         </TableCell>
                         <TableCell>
                           <div className="space-y-2">
-                            {day.dailyCash
-                              .filter((t) => t.cashIn > 0)
-                              .map((t) => (
-                                <div
-                                  key={`in-${t.id}`}
-                                  className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
-                                >
-                                  <div className="flex items-center gap-2">
+                            {day.dailyCash.map((t) => (
+                              <div
+                                key={t.id}
+                                className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
+                              >
+                                <div className="flex items-center gap-2">
+                                  {t.cashIn > 0 && (
                                     <Badge
                                       variant="outline"
                                       className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"
                                     >
                                       In
                                     </Badge>
-                                    <span className="font-medium">
-                                      {t.description}
-                                    </span>
-                                    <span className="text-green-600 dark:text-green-400 text-sm font-medium">
-                                      ৳{t.cashIn.toLocaleString()}
-                                    </span>
-                                  </div>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
-                                      >
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditingTransaction(t);
-                                        }}
-                                      >
-                                        Edit
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        className="text-red-500"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteTransaction(t.id);
-                                        }}
-                                      >
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              ))}
-
-                            {day.dailyCash
-                              .filter((t) => t.cashOut > 0)
-                              .map((t) => (
-                                <div
-                                  key={`out-${t.id}`}
-                                  className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
-                                >
-                                  <div className="flex items-center gap-2">
+                                  )}
+                                  {t.cashOut > 0 && (
                                     <Badge
                                       variant="outline"
                                       className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800"
                                     >
                                       Out
                                     </Badge>
-                                    <span className="font-medium">
-                                      {t.description}
+                                  )}
+                                  <span className="font-medium">
+                                    {t.description}
+                                  </span>
+                                  {t.cashIn > 0 && (
+                                    <span className="text-green-600 dark:text-green-400 text-sm font-medium">
+                                      ৳{t.cashIn.toLocaleString()}
                                     </span>
+                                  )}
+                                  {t.cashOut > 0 && (
                                     <span className="text-red-600 dark:text-red-400 text-sm font-medium">
                                       ৳{t.cashOut.toLocaleString()}
                                     </span>
-                                  </div>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
-                                      >
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditingTransaction(t);
-                                        }}
-                                      >
-                                        Edit
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        className="text-red-500"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteTransaction(t.id);
-                                        }}
-                                      >
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                  )}
                                 </div>
-                              ))}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingTransaction(t);
+                                      }}
+                                    >
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem
+                                          className="text-red-500"
+                                          onSelect={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                          }}
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>
+                                            Are you sure?
+                                          </AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            This action cannot be undone. This
+                                            will permanently delete the
+                                            transaction.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            Cancel
+                                          </AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteTransaction(t.id);
+                                            }}
+                                          >
+                                            Delete
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            ))}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1451,16 +1400,17 @@ export default function CashBookPage() {
 
       {/* Edit Transaction Dialog */}
       {editingTransaction && (
-        <EditCashTransactionDialog
+        <CashTransactionDialog
           transaction={editingTransaction}
           open={!!editingTransaction}
           onOpenChange={(open) => {
             if (!open) setEditingTransaction(null);
           }}
-          onEditTransaction={async (updatedData) => {
-            await handleEditTransaction(editingTransaction.id, updatedData);
-            setEditingTransaction(null);
-          }}
+          onTransactionSubmit={(data) =>
+            handleEditTransaction(editingTransaction.id, data)
+          }
+          expenseCategories={expenseCategories}
+          onAddCategory={handleAddCategory}
           aria-label="Edit transaction"
           role="dialog"
           aria-modal="true"
