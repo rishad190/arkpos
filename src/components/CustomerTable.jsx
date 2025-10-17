@@ -85,6 +85,7 @@ export function CustomerTable({
                   size="icon"
                   className="h-8 w-8"
                   onClick={(e) => e.stopPropagation()}
+                  data-radix-dropdown-menu-trigger
                 >
                   <span className="sr-only">Open menu</span>
                   <MoreVertical className="h-4 w-4" />
@@ -92,9 +93,11 @@ export function CustomerTable({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent row click events
-                    if (onEdit) onEdit(row.original);
+                  onSelect={() => {
+                    // Menu will close automatically, then we can open dialog
+                    requestAnimationFrame(() => {
+                      if (onEdit) onEdit(row.original);
+                    });
                   }}
                 >
                   Edit

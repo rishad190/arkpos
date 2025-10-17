@@ -1155,15 +1155,17 @@ export default function CashBookPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={(e) => e.stopPropagation()}
+                                  data-radix-dropdown-menu-trigger
                                 >
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingTransaction(t);
+                                  onSelect={() => {
+                                    requestAnimationFrame(() =>
+                                      setEditingTransaction(t)
+                                    );
                                   }}
                                 >
                                   Edit
@@ -1326,15 +1328,17 @@ export default function CashBookPage() {
                                       size="sm"
                                       className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
                                       onClick={(e) => e.stopPropagation()}
+                                      data-radix-dropdown-menu-trigger
                                     >
                                       <MoreVertical className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingTransaction(t);
+                                      onSelect={() => {
+                                        requestAnimationFrame(() =>
+                                          setEditingTransaction(t)
+                                        );
                                       }}
                                     >
                                       Edit
