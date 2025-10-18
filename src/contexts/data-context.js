@@ -39,7 +39,7 @@ const partnerOperations = {
     }
   },
 };
-("use client");
+
 import {
   createContext,
   useContext,

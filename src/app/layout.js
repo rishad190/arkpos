@@ -1,24 +1,17 @@
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { ClientLayout } from "@/components/ClientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { Navbar } from "@/components/Navbar"; // Add this import
+import { Navbar } from "@/components/Navbar";
 
-const geist = Geist({
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
-// Add metadata configuration
 export const metadata = {
   title: {
-    default: "ARK ENTERPRISE",
-    template: "%s | POS System",
+    default: "ARK POS",
+    template: "%s | ARK POS",
   },
-  description:
-    "A modern Point of Sale system for managing customers and transactions",
-  keywords: ["POS", "point of sale", "customer management", "transactions"],
-  authors: [{ name: "Md Rishad Khan" }],
-
+  description: "A modern Point of Sale system for ARK Enterprise.",
   icons: {
     icon: "/favicon.ico",
   },
@@ -26,21 +19,13 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={geist.className}>
-      <body>
+    <html lang="en">
+      <body className={inter.className}>
         <ClientLayout>
           <ProtectedRoute>
-            <div
-              className="flex flex-col min-h-screen"
-              data-dialog-root
-              inert={false} // Explicitly set inert to false to ensure focus management works
-              role="region"
-              aria-label="Main application"
-            >
+            <div className="flex flex-col min-h-screen">
               <Navbar />
-              <main className="flex-1" role="main">
-                {children}
-              </main>
+              <main className="flex-1 bg-gray-50">{children}</main>
             </div>
           </ProtectedRoute>
         </ClientLayout>

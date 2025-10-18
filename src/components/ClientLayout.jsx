@@ -1,22 +1,15 @@
 "use client";
+import { AuthProvider } from "@/contexts/auth-context";
 import { DataProvider } from "@/contexts/data-context";
-import { useState, useEffect } from "react";
-import { LoadingSpinner } from "./LoadingSpinner";
+import { Toaster } from "@/components/ui/toaster";
 
 export function ClientLayout({ children }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  return <DataProvider>{children}</DataProvider>;
+  return (
+    <AuthProvider>
+      <DataProvider>
+        {children}
+        <Toaster />
+      </DataProvider>
+    </AuthProvider>
+  );
 }

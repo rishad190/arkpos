@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { get, getDatabase, ref, onValue } from "firebase/database";
+import { getDatabase } from "firebase/database";
 import { getAuth } from "firebase/auth";
 
 // Firebase configuration
@@ -18,16 +18,10 @@ let app;
 let db = null;
 let auth = null;
 
-// Only initialize Firebase if all environment variables are present
-if (
-  firebaseConfig.apiKey &&
-  firebaseConfig.authDomain &&
-  firebaseConfig.databaseURL &&
-  firebaseConfig.projectId &&
-  firebaseConfig.storageBucket &&
-  firebaseConfig.messagingSenderId &&
-  firebaseConfig.appId
-) {
+// Check that all environment variables are present before initializing
+const firebaseReady = Object.values(firebaseConfig).every(Boolean);
+
+if (firebaseReady) {
   try {
     app = initializeApp(firebaseConfig);
     db = getDatabase(app);
@@ -43,32 +37,3 @@ if (
 
 // Export database instance and auth
 export { db, auth };
-
-// Helper function to safely get database reference
-export const getDbRef = (path) => {
-  if (!db) throw new Error("Database not initialized");
-  return ref(db, path);
-};
-
-// Helper function to safely get data
-export const getData = async (path) => {
-  try {
-    const snapshot = await get(getDbRef(path));
-    return snapshot.exists() ? snapshot.val() : null;
-  } catch (error) {
-    console.error(`Error getting data from ${path}:`, error);
-    throw error;
-  }
-};
-
-// Helper function to safely set data
-export const setData = async (path, data) => {
-  try {
-    const dbRef = getDbRef(path);
-    await set(dbRef, data);
-    return true;
-  } catch (error) {
-    console.error(`Error setting data at ${path}:`, error);
-    throw error;
-  }
-};

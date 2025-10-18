@@ -1,50 +1,26 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 export function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuth = () => {
-      try {
-        const auth = localStorage.getItem("isAuthenticated");
-        setIsAuthenticated(auth === "true");
+    if (!loading && !user && pathname !== "/login") {
+      router.push("/login");
+    }
+  }, [user, loading, router, pathname]);
 
-        if (!auth && pathname !== "/login") {
-          router.push("/login");
-        }
-      } catch (error) {
-        console.error("Auth check error:", error);
-        router.push("/login");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuth();
-
-    // Listen for storage changes
-    window.addEventListener("storage", checkAuth);
-    return () => window.removeEventListener("storage", checkAuth);
-  }, [router, pathname]);
-
-  // Show loading spinner while checking auth
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
+  if (loading) {
+    return <LoadingSpinner />;
   }
 
-  // Don't render children if not authenticated and not on login page
-  if (!isAuthenticated && pathname !== "/login") {
-    return null;
+  if (!user && pathname !== "/login") {
+    return null; // or a loading spinner
   }
 
   return children;

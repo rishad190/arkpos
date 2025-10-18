@@ -1,68 +1,45 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
+import { useAuth } from "@/contexts/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [loginAttempts, setLoginAttempts] = useState(0);
-
-  useEffect(() => {
-    const checkAuth = () => {
-      const isAuth = localStorage.getItem("isAuthenticated") === "true";
-      if (isAuth) {
-        router.push("/");
-      } else {
-        setIsLoading(false);
-      }
-    };
-    checkAuth();
-  }, [router]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setIsLoading(true);
 
     try {
-      if (loginAttempts >= 5) {
-        setError("Too many failed attempts. Please try again later.");
-        return;
-      }
-
-      // In a real application, this should be a secure backend authentication call.
-      // For this example, we are using an environment variable for the password.
-      if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
-        setIsLoading(true);
-        // Using localStorage is not recommended for secure session management.
-        // A more secure method like Firebase Authentication should be used.
-        localStorage.setItem("isAuthenticated", "true");
-        await router.push("/");
-      } else {
-        setLoginAttempts((prev) => prev + 1);
-        setError(`Invalid password. ${5 - loginAttempts} attempts remaining.`);
-      }
+      await login(email, password);
+      toast({ title: "Success", description: "Logged in successfully." });
+      router.push("/");
     } catch (error) {
       console.error("Login error:", error);
-      setError("An error occurred during login");
+      setError("Invalid email or password. Please try again.");
+      toast({
+        title: "Login Failed",
+        description: "Invalid email or password.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
@@ -78,7 +55,9 @@ export default function LoginPage() {
               priority
             />
           </div>
-          <h2 className="text-center text-3xl font-bold text-gray-900">ARK</h2>
+          <h2 className="text-center text-3xl font-bold text-gray-900">
+            ARK ENTERPRISE
+          </h2>
           <p className="text-center text-sm text-gray-600">
             Welcome back! Please sign in to continue.
           </p>
@@ -90,6 +69,16 @@ export default function LoginPage() {
               <p className="text-red-600 text-sm text-center">{error}</p>
             </div>
           )}
+
+          <div className="relative">
+            <Input
+              type="email"
+              placeholder="Enter email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
 
           <div className="relative">
             <Input
@@ -116,7 +105,7 @@ export default function LoginPage() {
           <Button
             type="submit"
             className="w-full bg-blue-600 hover:bg-blue-700 transition-colors"
-            disabled={isLoading || loginAttempts >= 5}
+            disabled={isLoading}
           >
             {isLoading ? (
               <div className="flex items-center justify-center gap-2">
@@ -131,7 +120,8 @@ export default function LoginPage() {
 
         <div className="text-center">
           <p className="text-sm text-gray-500">
-            &copy; {new Date().getFullYear()} ARK. All rights reserved.
+            &copy; {new Date().getFullYear()} ARK Enterprise. All rights
+            reserved.
           </p>
         </div>
       </div>

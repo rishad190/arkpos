@@ -1,0 +1,46 @@
+/* Styles for printing */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background-color: white !important;
+    font-size: 10pt;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    background-color: white !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-desktop-table {
+    display: block !important;
+  }
+
+  .print-mobile-view {
+    display: none !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    break-after: avoid;
+  }
+
+  table,
+  .card {
+    break-inside: avoid;
+  }
+}
