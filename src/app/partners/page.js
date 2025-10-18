@@ -521,7 +521,7 @@ export default function PartnerPage() {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the
-              imported product record for "{deleteTarget?.productName}".
+              imported product record for `{deleteTarget?.productName}`.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
