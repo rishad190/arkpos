@@ -1,4 +1,45 @@
-"use client";
+const partnerOperations = {
+  addPartnerProduct: async (productData) => {
+    try {
+      const refPath = COLLECTION_REFS.PARTNER_PRODUCTS;
+      const productsRef = ref(db, refPath);
+      const newRef = push(productsRef);
+      const payload = {
+        ...productData,
+        id: newRef.key,
+        createdAt: serverTimestamp(),
+      };
+      await set(newRef, payload);
+      return newRef.key;
+    } catch (error) {
+      console.error("Error adding partner product:", error);
+      throw error;
+    }
+  },
+  deletePartnerProduct: async (productId) => {
+    try {
+      await remove(ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`));
+    } catch (error) {
+      console.error("Error deleting partner product:", error);
+      throw error;
+    }
+  },
+  updatePartnerProduct: async (productId, updatedData) => {
+    try {
+      await update(
+        ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`),
+        {
+          ...updatedData,
+          updatedAt: serverTimestamp(),
+        }
+      );
+    } catch (error) {
+      console.error("Error updating partner product:", error);
+      throw error;
+    }
+  },
+};
+("use client");
 import {
   createContext,
   useContext,
@@ -53,6 +94,7 @@ const COLLECTION_REFS = {
   FABRICS: "fabrics",
   SUPPLIERS: "suppliers",
   SUPPLIER_TRANSACTIONS: "supplierTransactions",
+  PARTNER_PRODUCTS: "partnerProducts",
   SETTINGS: "settings",
 };
 
@@ -64,6 +106,7 @@ const initialState = {
   fabricBatches: [],
   fabrics: [],
   suppliers: [],
+  partnerProducts: [],
   supplierTransactions: [],
   loading: true,
   error: null,
@@ -113,10 +156,7 @@ function reducer(state, action) {
     case "ADD_DAILY_CASH_TRANSACTION":
       return {
         ...state,
-        dailyCashTransactions: [
-          ...state.dailyCashTransactions,
-          action.payload,
-        ],
+        dailyCashTransactions: [...state.dailyCashTransactions, action.payload],
       };
     case "UPDATE_DAILY_CASH_TRANSACTION":
       return {
@@ -160,6 +200,12 @@ function reducer(state, action) {
       return {
         ...state,
         supplierTransactions: action.payload,
+        loading: false,
+      };
+    case "SET_PARTNER_PRODUCTS":
+      return {
+        ...state,
+        partnerProducts: action.payload,
         loading: false,
       };
     case "SET_ERROR":
@@ -252,6 +298,21 @@ export function DataProvider({ children }) {
       }
     });
     unsubscribers.push(unsubscribe);
+
+    // Partner products listener
+    const partnerProductsRef = ref(db, COLLECTION_REFS.PARTNER_PRODUCTS);
+    const unsubPartner = onValue(partnerProductsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = Object.entries(snapshot.val()).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        dispatch({ type: "SET_PARTNER_PRODUCTS", payload: data });
+      } else {
+        dispatch({ type: "SET_PARTNER_PRODUCTS", payload: [] });
+      }
+    });
+    unsubscribers.push(unsubPartner);
 
     const dailyCashRef = ref(db, COLLECTION_REFS.DAILY_CASH);
     unsubscribers.push(
@@ -583,6 +644,27 @@ export function DataProvider({ children }) {
     },
   };
 
+  // Partner / Import Operations
+  const partnerOperations = {
+    addPartnerProduct: async (productData) => {
+      try {
+        const refPath = COLLECTION_REFS.PARTNER_PRODUCTS;
+        const productsRef = ref(db, refPath);
+        const newRef = push(productsRef);
+        const payload = {
+          ...productData,
+          id: newRef.key,
+          createdAt: serverTimestamp(),
+        };
+        await set(newRef, payload);
+        return newRef.key;
+      } catch (error) {
+        console.error("Error adding partner product:", error);
+        throw error;
+      }
+    },
+  };
+
   const dailyCashOperations = {
     addDailyCashTransaction: async (transaction) => {
       try {
@@ -684,6 +766,7 @@ export function DataProvider({ children }) {
     ...transactionOperations,
     ...fabricOperations,
     ...supplierOperations,
+    ...partnerOperations,
     ...dailyCashOperations,
     settings: state.settings,
     updateSettings,
