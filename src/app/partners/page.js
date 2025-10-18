@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,14 +20,40 @@ import {
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useToast } from "@/hooks/use-toast";
+import { Edit, Trash2, MoreVertical } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { EditPartnerProductDialog } from "@/components/EditPartnerProductDialog";
 
 // Conversion factor
 const METER_TO_YARD = 1.09361;
 
 export default function PartnerPage() {
-  const { suppliers, addPartnerProduct, partnerProducts } = useData();
+  const {
+    suppliers,
+    addPartnerProduct,
+    partnerProducts,
+    deletePartnerProduct,
+    updatePartnerProduct,
+  } = useData();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [editingProduct, setEditingProduct] = useState(null);
 
   const [formData, setFormData] = useState({
     productName: "",
@@ -107,7 +133,6 @@ export default function PartnerPage() {
         description: "Product import added successfully!",
       });
 
-      // Reset form
       setFormData({
         productName: "",
         date: new Date().toISOString().split("T")[0],
@@ -130,6 +155,54 @@ export default function PartnerPage() {
     }
   };
 
+  const handleDelete = async (productId) => {
+    try {
+      await deletePartnerProduct(productId);
+      toast({
+        title: "Success",
+        description: "Product import deleted successfully.",
+      });
+    } catch (error) {
+      console.error("Failed to delete product import:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete product import.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  const handleEdit = (product) => {
+    setEditingProduct(product);
+  };
+
+  const handleUpdate = useCallback(
+    async (productId, updatedData) => {
+      setIsSaving(true);
+      try {
+        await updatePartnerProduct(productId, updatedData);
+        toast({
+          title: "Success",
+          description: "Product import updated successfully!",
+        });
+        setEditingProduct(null);
+      } catch (error) {
+        console.error("Failed to update product import:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update product import.",
+          variant: "destructive",
+        });
+        throw error;
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [updatePartnerProduct, toast]
+  );
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
       <PageHeader
@@ -138,7 +211,6 @@ export default function PartnerPage() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Form Section */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
@@ -276,7 +348,6 @@ export default function PartnerPage() {
           </Card>
         </div>
 
-        {/* Calculation Summary Section */}
         <div className="lg:col-span-1">
           <Card className="sticky top-24">
             <CardHeader>
@@ -348,7 +419,6 @@ export default function PartnerPage() {
         </div>
       </div>
 
-      {/* Display Area */}
       <div className="mt-8">
         <h2 className="text-2xl font-bold mb-4">Imported Products</h2>
         {partnerProducts && partnerProducts.length > 0 ? (
@@ -356,11 +426,43 @@ export default function PartnerPage() {
             {partnerProducts.map((p) => (
               <Card key={p.id}>
                 <CardHeader>
-                  <CardTitle className="text-base">{p.productName}</CardTitle>
-                  <CardDescription className="text-sm">
-                    {p.supplierName} •{" "}
-                    {new Date(p.createdAt).toLocaleDateString()}
-                  </CardDescription>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-base">
+                        {p.productName}
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        {p.supplierName} •{" "}
+                        {new Date(p.createdAt || p.date).toLocaleDateString()}
+                      </CardDescription>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            requestAnimationFrame(() => handleEdit(p));
+                          }}
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-500"
+                          onSelect={() => {
+                            requestAnimationFrame(() => setDeleteTarget(p));
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
@@ -409,6 +511,43 @@ export default function PartnerPage() {
           </Card>
         )}
       </div>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              imported product record for "{deleteTarget?.productName}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) handleDelete(deleteTarget.id);
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {editingProduct && (
+        <EditPartnerProductDialog
+          product={editingProduct}
+          isOpen={!!editingProduct}
+          onClose={() => setEditingProduct(null)}
+          onSave={handleUpdate}
+        />
+      )}
     </div>
   );
 }

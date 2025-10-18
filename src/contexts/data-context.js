@@ -1,45 +1,3 @@
-const partnerOperations = {
-  addPartnerProduct: async (productData) => {
-    try {
-      const refPath = COLLECTION_REFS.PARTNER_PRODUCTS;
-      const productsRef = ref(db, refPath);
-      const newRef = push(productsRef);
-      const payload = {
-        ...productData,
-        id: newRef.key,
-        createdAt: serverTimestamp(),
-      };
-      await set(newRef, payload);
-      return newRef.key;
-    } catch (error) {
-      console.error("Error adding partner product:", error);
-      throw error;
-    }
-  },
-  deletePartnerProduct: async (productId) => {
-    try {
-      await remove(ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`));
-    } catch (error) {
-      console.error("Error deleting partner product:", error);
-      throw error;
-    }
-  },
-  updatePartnerProduct: async (productId, updatedData) => {
-    try {
-      await update(
-        ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`),
-        {
-          ...updatedData,
-          updatedAt: serverTimestamp(),
-        }
-      );
-    } catch (error) {
-      console.error("Error updating partner product:", error);
-      throw error;
-    }
-  },
-};
-
 import {
   createContext,
   useContext,
@@ -232,9 +190,6 @@ export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   // Firebase Subscriptions
-  // For production applications, it's recommended to use more granular queries
-  // to fetch only the data needed for a specific view. This will improve
-  // performance as the data grows.
   useEffect(() => {
     const unsubscribers = [];
     const collections = [
@@ -299,7 +254,6 @@ export function DataProvider({ children }) {
     });
     unsubscribers.push(unsubscribe);
 
-    // Partner products listener
     const partnerProductsRef = ref(db, COLLECTION_REFS.PARTNER_PRODUCTS);
     const unsubPartner = onValue(partnerProductsRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -343,7 +297,6 @@ export function DataProvider({ children }) {
     return () => unsubscribers.forEach((unsub) => unsub());
   }, [dispatch]);
 
-  // Add memoization for customer dues
   const customerDues = useMemo(() => {
     const dues = {};
     state.customers?.forEach((customer) => {
@@ -361,7 +314,6 @@ export function DataProvider({ children }) {
     [customerDues]
   );
 
-  // Get expense categories
   const getExpenseCategories = useCallback(async () => {
     try {
       const categoriesRef = ref(
@@ -374,7 +326,6 @@ export function DataProvider({ children }) {
         return snapshot.val().categories || DEFAULT_EXPENSE_CATEGORIES;
       }
 
-      // If no categories exist, initialize with defaults
       await set(categoriesRef, { categories: DEFAULT_EXPENSE_CATEGORIES });
       return DEFAULT_EXPENSE_CATEGORIES;
     } catch (error) {
@@ -391,7 +342,6 @@ export function DataProvider({ children }) {
       );
       await set(categoriesRef, { categories });
 
-      // Update local state
       dispatch({
         type: "UPDATE_SETTINGS",
         payload: { expenseCategories: categories },
@@ -402,7 +352,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Customer Operations
   const customerOperations = {
     addCustomer: async (customerData) => {
       const customersRef = ref(db, COLLECTION_REFS.CUSTOMERS);
@@ -413,7 +362,6 @@ export function DataProvider({ children }) {
       });
       return newCustomerRef.key;
     },
-
     updateCustomer: async (customerId, updatedData) => {
       const customerRef = ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`);
       await update(customerRef, {
@@ -421,9 +369,7 @@ export function DataProvider({ children }) {
         updatedAt: serverTimestamp(),
       });
     },
-
     deleteCustomer: async (customerId) => {
-      // First delete associated transactions
       const customerTransactions = state.transactions.filter(
         (t) => t.customerId === customerId
       );
@@ -432,14 +378,11 @@ export function DataProvider({ children }) {
           ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transaction.id}`)
         );
       }
-      // Then delete the customer
       await remove(ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`));
     },
-
     getCustomerDue,
   };
 
-  // Transaction Operations
   const transactionOperations = {
     addTransaction: async (transactionData) => {
       const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
@@ -448,10 +391,8 @@ export function DataProvider({ children }) {
         ...transactionData,
         createdAt: new Date().toISOString(),
       });
-
       return newTransactionRef.key;
     },
-
     updateTransaction: async (transactionId, updatedData) => {
       const transactionRef = ref(
         db,
@@ -462,50 +403,40 @@ export function DataProvider({ children }) {
         updatedAt: serverTimestamp(),
       });
     },
-
     deleteTransaction: async (transactionId) => {
       await remove(ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`));
     },
   };
 
-  // Fabric Operations
   const fabricOperations = {
     addFabric: async (fabricData) => {
       await push(ref(db, COLLECTION_REFS.FABRICS), fabricData);
     },
-
     updateFabric: async (fabricId, updatedData) => {
       await update(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`), {
         ...updatedData,
         updatedAt: serverTimestamp(),
       });
     },
-
     deleteFabric: async (fabricId) => {
       await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
     },
-
     addFabricBatch: async (batchData) => {
       await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
         ...batchData,
         createdAt: serverTimestamp(),
       });
     },
-
     deleteFabricBatch: async (batchId) => {
       try {
-        // Get the batch data first to update fabric totals
         const batchRef = ref(
           db,
           `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`
         );
         const batchSnapshot = await get(batchRef);
-
         if (!batchSnapshot.exists()) {
           throw new Error("Batch not found");
         }
-
-        // Delete the batch
         await remove(batchRef);
       } catch (error) {
         console.error("Error deleting fabric batch:", error);
@@ -514,7 +445,6 @@ export function DataProvider({ children }) {
     },
   };
 
-  // Supplier Operations
   const supplierOperations = {
     addSupplier: async (supplierData) => {
       try {
@@ -531,7 +461,6 @@ export function DataProvider({ children }) {
         throw error;
       }
     },
-
     updateSupplier: async (supplierId, updatedData) => {
       try {
         const supplierRef = ref(
@@ -547,14 +476,11 @@ export function DataProvider({ children }) {
         throw error;
       }
     },
-
     deleteSupplier: async (supplierId) => {
       try {
-        // First delete associated transactions
         const supplierTransactions = state.transactions.filter(
           (t) => t.supplierId === supplierId
         );
-
         for (const transaction of supplierTransactions) {
           await remove(
             ref(
@@ -563,15 +489,12 @@ export function DataProvider({ children }) {
             )
           );
         }
-
-        // Then delete the supplier
         await remove(ref(db, `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`));
       } catch (error) {
         console.error("Error deleting supplier:", error);
         throw error;
       }
     },
-
     addSupplierTransaction: async (transaction) => {
       try {
         const transactionsRef = ref(db, COLLECTION_REFS.SUPPLIER_TRANSACTIONS);
@@ -585,8 +508,6 @@ export function DataProvider({ children }) {
         };
 
         await set(newTransactionRef, newTransaction);
-
-        // Update supplier's total due
         const supplierRef = ref(
           db,
           `${COLLECTION_REFS.SUPPLIERS}/${transaction.supplierId}`
@@ -600,14 +521,12 @@ export function DataProvider({ children }) {
             updatedAt: serverTimestamp(),
           });
         }
-
         return newTransactionRef.key;
       } catch (error) {
         console.error("Error adding supplier transaction:", error);
         throw error;
       }
     },
-
     deleteSupplierTransaction: async (
       transactionId,
       supplierId,
@@ -615,23 +534,18 @@ export function DataProvider({ children }) {
       paidAmount
     ) => {
       try {
-        // Delete transaction
         await remove(
           ref(db, `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transactionId}`)
         );
-
-        // Update supplier's total due
         const supplierRef = ref(
           db,
           `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
         );
         const supplierSnapshot = await get(supplierRef);
-
         if (supplierSnapshot.exists()) {
           const supplier = supplierSnapshot.val();
           const dueAmount = amount - (paidAmount || 0);
           const newTotalDue = Math.max(0, (supplier.totalDue || 0) - dueAmount);
-
           await update(supplierRef, {
             totalDue: newTotalDue,
             updatedAt: serverTimestamp(),
@@ -644,7 +558,6 @@ export function DataProvider({ children }) {
     },
   };
 
-  // Partner / Import Operations
   const partnerOperations = {
     addPartnerProduct: async (productData) => {
       try {
@@ -663,6 +576,30 @@ export function DataProvider({ children }) {
         throw error;
       }
     },
+    deletePartnerProduct: async (productId) => {
+      try {
+        await remove(
+          ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`)
+        );
+      } catch (error) {
+        console.error("Error deleting partner product:", error);
+        throw error;
+      }
+    },
+    updatePartnerProduct: async (productId, updatedData) => {
+      try {
+        await update(
+          ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`),
+          {
+            ...updatedData,
+            updatedAt: serverTimestamp(),
+          }
+        );
+      } catch (error) {
+        console.error("Error updating partner product:", error);
+        throw error;
+      }
+    },
   };
 
   const dailyCashOperations = {
@@ -675,15 +612,12 @@ export function DataProvider({ children }) {
           id: newTransactionRef.key,
           createdAt: serverTimestamp(),
         });
-
-        // Update related customer transaction if it's a sale
         if (transaction.type === "sale" && transaction.reference) {
           const customerTransactionRef = query(
             ref(db, "transactions"),
             orderByChild("memoNumber"),
             equalTo(transaction.reference)
           );
-
           const snapshot = await get(customerTransactionRef);
           if (snapshot.exists()) {
             const [transactionId, transactionData] = Object.entries(
@@ -698,14 +632,12 @@ export function DataProvider({ children }) {
             });
           }
         }
-
         return newTransactionRef.key;
       } catch (error) {
         console.error("Error adding daily cash transaction:", error);
         throw error;
       }
     },
-
     deleteDailyCashTransaction: async (transactionId) => {
       try {
         const transactionRef = ref(
@@ -718,7 +650,6 @@ export function DataProvider({ children }) {
         throw error;
       }
     },
-
     updateDailyCashTransaction: async (transactionId, updatedData) => {
       try {
         const transactionRef = ref(
@@ -734,7 +665,6 @@ export function DataProvider({ children }) {
         throw error;
       }
     },
-
     setDailyCashTransactions: (transactions) => {
       dispatch({ type: "SET_DAILY_CASH_TRANSACTIONS", payload: transactions });
     },
@@ -742,15 +672,11 @@ export function DataProvider({ children }) {
 
   const updateSettings = async (newSettings) => {
     try {
-      // Update settings in Firebase
       await updateDoc(doc(db, "settings", "app"), newSettings);
-
-      // Update local state
       dispatch({
         type: "UPDATE_SETTINGS",
         payload: newSettings,
       });
-
       return true;
     } catch (error) {
       console.error("Error updating settings:", error);
@@ -759,9 +685,7 @@ export function DataProvider({ children }) {
   };
 
   const contextValue = {
-    // State
     ...state,
-    // Operations
     ...customerOperations,
     ...transactionOperations,
     ...fabricOperations,
@@ -779,7 +703,6 @@ export function DataProvider({ children }) {
   );
 }
 
-// Export the hook to use the context
 export function useData() {
   const context = useContext(DataContext);
   if (!context) {
