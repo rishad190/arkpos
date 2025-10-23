@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +44,7 @@ import { EditPartnerProductDialog } from "@/components/EditPartnerProductDialog"
 const METER_TO_YARD = 1.09361;
 
 export default function PartnerPage() {
+  const router = useRouter();
   const {
     suppliers,
     addPartnerProduct,
@@ -424,7 +426,11 @@ export default function PartnerPage() {
         {partnerProducts && partnerProducts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {partnerProducts.map((p) => (
-              <Card key={p.id}>
+              <Card
+                key={p.id}
+                onClick={() => router.push(`/partners/${p.id}`)}
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+              >
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
@@ -438,7 +444,12 @@ export default function PartnerPage() {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

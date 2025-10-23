@@ -203,6 +203,17 @@ export default function CashBookPage() {
       }
     });
 
+    // Sort transactions within each day: cash in first, then cash out
+    for (const date in dailySummary) {
+      dailySummary[date].dailyCash.sort((a, b) => {
+        const aIsCashIn = (a.cashIn || 0) > 0;
+        const bIsCashIn = (b.cashIn || 0) > 0;
+        if (aIsCashIn && !bIsCashIn) return -1;
+        if (!aIsCashIn && bIsCashIn) return 1;
+        return 0;
+      });
+    }
+
     // Convert daily summary to sorted array
     const dailyCash = Object.values(dailySummary).sort(
       (a, b) => new Date(b.date) - new Date(a.date)
