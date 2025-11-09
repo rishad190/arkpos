@@ -27,10 +27,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AddTransactionDialog } from "@/components/AddTransactionDialog.jsx";
-import { EditTransactionDialog } from "@/components/EditTransactionDialog.jsx";
-import { LoadingState, TableSkeleton } from "@/components/LoadingState.jsx";
-import { ErrorBoundary } from "@/components/ErrorBoundary.jsx";
+import { AddTransactionDialog } from "@/components/AddTransactionDialog";
+import { EditTransactionDialog } from "@/components/EditTransactionDialog";
+import { LoadingState, TableSkeleton } from "@/components/LoadingState";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import {
   ArrowLeft,
   Phone,
@@ -57,7 +57,7 @@ import { formatDate, exportToCSV, exportToPDF } from "@/lib/utils";
 import { TRANSACTION_CONSTANTS, ERROR_MESSAGES } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { DateRangePicker } from "@/components/DateRangePicker.jsx";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 

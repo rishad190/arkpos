@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useData } from "@/contexts/data-context";
 import {
   Card,
@@ -16,14 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import {
-  Building2,
-  ArrowUpRight,
-  ArrowDownRight,
-  Download,
-  FileText,
-  Printer,
-} from "lucide-react";
+import { Building2, Download, FileText, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -37,45 +30,72 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/common/PageHeader";
+import {
+  formatCurrency,
+  exportToCSV,
+  exportToPDF,
+  formatDate,
+} from "@/lib/utils";
+import { useReactToPrint } from "react-to-print";
+import ExpenseReportPrint from "@/components/ExpenseReportPrint";
 
 export default function ExpenseReportPage() {
-  const { dailyCashTransactions } = useData();
-  const [selectedMonth, setSelectedMonth] = useState(
+  const { dailyCashTransactions, loading, getExpenseCategories } = useData();
+  const [selectedPeriod, setSelectedPeriod] = useState(
     new Date().toISOString().slice(0, 7)
   );
-  const [categoryTotals, setCategoryTotals] = useState({});
-  const [bankTotals, setBankTotals] = useState({
-    deposits: 0,
-    withdrawals: 0,
-  });
   const [viewMode, setViewMode] = useState("monthly"); // monthly, yearly, all-time
-  const [loading, setLoading] = useState(true);
+  const [expenseCategories, setExpenseCategories] = useState([]);
+
+  const printRef = useRef();
 
   useEffect(() => {
-    // Filter transactions based on view mode
-    let filteredTransactions = dailyCashTransactions;
+    const loadCategories = async () => {
+      try {
+        const categories = await getExpenseCategories();
+        setExpenseCategories(categories);
+      } catch (error) {
+        console.error("Error loading categories:", error);
+        // Handle error appropriately, maybe show a toast
+      }
+    };
+    loadCategories();
+  }, [getExpenseCategories]);
+
+  const filteredTransactions = useMemo(() => {
     if (viewMode === "monthly") {
-      filteredTransactions = dailyCashTransactions.filter((t) =>
-        t.date.startsWith(selectedMonth)
-      );
-    } else if (viewMode === "yearly") {
-      const year = selectedMonth.slice(0, 4);
-      filteredTransactions = dailyCashTransactions.filter((t) =>
-        t.date.startsWith(year)
+      return dailyCashTransactions.filter((t) =>
+        t.date.startsWith(selectedPeriod)
       );
     }
+    if (viewMode === "yearly") {
+      const year = selectedPeriod.slice(0, 4);
+      return dailyCashTransactions.filter((t) => t.date.startsWith(year));
+    }
+    return dailyCashTransactions;
+  }, [dailyCashTransactions, selectedPeriod, viewMode]);
 
-    // Calculate category totals
-    const categoryData = filteredTransactions.reduce((acc, transaction) => {
+  const categoryTotals = useMemo(() => {
+    const totals = {};
+
+    // Initialize all known categories with 0
+    expenseCategories.forEach((category) => {
+      totals[category] = 0;
+    });
+
+    // Calculate totals from transactions
+    filteredTransactions.forEach((transaction) => {
       if (transaction.transactionType === "cash" && transaction.cashOut > 0) {
         const category = transaction.category || "Uncategorized";
-        acc[category] = (acc[category] || 0) + transaction.cashOut;
+        totals[category] = (totals[category] || 0) + transaction.cashOut;
       }
-      return acc;
-    }, {});
+    });
 
-    // Calculate bank totals
-    const bankData = filteredTransactions.reduce(
+    return totals;
+  }, [filteredTransactions, expenseCategories]);
+
+  const bankTotals = useMemo(() => {
+    return filteredTransactions.reduce(
       (acc, transaction) => {
         if (transaction.transactionType === "bank_deposit") {
           acc.deposits += transaction.cashIn || 0;
@@ -86,102 +106,77 @@ export default function ExpenseReportPage() {
       },
       { deposits: 0, withdrawals: 0 }
     );
+  }, [filteredTransactions]);
 
-    setCategoryTotals(categoryData);
-    setBankTotals(bankData);
-    setLoading(false);
-  }, [dailyCashTransactions, selectedMonth, viewMode]);
-
-  // Get total expenses
-  const totalExpenses = Object.values(categoryTotals).reduce(
-    (sum, amount) => sum + amount,
-    0
+  const totalExpenses = useMemo(
+    () =>
+      Object.values(categoryTotals).reduce((sum, amount) => sum + amount, 0),
+    [categoryTotals]
   );
 
-  // Generate months for dropdown
-  const months = Array.from({ length: 12 }, (_, i) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    return date.toISOString().slice(0, 7);
-  });
+  const months = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        return date.toISOString().slice(0, 7);
+      }),
+    []
+  );
 
-  // Generate years for dropdown
-  const years = Array.from(
-    new Set(dailyCashTransactions.map((t) => t.date.slice(0, 4)))
-  ).sort((a, b) => b - a);
+  const years = useMemo(
+    () =>
+      Array.from(
+        new Set(dailyCashTransactions.map((t) => t.date.slice(0, 4)))
+      ).sort((a, b) => b - a),
+    [dailyCashTransactions]
+  );
 
   const handleExportCSV = () => {
     const data = Object.entries(categoryTotals).map(([category, amount]) => ({
       Category: category,
       Amount: amount,
-      Percentage: ((amount / totalExpenses) * 100).toFixed(2) + "%",
+      Percentage:
+        totalExpenses > 0
+          ? ((amount / totalExpenses) * 100).toFixed(2) + "%"
+          : "0%",
     }));
-    exportToCSV(data, "expense-report.csv");
+    exportToCSV(data, "expense-report");
   };
 
   const handleExportPDF = () => {
-    const data = {
+    const data = Object.entries(categoryTotals).map(([category, amount]) => ({
+      category,
+      amount: formatCurrency(amount),
+      percentage:
+        totalExpenses > 0
+          ? `${((amount / totalExpenses) * 100).toFixed(1)}%`
+          : "0%",
+    }));
+
+    exportToPDF(data, "Expense Report", {
       title: "Expense Report",
-      date: new Date().toLocaleDateString(),
-      categories: categoryTotals,
-      bankTotals,
-      totalExpenses,
-    };
-    exportToPDF(data, "expense-report.pdf");
+      subtitle: `For ${
+        viewMode === "monthly"
+          ? new Date(selectedPeriod).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+            })
+          : selectedPeriod
+      }`,
+      columns: [
+        { header: "Category", dataKey: "category" },
+        { header: "Amount", dataKey: "amount" },
+        { header: "Percentage", dataKey: "percentage" },
+      ],
+    });
   };
 
-  const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Expense Report</title>
-            <style>
-              body { font-family: Arial, sans-serif; }
-              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              th { background-color: #f5f5f5; }
-              .summary { margin-bottom: 20px; }
-              .summary-item { margin: 10px 0; }
-            </style>
-          </head>
-          <body>
-            <h1>Expense Report</h1>
-            <div class="summary">
-              <div class="summary-item">Total Expenses: ৳${totalExpenses.toLocaleString()}</div>
-              <div class="summary-item">Bank Deposits: ৳${bankTotals.deposits.toLocaleString()}</div>
-              <div class="summary-item">Bank Withdrawals: ৳${bankTotals.withdrawals.toLocaleString()}</div>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th>Amount</th>
-                  <th>Percentage</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${Object.entries(categoryTotals)
-                  .map(
-                    ([category, amount]) => `
-                  <tr>
-                    <td>${category}</td>
-                    <td>৳${amount.toLocaleString()}</td>
-                    <td>${((amount / totalExpenses) * 100).toFixed(2)}%</td>
-                  </tr>
-                `
-                  )
-                  .join("")}
-              </tbody>
-            </table>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
-    }
-  };
+  const handlePrint = useReactToPrint({
+    content: () => printRef.current,
+    documentTitle: "Expense-Report",
+    onPrintError: () => alert("Failed to print. Please try again."),
+  });
 
   if (loading) {
     return (
@@ -228,7 +223,17 @@ export default function ExpenseReportPage() {
 
       {/* View Mode and Date Selection */}
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-        <Tabs value={viewMode} onValueChange={setViewMode}>
+        <Tabs
+          value={viewMode}
+          onValueChange={(value) => {
+            setViewMode(value);
+            if (value === "monthly") {
+              setSelectedPeriod(new Date().toISOString().slice(0, 7));
+            } else if (value === "yearly") {
+              setSelectedPeriod(new Date().getFullYear().toString());
+            }
+          }}
+        >
           <TabsList>
             <TabsTrigger value="monthly">Monthly</TabsTrigger>
             <TabsTrigger value="yearly">Yearly</TabsTrigger>
@@ -237,7 +242,7 @@ export default function ExpenseReportPage() {
         </Tabs>
 
         {viewMode !== "all-time" && (
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select period" />
             </SelectTrigger>
@@ -245,7 +250,7 @@ export default function ExpenseReportPage() {
               {viewMode === "monthly"
                 ? months.map((month) => (
                     <SelectItem key={month} value={month}>
-                      {new Date(month).toLocaleDateString("en-US", {
+                      {new Date(month + "-02").toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "long",
                       })}
@@ -272,9 +277,13 @@ export default function ExpenseReportPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ৳{totalExpenses.toLocaleString()}
+              {formatCurrency(totalExpenses)}
             </div>
-            <Progress value={100} className="h-2 mt-2" />
+            <Progress
+              value={100}
+              className="h-2 mt-2"
+              aria-label="Total Expenses"
+            />
           </CardContent>
         </Card>
 
@@ -287,10 +296,14 @@ export default function ExpenseReportPage() {
             <div className="flex items-center">
               <Building2 className="h-4 w-4 text-blue-500 mr-2" />
               <div className="text-2xl font-bold text-blue-500">
-                ৳{bankTotals.deposits.toLocaleString()}
+                {formatCurrency(bankTotals.deposits)}
               </div>
             </div>
-            <Progress value={100} className="h-2 mt-2 bg-blue-100" />
+            <Progress
+              value={100}
+              className="h-2 mt-2 bg-blue-100"
+              aria-label="Bank Deposits"
+            />
           </CardContent>
         </Card>
 
@@ -305,10 +318,14 @@ export default function ExpenseReportPage() {
             <div className="flex items-center">
               <Building2 className="h-4 w-4 text-purple-500 mr-2" />
               <div className="text-2xl font-bold text-purple-500">
-                ৳{bankTotals.withdrawals.toLocaleString()}
+                {formatCurrency(bankTotals.withdrawals)}
               </div>
             </div>
-            <Progress value={100} className="h-2 mt-2 bg-purple-100" />
+            <Progress
+              value={100}
+              className="h-2 mt-2 bg-purple-100"
+              aria-label="Bank Withdrawals"
+            />
           </CardContent>
         </Card>
       </div>
@@ -321,27 +338,38 @@ export default function ExpenseReportPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {Object.entries(categoryTotals)
-              .sort(([, a], [, b]) => b - a)
-              .map(([category, amount]) => (
-                <div key={category} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">{category}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
-                        ৳{amount.toLocaleString()}
-                      </span>
-                      <Badge variant="outline">
-                        {((amount / totalExpenses) * 100).toFixed(1)}%
-                      </Badge>
+            {Object.keys(categoryTotals).length > 0 ? (
+              Object.entries(categoryTotals)
+                .sort(([, a], [, b]) => b - a)
+                .map(([category, amount]) => (
+                  <div key={category} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{category}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {formatCurrency(amount)}
+                        </span>
+                        <Badge variant="outline">
+                          {totalExpenses > 0
+                            ? `${((amount / totalExpenses) * 100).toFixed(1)}%`
+                            : "0%"}
+                        </Badge>
+                      </div>
                     </div>
+                    <Progress
+                      value={
+                        totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0
+                      }
+                      className="h-2"
+                      aria-label={`${category} expense percentage`}
+                    />
                   </div>
-                  <Progress
-                    value={(amount / totalExpenses) * 100}
-                    className="h-2"
-                  />
-                </div>
-              ))}
+                ))
+            ) : (
+              <p className="text-sm text-gray-500">
+                No expense categories found.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -350,7 +378,9 @@ export default function ExpenseReportPage() {
       <Card>
         <CardHeader>
           <CardTitle>Bank Transactions</CardTitle>
-          <CardDescription>Recent bank activity</CardDescription>
+          <CardDescription>
+            Recent bank activity for the selected period
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -363,43 +393,62 @@ export default function ExpenseReportPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {dailyCashTransactions
-                .filter(
-                  (t) =>
-                    t.transactionType === "bank_deposit" ||
-                    t.transactionType === "bank_withdrawal"
-                )
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .slice(0, 10)
-                .map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell>
-                      {new Date(transaction.date).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>{transaction.bankName}</TableCell>
-                    <TableCell>{transaction.accountName}</TableCell>
-                    <TableCell
-                      className={`text-right ${
-                        transaction.transactionType === "bank_deposit"
-                          ? "text-blue-500"
-                          : "text-purple-500"
-                      }`}
-                    >
-                      {transaction.transactionType === "bank_deposit"
-                        ? "+"
-                        : "-"}
-                      ৳
-                      {(transaction.transactionType === "bank_deposit"
-                        ? transaction.cashIn
-                        : transaction.cashOut
-                      ).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))}
+              {filteredTransactions.filter(
+                (t) =>
+                  t.transactionType === "bank_deposit" ||
+                  t.transactionType === "bank_withdrawal"
+              ).length > 0 ? (
+                filteredTransactions
+                  .filter(
+                    (t) =>
+                      t.transactionType === "bank_deposit" ||
+                      t.transactionType === "bank_withdrawal"
+                  )
+                  .sort((a, b) => new Date(b.date) - new Date(a.date))
+                  .slice(0, 10)
+                  .map((transaction) => {
+                    const isDeposit =
+                      transaction.transactionType === "bank_deposit";
+                    const amount = isDeposit
+                      ? transaction.cashIn
+                      : transaction.cashOut;
+
+                    return (
+                      <TableRow key={transaction.id}>
+                        <TableCell>{formatDate(transaction.date)}</TableCell>
+                        <TableCell>{transaction.bankName}</TableCell>
+                        <TableCell>{transaction.accountName}</TableCell>
+                        <TableCell
+                          className={`text-right font-semibold ${
+                            isDeposit ? "text-blue-500" : "text-purple-500"
+                          }`}
+                        >
+                          {isDeposit ? "+" : "-"} {formatCurrency(amount)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+              ) : (
+                <TableRow>
+                  <TableCell colSpan="4" className="text-center">
+                    No bank transactions recorded.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+      <div className="hidden">
+        <ExpenseReportPrint
+          ref={printRef}
+          categoryTotals={categoryTotals}
+          bankTotals={bankTotals}
+          totalExpenses={totalExpenses}
+          period={selectedPeriod}
+          viewMode={viewMode}
+        />
+      </div>
     </div>
   );
 }

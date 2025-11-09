@@ -9,16 +9,18 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { AddCustomerDialog } from "@/components/AddCustomerDialog.jsx";
-import { EditCustomerDialog } from "@/components/EditCustomerDialog.jsx";
-import { CustomerTable } from "@/components/CustomerTable.jsx";
-import { SummaryCards } from "@/components/SummaryCards.jsx";
-import { CustomerSearch } from "@/components/CustomerSearch.jsx";
-import { Pagination } from "@/components/Pagination.jsx";
-import { LoadingState, TableSkeleton } from "@/components/LoadingState.jsx";
-import { ErrorBoundary } from "@/components/ErrorBoundary.jsx";
+import { AddCustomerDialog } from "@/components/AddCustomerDialog";
+import { EditCustomerDialog } from "@/components/EditCustomerDialog";
+import { CustomerTable } from "@/components/CustomerTable";
+import { SummaryCards } from "@/components/SummaryCards";
+import { CustomerSearch } from "@/components/CustomerSearch";
+import { Pagination } from "@/components/Pagination";
+import { LoadingState, TableSkeleton } from "@/components/LoadingState";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageHeader } from "@/components/common/PageHeader";
 import { SkeletonLoader } from "@/components/common/SkeletonLoader";
+import { QuickStatCard } from "@/components/QuickStatCard";
+import { RecentTransactions } from "@/components/RecentTransactions";
 import { useData } from "@/contexts/data-context";
 import { useAppToast } from "@/hooks/use-app-toast";
 import {
@@ -461,66 +463,10 @@ export default function Dashboard() {
 
             {/* Recent Activity and Low Stock */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="border-none shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>Recent Transactions</CardTitle>
-                    <CardDescription>
-                      Latest customer transactions
-                    </CardDescription>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push("/cashbook")}
-                  >
-                    View All
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {stats.recentTransactions.length > 0 ? (
-                      stats.recentTransactions.map((transaction) => (
-                        <div
-                          key={transaction.id}
-                          className="flex items-center justify-between p-4 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
-                        >
-                          <div>
-                            <p className="font-medium">
-                              {customers.find(
-                                (c) => c.id === transaction.customerId
-                              )?.name || "Unknown Customer"}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(transaction.date).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">
-                              ৳{transaction.total?.toLocaleString()}
-                            </p>
-                            <Badge
-                              variant={
-                                transaction.deposit >= transaction.total
-                                  ? "success"
-                                  : "warning"
-                              }
-                            >
-                              {transaction.deposit >= transaction.total
-                                ? "Paid"
-                                : "Partial"}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No recent transactions
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              <RecentTransactions
+                transactions={stats.recentTransactions}
+                customers={customers}
+              />
 
               <Card className="border-none shadow-md hover:shadow-lg transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -645,33 +591,5 @@ export default function Dashboard() {
         )}
       </div>
     </ErrorBoundary>
-  );
-}
-
-function QuickStatCard({ title, value, icon: Icon, trend, trendValue }) {
-  return (
-    <Card className="border-none shadow-md">
-      <CardContent className="p-6">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium text-muted-foreground">
-            {title}
-          </span>
-          <Icon className="h-4 w-4 text-muted-foreground" />
-        </div>
-        <div className="text-2xl font-bold">{value}</div>
-        <div
-          className={`flex items-center mt-2 text-sm ${
-            trend === "up" ? "text-green-600" : "text-red-600"
-          }`}
-        >
-          {trend === "up" ? (
-            <ArrowUpRight className="h-4 w-4 mr-1" />
-          ) : (
-            <ArrowDownRight className="h-4 w-4 mr-1" />
-          )}
-          <span>{trendValue} from last month</span>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
