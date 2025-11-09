@@ -1,10 +1,11 @@
 "use client";
-import { useState, useRef, useMemo } from "react";
+import { useState, useMemo } from "react"; // REMOVED useRef
 import logger from "@/utils/logger";
 import { useRouter } from "next/navigation";
 import { useData } from "@/contexts/data-context";
 import { CashMemoPrint } from "@/components/CashMemoPrint";
 import { TransactionErrorBoundary } from "@/components/ErrorBoundary";
+// --- REMOVED: useReactToPrint ---
 
 import {
   Table,
@@ -50,12 +51,13 @@ import {
 
 import { calculateFifoSale } from "@/lib/inventory-utils";
 import { formatColorDisplay, formatProductWithColor } from "@/lib/color-utils";
-import * as utils from "@/lib/utils";
+import * as utils from "@/lib/utils"; // We will use utils.printElement
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 export default function CashMemoPage() {
   const router = useRouter();
-  const { toast } = useToast(); // Get toast function
+  const { toast } = useToast();
   const {
     customers,
     addTransaction,
@@ -76,13 +78,13 @@ export default function CashMemoPage() {
     customerPhone: "",
     customerAddress: "",
     memoNumber: `MEMO-${Date.now()}`,
-    deposit: 0, // Changed from empty string to 0
+    deposit: 0,
   });
 
   const [products, setProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({
     name: "",
-    quantity: "", // Changed from quality to quantity for consistency
+    quantity: "",
     price: "",
     total: 0,
     cost: 0,
@@ -93,7 +95,6 @@ export default function CashMemoPage() {
   const availableColors = useMemo(() => {
     if (!newProduct.name || !fabrics) return [];
 
-    // Find the selected fabric
     const selectedFabric = fabrics.find(
       (f) =>
         f && f.name && f.name.toLowerCase() === newProduct.name.toLowerCase()
@@ -101,7 +102,6 @@ export default function CashMemoPage() {
 
     if (!selectedFabric?.batches) return [];
 
-    // Get colors with quantities from batches
     return selectedFabric.batches
       .flatMap((batch) => batch.items || [])
       .reduce((colors, item) => {
@@ -120,7 +120,10 @@ export default function CashMemoPage() {
       .filter((c) => c.quantity > 0);
   }, [newProduct.name, fabrics]);
 
-  const originalContent = useRef(null);
+  // This function now matches the 'bhaiyapos' repo logic
+  const handlePrint = () => {
+    utils.printElement("print-section");
+  };
 
   const handleAddProduct = () => {
     // --- Enhanced Validation with better error messages ---
@@ -315,10 +318,6 @@ export default function CashMemoPage() {
     (sum, product) => sum + product.profit,
     0
   );
-
-  const handlePrint = () => {
-    utils.printElement("print-section");
-  };
 
   const handleSelectCustomer = (customer) => {
     setMemoData({
@@ -572,10 +571,7 @@ export default function CashMemoPage() {
           for (const product of products) {
             const fabric = fabrics.find((f) => f && f.id === product.fabricId);
             if (!fabric) {
-              logger.error(
-                `[CashMemo] Fabric not found for product:`,
-                product
-              );
+              logger.error(`[CashMemo] Fabric not found for product:`, product);
             } else {
               logger.debug(
                 `[CashMemo] Found fabric for ${product.name}:`,
@@ -708,7 +704,7 @@ export default function CashMemoPage() {
             </div>
           </div>
         )}
-        <Card className="p-4 md:p-6">
+        <Card className="p-4 md:p-6 no-print">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-4">
               <div>
@@ -792,7 +788,7 @@ export default function CashMemoPage() {
                                   }
                                 >
                                   <Check
-                                    className={utils.cn(
+                                    className={cn(
                                       "mr-2 h-4 w-4",
                                       customerId === customer.id // Check against customerId
                                         ? "opacity-100"
@@ -861,7 +857,7 @@ export default function CashMemoPage() {
           </div>
         </Card>
 
-        <Card className="p-4 md:p-6">
+        <Card className="p-4 md:p-6 no-print">
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-end">
               {/* Product Name Search/Select */}
@@ -951,7 +947,7 @@ export default function CashMemoPage() {
                                   }}
                                 >
                                   <Check
-                                    className={utils.cn(
+                                    className={cn(
                                       "mr-2 h-4 w-4",
                                       newProduct.name.toLowerCase() ===
                                         fabric.name.toLowerCase()
@@ -1130,8 +1126,7 @@ export default function CashMemoPage() {
                         {product.profit.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
-                        })}{" "}
-                        {/* Ensure profit shows decimals */}
+                        })}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1155,8 +1150,7 @@ export default function CashMemoPage() {
                       {totalProfit.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
-                      })}{" "}
-                      {/* Ensure profit shows decimals */}
+                      })}
                     </TableCell>
                   </TableRow>
                   <TableRow>
@@ -1190,26 +1184,21 @@ export default function CashMemoPage() {
           </div>
         </Card>
 
-        <div className="flex flex-col sm:flex-row justify-end gap-4">
+        <div className="flex flex-col sm:flex-row justify-end gap-4 no-print">
           <Button
             variant="outline"
-            className="w-full sm:w-auto print:hidden"
+            className="w-full sm:w-auto"
             onClick={handlePrint}
           >
             <Printer className="mr-2 h-4 w-4" />
             Print Memo
           </Button>
-          <Button
-            variant="outline"
-            className="w-full sm:w-auto print:hidden"
-            // onClick={handleExportPDF} // PDF Export functionality might need review/implementation
-            disabled // Disable if not implemented
-          >
+          <Button variant="outline" className="w-full sm:w-auto" disabled>
             <FileDown className="mr-2 h-4 w-4" />
             Export PDF
           </Button>
           <Button
-            className="w-full sm:w-auto print:hidden"
+            className="w-full sm:w-auto"
             onClick={handleSaveMemo}
             disabled={isSaving || saveSuccess || products.length === 0}
           >
@@ -1232,7 +1221,8 @@ export default function CashMemoPage() {
           </Button>
         </div>
 
-        {/* Print Section (Hidden on screen) */}
+        {/* --- THIS IS THE FIX --- */}
+        {/* The ref={printRef} is removed. The component is just in a div with the correct ID */}
         <div id="print-section" className="hidden print:block">
           <CashMemoPrint
             memoData={memoData}
@@ -1240,6 +1230,7 @@ export default function CashMemoPage() {
             grandTotal={grandTotal}
           />
         </div>
+        {/* --- END OF FIX --- */}
       </div>
     </TransactionErrorBoundary>
   );

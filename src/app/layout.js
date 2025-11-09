@@ -1,5 +1,6 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "./print.css"; // <-- ENSURE THIS IMPORT IS HERE
 import { ClientLayout } from "@/components/ClientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Navbar } from "@/components/Navbar";

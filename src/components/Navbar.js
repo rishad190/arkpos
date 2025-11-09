@@ -115,7 +115,7 @@ export function Navbar() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {navItems.slice(4).map((item) => {
+                  {navItems.slice(5).map((item) => {
                     const isActive = pathname === item.href;
                     return (
                       <DropdownMenuItem key={item.href} asChild>

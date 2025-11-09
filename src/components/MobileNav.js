@@ -3,7 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button.jsx";
-import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet.jsx";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "./ui/sheet.jsx";
 import { Menu as MenuIcon, Settings, LogOut } from "lucide-react";
 
 export function MobileNav({ handleLogout, router, pathname, navItems, user }) {
@@ -22,8 +28,13 @@ export function MobileNav({ handleLogout, router, pathname, navItems, user }) {
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-64">
-        <nav className="flex flex-col space-y-4 mt-4">
-          <h2 className="text-lg font-semibold px-3">Menu</h2>
+        {/* ADDED HEADER AND TITLE FOR ACCESSIBILITY */}
+        <SheetHeader className="text-left mb-4">
+          <SheetTitle>Menu</SheetTitle>
+        </SheetHeader>
+
+        {/* Removed mt-4 from nav to use header margin */}
+        <nav className="flex flex-col space-y-2">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
