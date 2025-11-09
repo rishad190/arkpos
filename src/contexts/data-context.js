@@ -1,73 +1,99 @@
+"use client";
 import {
   createContext,
   useContext,
-  useState,
   useEffect,
   useMemo,
   useCallback,
   useReducer,
+  useRef,
 } from "react";
 import {
   ref,
   onValue,
   push,
   set,
-  remove,
   update,
-  serverTimestamp,
-  get,
+  remove,
   query,
   orderByChild,
   equalTo,
-  onChildAdded,
-  onChildChanged,
-  onChildRemoved,
+  get,
+  serverTimestamp,
 } from "firebase/database";
-import { doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
+
 import { db } from "@/lib/firebase";
+import logger from "@/utils/logger";
+import { CustomerService } from "@/services/customerService";
+import { TransactionService } from "@/services/transactionService";
+import { FabricService } from "@/services/fabricService";
+import { AtomicOperationService } from "@/services/atomicOperations";
 
 // Create context
 const DataContext = createContext(null);
-
-// Default expense categories
-const DEFAULT_EXPENSE_CATEGORIES = [
-  "Utilities",
-  "Rent",
-  "Salaries",
-  "Supplies",
-  "Transportation",
-  "Maintenance",
-  "Marketing",
-  "Insurance",
-  "Taxes",
-  "Others",
-];
 
 // Firebase References
 const COLLECTION_REFS = {
   CUSTOMERS: "customers",
   TRANSACTIONS: "transactions",
-  DAILY_CASH: "dailyCash",
-  FABRIC_BATCHES: "fabricBatches",
-  FABRICS: "fabrics",
+  DAILY_CASH_INCOME: "dailyCashIncome",
+  DAILY_CASH_EXPENSE: "dailyCashExpense",
+
   SUPPLIERS: "suppliers",
   SUPPLIER_TRANSACTIONS: "supplierTransactions",
-  PARTNER_PRODUCTS: "partnerProducts",
+
+  FABRICS: "fabrics",
+  FABRIC_BATCHES: "fabricBatches",
   SETTINGS: "settings",
+  PERFORMANCE_METRICS: "performanceMetrics",
+};
+
+// Connection state constants
+const CONNECTION_STATES = {
+  CONNECTED: "connected",
+  CONNECTING: "connecting",
+  DISCONNECTED: "disconnected",
+  OFFLINE: "offline",
+};
+
+// Performance thresholds
+const PERFORMANCE_THRESHOLDS = {
+  SLOW_OPERATION: 2000, // 2 seconds
+  VERY_SLOW_OPERATION: 5000, // 5 seconds
+  DEBOUNCE_DELAY: 300, // 300ms
+};
+
+// Error types for better error handling
+const ERROR_TYPES = {
+  NETWORK: "network_error",
+  VALIDATION: "validation_error",
+  PERMISSION: "permission_error",
+  NOT_FOUND: "not_found_error",
+  CONFLICT: "conflict_error",
 };
 
 // Add settings to the initial state
 const initialState = {
   customers: [],
   transactions: [],
-  dailyCashTransactions: [],
-  fabricBatches: [],
-  fabrics: [],
+  dailyCashIncome: [],
+  dailyCashExpense: [],
+
   suppliers: [],
-  partnerProducts: [],
   supplierTransactions: [],
+  fabrics: [],
+  // Remove fabricBatches from initial state as batches are now nested in fabrics
   loading: true,
   error: null,
+  connectionState: CONNECTION_STATES.CONNECTING,
+  offlineQueue: [],
+  pendingOperations: new Set(),
+  performanceMetrics: {
+    operationCount: 0,
+    slowOperations: 0,
+    averageResponseTime: 0,
+    lastOperationTime: null,
+  },
   settings: {
     store: {
       storeName: "",
@@ -75,6 +101,7 @@ const initialState = {
       phone: "",
       email: "",
       currency: "৳",
+      logo: "/download.png",
     },
     notifications: {
       lowStockAlert: true,
@@ -92,7 +119,6 @@ const initialState = {
       sessionTimeout: 30,
       backupEnabled: true,
     },
-    expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
   },
 };
 
@@ -111,43 +137,19 @@ function reducer(state, action) {
         transactions: action.payload,
         loading: false,
       };
-    case "ADD_DAILY_CASH_TRANSACTION":
+    case "SET_DAILY_CASH_INCOME":
       return {
         ...state,
-        dailyCashTransactions: [...state.dailyCashTransactions, action.payload],
-      };
-    case "UPDATE_DAILY_CASH_TRANSACTION":
-      return {
-        ...state,
-        dailyCashTransactions: state.dailyCashTransactions.map((t) =>
-          t.id === action.payload.id ? action.payload : t
-        ),
-      };
-    case "REMOVE_DAILY_CASH_TRANSACTION":
-      return {
-        ...state,
-        dailyCashTransactions: state.dailyCashTransactions.filter(
-          (t) => t.id !== action.payload
-        ),
-      };
-    case "SET_DAILY_CASH_TRANSACTIONS":
-      return {
-        ...state,
-        dailyCashTransactions: action.payload,
+        dailyCashIncome: action.payload,
         loading: false,
       };
-    case "SET_FABRIC_BATCHES":
+    case "SET_DAILY_CASH_EXPENSE":
       return {
         ...state,
-        fabricBatches: action.payload,
+        dailyCashExpense: action.payload,
         loading: false,
       };
-    case "SET_FABRICS":
-      return {
-        ...state,
-        fabrics: action.payload,
-        loading: false,
-      };
+
     case "SET_SUPPLIERS":
       return {
         ...state,
@@ -160,12 +162,13 @@ function reducer(state, action) {
         supplierTransactions: action.payload,
         loading: false,
       };
-    case "SET_PARTNER_PRODUCTS":
+    case "SET_FABRICS":
       return {
         ...state,
-        partnerProducts: action.payload,
+        fabrics: action.payload,
         loading: false,
       };
+    // Remove SET_FABRIC_BATCHES case as batches are now nested in fabrics
     case "SET_ERROR":
       return {
         ...state,
@@ -180,6 +183,51 @@ function reducer(state, action) {
           ...action.payload,
         },
       };
+    case "SET_CONNECTION_STATE":
+      return {
+        ...state,
+        connectionState: action.payload,
+      };
+    case "ADD_TO_OFFLINE_QUEUE":
+      return {
+        ...state,
+        offlineQueue: [...state.offlineQueue, action.payload],
+      };
+    case "REMOVE_FROM_OFFLINE_QUEUE":
+      return {
+        ...state,
+        offlineQueue: state.offlineQueue.filter(
+          (_, index) => index !== action.payload
+        ),
+      };
+    case "CLEAR_OFFLINE_QUEUE":
+      return {
+        ...state,
+        offlineQueue: [],
+      };
+    case "ADD_PENDING_OPERATION":
+      return {
+        ...state,
+        pendingOperations: new Set([
+          ...state.pendingOperations,
+          action.payload,
+        ]),
+      };
+    case "REMOVE_PENDING_OPERATION":
+      const newPendingOps = new Set(state.pendingOperations);
+      newPendingOps.delete(action.payload);
+      return {
+        ...state,
+        pendingOperations: newPendingOps,
+      };
+    case "UPDATE_PERFORMANCE_METRICS":
+      return {
+        ...state,
+        performanceMetrics: {
+          ...state.performanceMetrics,
+          ...action.payload,
+        },
+      };
     default:
       return state;
   }
@@ -188,52 +236,253 @@ function reducer(state, action) {
 // Export the provider component
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const mountTime = useRef(Date.now());
 
-  // Firebase Subscriptions
+  useEffect(() => {
+    console.warn("[PERF DEBUG] DataContext mounted - monitoring performance");
+    console.warn(
+      "[PERF DEBUG] Initial state size:",
+      JSON.stringify(initialState).length,
+      "bytes"
+    );
+  }, []);
+
+  // Connection state monitoring
+  useEffect(() => {
+    const connectedRef = ref(db, ".info/connected");
+    const connectionUnsubscribe = onValue(connectedRef, (snapshot) => {
+      const connected = snapshot.val();
+      dispatch({
+        type: "SET_CONNECTION_STATE",
+        payload: connected
+          ? CONNECTION_STATES.CONNECTED
+          : CONNECTION_STATES.DISCONNECTED,
+      });
+
+      if (connected) {
+        logger.info("[DataContext] Firebase connection established");
+      } else {
+        logger.warn("[DataContext] Firebase connection lost");
+      }
+    });
+
+    return () => connectionUnsubscribe();
+  }, [dispatch]);
+
+  // Process offline queue when connection is restored
+  const processOfflineQueue = useCallback(async () => {
+    if (state.offlineQueue.length === 0) return;
+
+    logger.info(
+      `[DataContext] Processing ${state.offlineQueue.length} offline operations`
+    );
+
+    const successfulOperations = [];
+    const failedOperations = [];
+
+    for (let i = 0; i < state.offlineQueue.length; i++) {
+      const operation = state.offlineQueue[i];
+      try {
+        await operation.fn();
+        successfulOperations.push(i);
+        logger.info(
+          `[DataContext] Offline operation ${i} completed successfully`
+        );
+      } catch (error) {
+        failedOperations.push({ index: i, error });
+        logger.error(`[DataContext] Offline operation ${i} failed:`, error);
+      }
+    }
+
+    // Remove successful operations from queue
+    successfulOperations.forEach((index) => {
+      dispatch({ type: "REMOVE_FROM_OFFLINE_QUEUE", payload: index });
+    });
+
+    if (failedOperations.length > 0) {
+      logger.warn(
+        `[DataContext] ${failedOperations.length} offline operations failed`
+      );
+    }
+  }, [state.offlineQueue]);
+
+  // Initialize service instances
+  const atomicOperations = useMemo(
+    () => new AtomicOperationService(dispatch, () => state),
+    [dispatch, state]
+  );
+  const customerService = useMemo(
+    () => new CustomerService(db, logger, atomicOperations),
+    [db, logger, atomicOperations]
+  );
+  const transactionService = useMemo(
+    () => new TransactionService(db, logger, atomicOperations),
+    [db, logger, atomicOperations]
+  );
+  const fabricService = useMemo(
+    () => new FabricService(db, logger, atomicOperations),
+    [db, logger, atomicOperations]
+  );
+
+  // Debounced Firebase Subscriptions
   useEffect(() => {
     const unsubscribers = [];
+    const debounceTimers = {};
+
     const collections = [
       {
         path: COLLECTION_REFS.CUSTOMERS,
-        setter: (data) => dispatch({ type: "SET_CUSTOMERS", payload: data }),
+        setter: (data) => {
+          // Convert customers object to array format for components
+          if (data && typeof data === "object") {
+            const customersArray = Object.entries(data)
+              .map(([id, customerData]) => ({
+                id,
+                ...customerData,
+              }))
+              .filter(Boolean); // Remove null entries
+            dispatch({ type: "SET_CUSTOMERS", payload: customersArray });
+          } else {
+            dispatch({ type: "SET_CUSTOMERS", payload: [] });
+          }
+        },
       },
       {
         path: COLLECTION_REFS.TRANSACTIONS,
-        setter: (data) => dispatch({ type: "SET_TRANSACTIONS", payload: data }),
+        setter: (data) => {
+          // Convert transactions object to array format for components
+          if (data && typeof data === "object") {
+            const transactionsArray = Object.entries(data)
+              .map(([id, transactionData]) => ({
+                id,
+                ...transactionData,
+              }))
+              .filter(Boolean);
+            dispatch({ type: "SET_TRANSACTIONS", payload: transactionsArray });
+          } else {
+            dispatch({ type: "SET_TRANSACTIONS", payload: [] });
+          }
+        },
       },
+
       {
-        path: COLLECTION_REFS.FABRIC_BATCHES,
-        setter: (data) =>
-          dispatch({ type: "SET_FABRIC_BATCHES", payload: data }),
+        path: COLLECTION_REFS.SUPPLIERS,
+        setter: (data) => {
+          // Convert suppliers object to array format for components
+          if (data && typeof data === "object") {
+            const suppliersArray = Object.entries(data)
+              .map(([id, supplierData]) => ({
+                id,
+                ...supplierData,
+              }))
+              .filter(Boolean);
+            dispatch({ type: "SET_SUPPLIERS", payload: suppliersArray });
+          } else {
+            dispatch({ type: "SET_SUPPLIers", payload: [] });
+          }
+        },
       },
       {
         path: COLLECTION_REFS.FABRICS,
-        setter: (data) => dispatch({ type: "SET_FABRICS", payload: data }),
+        setter: (data) => {
+          // Convert flattened fabric structure to array format for components
+          if (data && typeof data === "object") {
+            const fabricsArray = Object.entries(data)
+              .map(([id, fabricData]) => {
+                // Remove any existing id field from fabricData to avoid conflicts
+                const { id: existingId, ...cleanFabricData } = fabricData;
+
+                // Only include fabrics that have a valid Firebase ID
+                if (!id || id === "" || id === "0") {
+                  logger.warn(
+                    `[DataContext] Skipping fabric with invalid ID:`,
+                    { id, fabricData }
+                  );
+                  return null;
+                }
+
+                return {
+                  id,
+                  ...cleanFabricData,
+                  // Ensure batches is an array for compatibility
+                  batches: cleanFabricData.batches
+                    ? Object.entries(cleanFabricData.batches).map(
+                        ([batchId, batch]) => ({
+                          id: batchId,
+                          ...batch,
+                        })
+                      )
+                    : [],
+                };
+              })
+              .filter(Boolean); // Remove null entries
+
+            dispatch({ type: "SET_FABRICS", payload: fabricsArray });
+          } else {
+            logger.info("[DataContext] No fabric data found");
+            dispatch({ type: "SET_FABRICS", payload: [] });
+          }
+        },
+      },
+      // Remove separate fabricBatches listener as batches are now nested in fabrics
+      {
+        path: COLLECTION_REFS.DAILY_CASH_INCOME,
+        setter: (data) => {
+          if (data && typeof data === "object") {
+            const incomeArray = Object.entries(data)
+              .map(([id, transactionData]) => ({
+                id,
+                ...transactionData,
+              }))
+              .filter(Boolean);
+            dispatch({ type: "SET_DAILY_CASH_INCOME", payload: incomeArray });
+          } else {
+            dispatch({ type: "SET_DAILY_CASH_INCOME", payload: [] });
+          }
+        },
       },
       {
-        path: COLLECTION_REFS.SUPPLIERS,
-        setter: (data) => dispatch({ type: "SET_SUPPLIERS", payload: data }),
-      },
-    ];
+        path: COLLECTION_REFS.DAILY_CASH_EXPENSE,
+        setter: (data) => {
+          if (data && typeof data === "object") {
+            const expenseArray = Object.entries(data)
+              .map(([id, transactionData]) => ({
+                id,
+                ...transactionData,
+              }))
+              .filter(Boolean);
+            dispatch({ type: "SET_DAILY_CASH_EXPENSE", payload: expenseArray });
+          } else {
+            dispatch({ type: "SET_DAILY_CASH_EXPENSE", payload: [] });
+          }
+        },
+      }
+    ]; // Closing the collections array
 
     try {
       collections.forEach(({ path, setter }) => {
         const collectionRef = ref(db, path);
         const unsubscribe = onValue(collectionRef, (snapshot) => {
-          if (snapshot.exists()) {
-            const data = Object.entries(snapshot.val()).map(([id, value]) => ({
-              id,
-              ...value,
-            }));
-            setter(data);
-          } else {
-            setter([]);
+          // Debounce rapid updates to improve performance
+          if (debounceTimers[path]) {
+            clearTimeout(debounceTimers[path]);
           }
+
+          debounceTimers[path] = setTimeout(() => {
+            if (snapshot.exists()) {
+              const rawData = snapshot.val();
+              // Removed raw data logging for cleaner console
+              setter(rawData);
+            } else {
+              logger.info(`[DataContext] No data found for ${path}`);
+              setter([]);
+            }
+          }, PERFORMANCE_THRESHOLDS.DEBOUNCE_DELAY);
         });
         unsubscribers.push(unsubscribe);
       });
     } catch (err) {
-      console.error("Error setting up Firebase listeners:", err);
+      logger.error("Error setting up Firebase listeners:", err);
       dispatch({ type: "SET_ERROR", payload: err.message });
     }
 
@@ -242,67 +491,47 @@ export function DataProvider({ children }) {
       COLLECTION_REFS.SUPPLIER_TRANSACTIONS
     );
     const unsubscribe = onValue(supplierTransactionsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = Object.entries(snapshot.val()).map(([id, value]) => ({
-          id,
-          ...value,
-        }));
-        dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: data });
-      } else {
-        dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: [] });
+      if (debounceTimers[COLLECTION_REFS.SUPPLIER_TRANSACTIONS]) {
+        clearTimeout(debounceTimers[COLLECTION_REFS.SUPPLIER_TRANSACTIONS]);
       }
+
+      debounceTimers[COLLECTION_REFS.SUPPLIER_TRANSACTIONS] = setTimeout(() => {
+        if (snapshot.exists()) {
+          const data = Object.entries(snapshot.val()).map(([id, value]) => ({
+            id,
+            ...value,
+          }));
+          dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: data });
+        } else {
+          dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: [] });
+        }
+      }, PERFORMANCE_THRESHOLDS.DEBOUNCE_DELAY);
     });
     unsubscribers.push(unsubscribe);
 
-    const partnerProductsRef = ref(db, COLLECTION_REFS.PARTNER_PRODUCTS);
-    const unsubPartner = onValue(partnerProductsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = Object.entries(snapshot.val()).map(([id, value]) => ({
-          id,
-          ...value,
-        }));
-        dispatch({ type: "SET_PARTNER_PRODUCTS", payload: data });
-      } else {
-        dispatch({ type: "SET_PARTNER_PRODUCTS", payload: [] });
-      }
-    });
-    unsubscribers.push(unsubPartner);
-
-    const dailyCashRef = ref(db, COLLECTION_REFS.DAILY_CASH);
-    unsubscribers.push(
-      onChildAdded(dailyCashRef, (snapshot) => {
-        dispatch({
-          type: "ADD_DAILY_CASH_TRANSACTION",
-          payload: { id: snapshot.key, ...snapshot.val() },
-        });
-      })
-    );
-    unsubscribers.push(
-      onChildChanged(dailyCashRef, (snapshot) => {
-        dispatch({
-          type: "UPDATE_DAILY_CASH_TRANSACTION",
-          payload: { id: snapshot.key, ...snapshot.val() },
-        });
-      })
-    );
-    unsubscribers.push(
-      onChildRemoved(dailyCashRef, (snapshot) => {
-        dispatch({
-          type: "REMOVE_DAILY_CASH_TRANSACTION",
-          payload: snapshot.key,
-        });
-      })
-    );
-
-    return () => unsubscribers.forEach((unsub) => unsub());
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+      Object.values(debounceTimers).forEach((timer) => clearTimeout(timer));
+    };
   }, [dispatch]);
 
+  // Add memoization for customer dues
   const customerDues = useMemo(() => {
     const dues = {};
-    state.customers?.forEach((customer) => {
-      dues[customer.id] = state.transactions
-        ?.filter((t) => t.customerId === customer.id)
-        .reduce((total, t) => total + ((t.total || 0) - (t.deposit || 0)), 0);
+
+    // Handle both array and object formats for customers
+    const customersArray = Array.isArray(state.customers)
+      ? state.customers
+      : state.customers && typeof state.customers === "object"
+      ? Object.values(state.customers)
+      : [];
+
+    customersArray?.forEach((customer) => {
+      if (customer && customer.id) {
+        dues[customer.id] = state.transactions
+          ?.filter((t) => t.customerId === customer.id)
+          .reduce((total, t) => total + ((t.total || 0) - (t.deposit || 0)), 0);
+      }
     });
     return dues;
   }, [state.customers, state.transactions]);
@@ -314,395 +543,489 @@ export function DataProvider({ children }) {
     [customerDues]
   );
 
-  const getExpenseCategories = useCallback(async () => {
-    try {
-      const categoriesRef = ref(
-        db,
-        `${COLLECTION_REFS.SETTINGS}/expense_categories`
-      );
-      const snapshot = await get(categoriesRef);
+  // Customer Operations using service
+  const customerOperations = useMemo(
+    () => ({
+      addCustomer: customerService.addCustomer.bind(customerService),
+      updateCustomer: customerService.updateCustomer.bind(customerService),
+      deleteCustomer: customerService.deleteCustomer.bind(customerService),
+      getCustomerDue,
+    }),
+    [customerService, getCustomerDue]
+  );
 
-      if (snapshot.exists()) {
-        return snapshot.val().categories || DEFAULT_EXPENSE_CATEGORIES;
-      }
+  // Transaction Operations using service
+  const transactionOperations = useMemo(
+    () => ({
+      addTransaction:
+        transactionService.addTransaction.bind(transactionService),
+      updateTransaction:
+        transactionService.updateTransaction.bind(transactionService),
+      deleteTransaction:
+        transactionService.deleteTransaction.bind(transactionService),
+    }),
+    [transactionService]
+  );
 
-      await set(categoriesRef, { categories: DEFAULT_EXPENSE_CATEGORIES });
-      return DEFAULT_EXPENSE_CATEGORIES;
-    } catch (error) {
-      console.error("Error getting expense categories:", error);
-      return DEFAULT_EXPENSE_CATEGORIES;
-    }
-  }, []);
+  // Supplier Operations with atomic execution and validation
+  const supplierOperations = useMemo(
+    () => ({
+      addSupplier: async (supplierData) => {
+        // Validate supplier data
+        const validationErrors = [];
+        if (!supplierData.name?.trim())
+          validationErrors.push("Supplier name is required");
+        if (!supplierData.phone?.trim())
+          validationErrors.push("Phone number is required");
 
-  const updateExpenseCategories = async (categories) => {
-    try {
-      const categoriesRef = ref(
-        db,
-        `${COLLECTION_REFS.SETTINGS}/expense_categories`
-      );
-      await set(categoriesRef, { categories });
-
-      dispatch({
-        type: "UPDATE_SETTINGS",
-        payload: { expenseCategories: categories },
-      });
-    } catch (error) {
-      console.error("Error updating expense categories:", error);
-      throw error;
-    }
-  };
-
-  const customerOperations = {
-    addCustomer: async (customerData) => {
-      const customersRef = ref(db, COLLECTION_REFS.CUSTOMERS);
-      const newCustomerRef = push(customersRef);
-      await set(newCustomerRef, {
-        ...customerData,
-        createdAt: new Date().toISOString(),
-      });
-      return newCustomerRef.key;
-    },
-    updateCustomer: async (customerId, updatedData) => {
-      const customerRef = ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`);
-      await update(customerRef, {
-        ...updatedData,
-        updatedAt: serverTimestamp(),
-      });
-    },
-    deleteCustomer: async (customerId) => {
-      const customerTransactions = state.transactions.filter(
-        (t) => t.customerId === customerId
-      );
-      for (const transaction of customerTransactions) {
-        await remove(
-          ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transaction.id}`)
-        );
-      }
-      await remove(ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`));
-    },
-    getCustomerDue,
-  };
-
-  const transactionOperations = {
-    addTransaction: async (transactionData) => {
-      const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
-      const newTransactionRef = push(transactionsRef);
-      await set(newTransactionRef, {
-        ...transactionData,
-        createdAt: new Date().toISOString(),
-      });
-      return newTransactionRef.key;
-    },
-    updateTransaction: async (transactionId, updatedData) => {
-      const transactionRef = ref(
-        db,
-        `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`
-      );
-      await update(transactionRef, {
-        ...updatedData,
-        updatedAt: serverTimestamp(),
-      });
-    },
-    deleteTransaction: async (transactionId) => {
-      await remove(ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`));
-    },
-  };
-
-  const fabricOperations = {
-    addFabric: async (fabricData) => {
-      await push(ref(db, COLLECTION_REFS.FABRICS), fabricData);
-    },
-    updateFabric: async (fabricId, updatedData) => {
-      await update(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`), {
-        ...updatedData,
-        updatedAt: serverTimestamp(),
-      });
-    },
-    deleteFabric: async (fabricId) => {
-      await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
-    },
-    addFabricBatch: async (batchData) => {
-      await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
-        ...batchData,
-        createdAt: serverTimestamp(),
-      });
-    },
-    deleteFabricBatch: async (batchId) => {
-      try {
-        const batchRef = ref(
-          db,
-          `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`
-        );
-        const batchSnapshot = await get(batchRef);
-        if (!batchSnapshot.exists()) {
-          throw new Error("Batch not found");
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
         }
-        await remove(batchRef);
-      } catch (error) {
-        console.error("Error deleting fabric batch:", error);
-        throw error;
-      }
-    },
-  };
 
-  const supplierOperations = {
-    addSupplier: async (supplierData) => {
-      try {
-        const suppliersRef = ref(db, COLLECTION_REFS.SUPPLIERS);
-        const newSupplierRef = push(suppliersRef);
-        await set(newSupplierRef, {
-          ...supplierData,
-          totalDue: 0,
-          createdAt: serverTimestamp(),
+        return atomicOperations.execute("addSupplier", async () => {
+          const suppliersRef = ref(db, COLLECTION_REFS.SUPPLIERS);
+          const newSupplierRef = push(suppliersRef);
+          await set(newSupplierRef, {
+            ...supplierData,
+            totalDue: 0,
+            createdAt: serverTimestamp(),
+          });
+          return newSupplierRef.key;
         });
-        return newSupplierRef.key;
-      } catch (error) {
-        console.error("Error adding supplier:", error);
-        throw error;
-      }
-    },
-    updateSupplier: async (supplierId, updatedData) => {
-      try {
-        const supplierRef = ref(
-          db,
-          `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
-        );
-        await update(supplierRef, {
-          ...updatedData,
-          updatedAt: serverTimestamp(),
-        });
-      } catch (error) {
-        console.error("Error updating supplier:", error);
-        throw error;
-      }
-    },
-    deleteSupplier: async (supplierId) => {
-      try {
-        const supplierTransactions = state.transactions.filter(
-          (t) => t.supplierId === supplierId
-        );
-        for (const transaction of supplierTransactions) {
-          await remove(
-            ref(
-              db,
-              `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transaction.id}`
-            )
+      },
+
+      updateSupplier: async (supplierId, updatedData) => {
+        // Validate supplier data
+        const validationErrors = [];
+        if (!updatedData.name?.trim())
+          validationErrors.push("Supplier name is required");
+        if (!updatedData.phone?.trim())
+          validationErrors.push("Phone number is required");
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return atomicOperations.execute("updateSupplier", async () => {
+          const supplierRef = ref(
+            db,
+            `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
           );
-        }
-        await remove(ref(db, `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`));
-      } catch (error) {
-        console.error("Error deleting supplier:", error);
-        throw error;
-      }
-    },
-    addSupplierTransaction: async (transaction) => {
-      try {
-        const transactionsRef = ref(db, COLLECTION_REFS.SUPPLIER_TRANSACTIONS);
-        const newTransactionRef = push(transactionsRef);
-
-        const newTransaction = {
-          ...transaction,
-          id: newTransactionRef.key,
-          due: transaction.totalAmount - (transaction.paidAmount || 0),
-          createdAt: serverTimestamp(),
-        };
-
-        await set(newTransactionRef, newTransaction);
-        const supplierRef = ref(
-          db,
-          `${COLLECTION_REFS.SUPPLIERS}/${transaction.supplierId}`
-        );
-        const supplierSnapshot = await get(supplierRef);
-
-        if (supplierSnapshot.exists()) {
-          const currentDue = supplierSnapshot.val().totalDue || 0;
           await update(supplierRef, {
-            totalDue: currentDue + newTransaction.due,
-            updatedAt: serverTimestamp(),
-          });
-        }
-        return newTransactionRef.key;
-      } catch (error) {
-        console.error("Error adding supplier transaction:", error);
-        throw error;
-      }
-    },
-    deleteSupplierTransaction: async (
-      transactionId,
-      supplierId,
-      amount,
-      paidAmount
-    ) => {
-      try {
-        await remove(
-          ref(db, `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transactionId}`)
-        );
-        const supplierRef = ref(
-          db,
-          `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
-        );
-        const supplierSnapshot = await get(supplierRef);
-        if (supplierSnapshot.exists()) {
-          const supplier = supplierSnapshot.val();
-          const dueAmount = amount - (paidAmount || 0);
-          const newTotalDue = Math.max(0, (supplier.totalDue || 0) - dueAmount);
-          await update(supplierRef, {
-            totalDue: newTotalDue,
-            updatedAt: serverTimestamp(),
-          });
-        }
-      } catch (error) {
-        console.error("Error deleting supplier transaction:", error);
-        throw error;
-      }
-    },
-  };
-
-  const partnerOperations = {
-    addPartnerProduct: async (productData) => {
-      try {
-        const refPath = COLLECTION_REFS.PARTNER_PRODUCTS;
-        const productsRef = ref(db, refPath);
-        const newRef = push(productsRef);
-        const payload = {
-          ...productData,
-          id: newRef.key,
-          createdAt: serverTimestamp(),
-        };
-        await set(newRef, payload);
-        return newRef.key;
-      } catch (error) {
-        console.error("Error adding partner product:", error);
-        throw error;
-      }
-    },
-    deletePartnerProduct: async (productId) => {
-      try {
-        await remove(
-          ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`)
-        );
-      } catch (error) {
-        console.error("Error deleting partner product:", error);
-        throw error;
-      }
-    },
-    updatePartnerProduct: async (productId, updatedData) => {
-      try {
-        await update(
-          ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`),
-          {
             ...updatedData,
             updatedAt: serverTimestamp(),
-          }
-        );
-      } catch (error) {
-        console.error("Error updating partner product:", error);
-        throw error;
-      }
-    },
-  };
-
-  const dailyCashOperations = {
-    addDailyCashTransaction: async (transaction) => {
-      try {
-        const dailyCashRef = ref(db, COLLECTION_REFS.DAILY_CASH);
-        const newTransactionRef = push(dailyCashRef);
-        await set(newTransactionRef, {
-          ...transaction,
-          id: newTransactionRef.key,
-          createdAt: serverTimestamp(),
+          });
         });
-        if (transaction.type === "sale" && transaction.reference) {
-          const customerTransactionRef = query(
-            ref(db, "transactions"),
-            orderByChild("memoNumber"),
-            equalTo(transaction.reference)
+      },
+
+      deleteSupplier: async (supplierId) => {
+        return atomicOperations.execute("deleteSupplier", async () => {
+          // First delete associated transactions
+          const supplierTransactions = state.transactions.filter(
+            (t) => t.supplierId === supplierId
           );
-          const snapshot = await get(customerTransactionRef);
-          if (snapshot.exists()) {
-            const [transactionId, transactionData] = Object.entries(
-              snapshot.val()
-            )[0];
-            await update(ref(db, `transactions/${transactionId}`), {
-              deposit:
-                (transactionData.deposit || 0) + (transaction.cashIn || 0),
-              due:
-                transactionData.total -
-                ((transactionData.deposit || 0) + (transaction.cashIn || 0)),
+
+          for (const transaction of supplierTransactions) {
+            await remove(
+              ref(
+                db,
+                `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transaction.id}`
+              )
+            );
+          }
+
+          // Then delete the supplier
+          await remove(ref(db, `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`));
+        });
+      },
+
+      addSupplierTransaction: async (transaction) => {
+        // Validate supplier transaction data
+        const validationErrors = [];
+        if (!transaction.supplierId)
+          validationErrors.push("Supplier ID is required");
+        if (!transaction.totalAmount || transaction.totalAmount <= 0)
+          validationErrors.push("Valid total amount is required");
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return atomicOperations.execute("addSupplierTransaction", async () => {
+          const transactionsRef = ref(
+            db,
+            COLLECTION_REFS.SUPPLIER_TRANSACTIONS
+          );
+          const newTransactionRef = push(transactionsRef);
+
+          const newTransaction = {
+            ...transaction,
+            id: newTransactionRef.key,
+            due: transaction.totalAmount - (transaction.paidAmount || 0),
+            createdAt: serverTimestamp(),
+          };
+
+          await set(newTransactionRef, newTransaction);
+
+          // Update supplier's total due
+          const supplierRef = ref(
+            db,
+            `${COLLECTION_REFS.SUPPLIERS}/${transaction.supplierId}`
+          );
+          const supplierSnapshot = await get(supplierRef);
+
+          if (supplierSnapshot.exists()) {
+            const currentDue = supplierSnapshot.val().totalDue || 0;
+            await update(supplierRef, {
+              totalDue: currentDue + newTransaction.due,
+              updatedAt: serverTimestamp(),
             });
           }
-        }
-        return newTransactionRef.key;
-      } catch (error) {
-        console.error("Error adding daily cash transaction:", error);
-        throw error;
-      }
-    },
-    deleteDailyCashTransaction: async (transactionId) => {
-      try {
-        const transactionRef = ref(
-          db,
-          `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
-        );
-        await remove(transactionRef);
-      } catch (error) {
-        console.error("Error deleting daily cash transaction:", error);
-        throw error;
-      }
-    },
-    updateDailyCashTransaction: async (transactionId, updatedData) => {
-      try {
-        const transactionRef = ref(
-          db,
-          `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
-        );
-        await update(transactionRef, {
-          ...updatedData,
-          updatedAt: serverTimestamp(),
-        });
-      } catch (error) {
-        console.error("Error updating daily cash transaction:", error);
-        throw error;
-      }
-    },
-    setDailyCashTransactions: (transactions) => {
-      dispatch({ type: "SET_DAILY_CASH_TRANSACTIONS", payload: transactions });
-    },
-  };
 
-  const updateSettings = async (newSettings) => {
-    try {
-      await updateDoc(doc(db, "settings", "app"), newSettings);
+          return newTransactionRef.key;
+        });
+      },
+
+      deleteSupplierTransaction: async (
+        transactionId,
+        supplierId,
+        amount,
+        paidAmount
+      ) => {
+        return atomicOperations.execute(
+          "deleteSupplierTransaction",
+          async () => {
+            // Delete transaction
+            await remove(
+              ref(
+                db,
+                `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transactionId}`
+              )
+            );
+
+            // Update supplier's total due
+            const supplierRef = ref(
+              db,
+              `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
+            );
+            const supplierSnapshot = await get(supplierRef);
+
+            if (supplierSnapshot.exists()) {
+              const supplier = supplierSnapshot.val();
+              const dueAmount = amount - (paidAmount || 0);
+              const newTotalDue = Math.max(
+                0,
+                (supplier.totalDue || 0) - dueAmount
+              );
+
+              await update(supplierRef, {
+                totalDue: newTotalDue,
+                updatedAt: serverTimestamp(),
+              });
+            }
+          }
+        );
+      },
+    }),
+    [state.transactions]
+  );
+
+  // Daily Cash Operations with atomic execution and validation
+  const dailyCashOperations = useMemo(
+    () => ({
+      addDailyCashTransaction: async (transaction) => {
+        // Validate daily cash transaction data
+        const validationErrors = [];
+        if (!transaction.date) validationErrors.push("Date is required");
+        if (!transaction.description?.trim())
+          validationErrors.push("Description is required");
+        if ((transaction.cashIn || 0) < 0 || (transaction.cashOut || 0) < 0) {
+          validationErrors.push("Cash amounts cannot be negative");
+        }
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return atomicOperations.execute("addDailyCashTransaction", async () => {
+          const collectionPath =
+            transaction.cashIn > 0
+              ? COLLECTION_REFS.DAILY_CASH_INCOME
+              : COLLECTION_REFS.DAILY_CASH_EXPENSE;
+          const dailyCashRef = ref(db, collectionPath);
+          const newTransactionRef = push(dailyCashRef);
+          await set(newTransactionRef, {
+            ...transaction,
+            id: newTransactionRef.key,
+            createdAt: serverTimestamp(),
+          });
+
+          // Update related customer transaction if it's a sale
+          if (transaction.type === "sale" && transaction.reference) {
+            const customerTransactionRef = query(
+              ref(db, "transactions"),
+              orderByChild("memoNumber"),
+              equalTo(transaction.reference)
+            );
+
+            const snapshot = await get(customerTransactionRef);
+            if (snapshot.exists()) {
+              const [transactionId, transactionData] = Object.entries(
+                snapshot.val()
+              )[0];
+              await update(ref(db, `transactions/${transactionId}`), {
+                deposit:
+                  (transactionData.deposit || 0) + (transaction.cashIn || 0),
+                due:
+                  transactionData.total -
+                  ((transactionData.deposit || 0) + (transaction.cashIn || 0)),
+              });
+            }
+          }
+
+          return newTransactionRef.key;
+        });
+      },
+
+      deleteDailyCashTransaction: async (transactionId, reference) => {
+        return atomicOperations.execute(
+          "deleteDailyCashTransaction",
+          async () => {
+            let dailyCashData = null;
+            let collectionPath = null;
+
+            // Try to fetch from income collection
+            const incomeSnapshot = await get(
+              ref(db, `${COLLECTION_REFS.DAILY_CASH_INCOME}/${transactionId}`)
+            );
+            if (incomeSnapshot.exists()) {
+              dailyCashData = incomeSnapshot.val();
+              collectionPath = COLLECTION_REFS.DAILY_CASH_INCOME;
+            } else {
+              // If not found in income, try expense collection
+              const expenseSnapshot = await get(
+                ref(db, `${COLLECTION_REFS.DAILY_CASH_EXPENSE}/${transactionId}`)
+              );
+              if (expenseSnapshot.exists()) {
+                dailyCashData = expenseSnapshot.val();
+                collectionPath = COLLECTION_REFS.DAILY_CASH_EXPENSE;
+              }
+            }
+
+            if (!dailyCashData || !collectionPath) {
+              throw new Error("Transaction not found in any daily cash collection.");
+            }
+
+            // If it's a sale, update the related customer transaction
+            if (dailyCashData.type === "sale" && dailyCashData.reference) {
+              const customerTransactionRef = query(
+                ref(db, "transactions"),
+                orderByChild("memoNumber"),
+                equalTo(dailyCashData.reference)
+              );
+              const snapshot = await get(customerTransactionRef);
+
+              if (snapshot.exists()) {
+                const [id, transactionData] = Object.entries(snapshot.val())[0];
+                await update(ref(db, `transactions/${id}`), {
+                  deposit:
+                    (transactionData.deposit || 0) - (dailyCashData.cashIn || 0),
+                });
+              }
+            }
+
+            // Finally, remove the daily cash transaction from its determined collection
+            await remove(ref(db, `${collectionPath}/${transactionId}`));
+          }
+        );
+      },
+
+      updateDailyCashTransaction: async (transactionId, updatedData) => {
+        // Validate daily cash transaction data
+        const validationErrors = [];
+        if (!updatedData.date) validationErrors.push("Date is required");
+        if (!updatedData.description?.trim())
+          validationErrors.push("Description is required");
+        if ((updatedData.cashIn || 0) < 0 || (updatedData.cashOut || 0) < 0) {
+          validationErrors.push("Cash amounts cannot be negative");
+        }
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return atomicOperations.execute(
+          "updateDailyCashTransaction",
+          async () => {
+            let originalData = null;
+            let originalCollectionPath = null;
+
+            // Try to fetch from income collection
+            const incomeSnapshot = await get(
+              ref(db, `${COLLECTION_REFS.DAILY_CASH_INCOME}/${transactionId}`)
+            );
+            if (incomeSnapshot.exists()) {
+              originalData = incomeSnapshot.val();
+              originalCollectionPath = COLLECTION_REFS.DAILY_CASH_INCOME;
+            } else {
+              // If not found in income, try expense collection
+              const expenseSnapshot = await get(
+                ref(db, `${COLLECTION_REFS.DAILY_CASH_EXPENSE}/${transactionId}`)
+              );
+              if (expenseSnapshot.exists()) {
+                originalData = expenseSnapshot.val();
+                originalCollectionPath = COLLECTION_REFS.DAILY_CASH_EXPENSE;
+              }
+            }
+
+            if (!originalData || !originalCollectionPath) {
+              throw new Error("Original transaction not found in any daily cash collection.");
+            }
+
+            const updatedCollectionPath =
+              updatedData.cashIn > 0
+                ? COLLECTION_REFS.DAILY_CASH_INCOME
+                : COLLECTION_REFS.DAILY_CASH_EXPENSE;
+
+            // If the collection path changes, move the transaction
+            if (originalCollectionPath !== updatedCollectionPath) {
+              // Delete from old collection
+              await remove(ref(db, `${originalCollectionPath}/${transactionId}`));
+
+              // Add to new collection
+              await set(ref(db, `${updatedCollectionPath}/${transactionId}`), {
+                ...updatedData,
+                updatedAt: serverTimestamp(),
+              });
+            } else {
+              // Update in the current collection
+              await update(ref(db, `${originalCollectionPath}/${transactionId}`), {
+                ...updatedData,
+                updatedAt: serverTimestamp(),
+              });
+            }
+
+            // If it's a sale, update the related customer transaction
+            if (
+              originalData &&
+              originalData.type === "sale" &&
+              originalData.reference
+            ) {
+              const customerTransactionRef = query(
+                ref(db, "transactions"),
+                orderByChild("memoNumber"),
+                equalTo(originalData.reference)
+              );
+              const snapshot = await get(customerTransactionRef);
+
+              if (snapshot.exists()) {
+                const [id, transactionData] = Object.entries(snapshot.val())[0];
+                const originalCashIn = originalData.cashIn || 0;
+                const newCashIn = updatedData.cashIn || 0;
+                const depositChange = newCashIn - originalCashIn;
+
+                await update(ref(db, `transactions/${id}`), {
+                  deposit: (transactionData.deposit || 0) + depositChange,
+                });
+              }
+            }
+          }
+        );
+      },
+    }),
+    // Add state as a dependency to ensure atomicOperations has the latest state
+    [state]
+  );
+
+  // Settings Operations with atomic execution and validation
+  const updateSettings = useCallback(async (newSettings) => {
+    // Validate settings data
+    const validationErrors = [];
+    if (!newSettings.store?.storeName?.trim())
+      validationErrors.push("Store name is required");
+    if (!newSettings.store?.address?.trim())
+      validationErrors.push("Store address is required");
+    if (!newSettings.store?.phone?.trim())
+      validationErrors.push("Store phone is required");
+
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+    }
+
+    return atomicOperations.execute("updateSettings", async () => {
+      // Update settings in Firebase
+      await update(ref(db, "settings"), newSettings);
+
+      // Update local state
       dispatch({
         type: "UPDATE_SETTINGS",
         payload: newSettings,
       });
-      return true;
-    } catch (error) {
-      console.error("Error updating settings:", error);
-      throw error;
-    }
-  };
 
-  const contextValue = {
-    ...state,
-    ...customerOperations,
-    ...transactionOperations,
-    ...fabricOperations,
-    ...supplierOperations,
-    ...partnerOperations,
-    ...dailyCashOperations,
-    settings: state.settings,
-    updateSettings,
-    getExpenseCategories,
-    updateExpenseCategories,
-  };
+      return true;
+    });
+  }, []);
+
+  // Placeholder for batch locking mechanisms
+  const acquireBatchLock = useCallback(async (batchId) => {
+    // In a real application, this would involve a distributed lock
+    // For now, we'll just log and return true
+    logger.info(`[Lock] Acquiring lock for batch: ${batchId}`);
+    return true;
+  }, []);
+
+  const releaseBatchLock = useCallback(async (batchId) => {
+    // In a real application, this would release the distributed lock
+    logger.info(`[Lock] Releasing lock for batch: ${batchId}`);
+  }, []);
+
+  // Fabric Operations using service
+  const fabricOperations = useMemo(
+    () => ({
+      addFabric: fabricService.addFabric.bind(fabricService),
+      updateFabric: fabricService.updateFabric.bind(fabricService),
+      deleteFabric: fabricService.deleteFabric.bind(fabricService),
+      addFabricBatch: fabricService.addFabricBatch.bind(fabricService),
+      updateFabricBatch: fabricService.updateFabricBatch.bind(fabricService),
+      reduceInventory: (saleProducts) =>
+        fabricService.reduceInventory(
+          saleProducts,
+          acquireBatchLock,
+          releaseBatchLock
+        ),
+    }),
+    [fabricService, acquireBatchLock, releaseBatchLock]
+  );
+
+  const contextValue = useMemo(
+    () => ({
+      // State
+      ...state,
+      ...customerOperations,
+      ...transactionOperations,
+      ...supplierOperations,
+      ...dailyCashOperations,
+      ...fabricOperations,
+      settings: state.settings,
+      updateSettings,
+    }),
+    [
+      state,
+      customerOperations,
+      transactionOperations,
+      supplierOperations,
+      dailyCashOperations,
+      fabricOperations,
+      updateSettings,
+    ]
+  );
 
   return (
     <DataContext.Provider value={contextValue}>{children}</DataContext.Provider>
   );
 }
 
+// Export the hook to use the context
 export function useData() {
   const context = useContext(DataContext);
   if (!context) {

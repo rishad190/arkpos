@@ -2,7 +2,6 @@
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { MobileNav } from "@/components/MobileNav";
+import { UserNav } from "@/components/UserNav";
 import {
   LayoutDashboard,
   BookOpen,
@@ -21,8 +22,6 @@ import {
   Receipt,
   Settings,
   LogOut,
-  Menu,
-  X,
   Bell,
   User,
   BarChart3,
@@ -31,7 +30,6 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 
 export function Navbar() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -63,6 +61,7 @@ export function Navbar() {
     { href: "/cashbook", label: "Cash Book", icon: BookOpen },
     { href: "/suppliers", label: "Suppliers", icon: Users },
     { href: "/inventory", label: "Inventory", icon: Package },
+    { href: "/inventory-profit", label: "Inventory Profit", icon: BarChart3 },
     { href: "/cashmemo", label: "Cash Memo", icon: Receipt },
     { href: "/partners", label: "Partners", icon: GitMerge },
     { href: "/reports/expense", label: "Expense Report", icon: BarChart3 },
@@ -88,7 +87,7 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center space-x-1">
-            {navItems.map((item) => {
+            {navItems.slice(0, 5).map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
@@ -105,6 +104,38 @@ export function Navbar() {
                 </Link>
               );
             })}
+            {navItems.length > 5 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+                  >
+                    More
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {navItems.slice(4).map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <DropdownMenuItem key={item.href} asChild>
+                        <Link
+                          href={item.href}
+                          className={`flex items-center ${
+                            isActive
+                              ? "bg-accent text-accent-foreground"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <item.icon className="h-4 w-4 mr-2" />
+                          {item.label}
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
           <div className="flex items-center space-x-2">
@@ -123,64 +154,19 @@ export function Navbar() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                  <User className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/settings")}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <UserNav handleLogout={handleLogout} router={router} />
 
-            <div className="md:hidden">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-              >
-                {isMenuOpen ? (
-                  <X className="h-6 w-6" />
-                ) : (
-                  <Menu className="h-6 w-6" />
-                )}
-              </Button>
+            <div className="block md:hidden">
+              <MobileNav
+                handleLogout={handleLogout}
+                router={router}
+                pathname={pathname}
+                navItems={navItems}
+              />
             </div>
           </div>
         </div>
       </div>
-
-      {isMenuOpen && (
-        <div className="md:hidden border-t bg-white">
-          <div className="px-2 pt-2 pb-3 space-y-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
-                  pathname === item.href
-                    ? "bg-primary text-primary-foreground"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <item.icon className="h-5 w-5 mr-3" />
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
     </nav>
   );
 }

@@ -1,61 +1,141 @@
-export function calculateWeightedAverage(batches) {
-  if (!batches?.length) return 0;
+// Updated for flattened fabric structure where batches are nested within fabric object
+export const calculateTotalQuantity = (fabric) => {
+  if (!fabric || !fabric.batches) {
+    return 0;
+  }
 
-  const totalValue = batches.reduce(
-    (sum, batch) => sum + batch.quantity * batch.unitCost,
-    0
-  );
+  // Handle both array and object formats for batches
+  const batches = Array.isArray(fabric.batches)
+    ? fabric.batches
+    : Object.values(fabric.batches || {});
 
-  const totalQuantity = batches.reduce((sum, batch) => sum + batch.quantity, 0);
+  return batches.reduce((total, batch) => {
+    if (!batch || !batch.items) {
+      return total;
+    }
+    return (
+      total +
+      batch.items.reduce(
+        (batchTotal, item) => batchTotal + (item.quantity || 0),
+        0
+      )
+    );
+  }, 0);
+};
 
-  return totalQuantity > 0 ? totalValue / totalQuantity : 0;
-}
+export const getQuantityByColor = (fabric) => {
+  if (!fabric || !fabric.batches) {
+    return {};
+  }
 
-export function calculateFifoSale(batches, soldQuantity) {
-  let remainingQty = soldQuantity;
-  const costOfGoodsSold = [];
-  const updatedBatches = [];
+  const colorQuantities = {};
 
-  // Sort batches by purchase date
-  const sortedBatches = [...batches].sort(
-    (a, b) => new Date(a.purchaseDate) - new Date(b.purchaseDate)
+  // Handle both array and object formats for batches
+  const batches = Array.isArray(fabric.batches)
+    ? fabric.batches
+    : Object.values(fabric.batches || {});
+
+  batches.forEach((batch) => {
+    if (!batch || !batch.items) return;
+
+    batch.items.forEach((item) => {
+      if (!item || !item.colorName) return;
+
+      const color = item.colorName;
+      const quantity = item.quantity || 0;
+
+      if (colorQuantities[color]) {
+        colorQuantities[color] += quantity;
+      } else {
+        colorQuantities[color] = quantity;
+      }
+    });
+  });
+
+  return colorQuantities;
+};
+
+export const calculateAverageCost = (fabric) => {
+  if (!fabric || !fabric.batches) {
+    return 0;
+  }
+
+  // Handle both array and object formats for batches
+  const batches = Array.isArray(fabric.batches)
+    ? fabric.batches
+    : Object.values(fabric.batches || {});
+
+  let totalCost = 0;
+  let totalQuantity = 0;
+
+  batches.forEach((batch) => {
+    if (!batch || !batch.items) return;
+
+    const batchCost = Number(batch.costPerPiece || batch.unitCost || 0);
+    const batchQuantity = batch.items.reduce(
+      (sum, item) => sum + (item.quantity || 0),
+      0
+    );
+
+    totalCost += batchCost * batchQuantity;
+    totalQuantity += batchQuantity;
+  });
+
+  return totalQuantity > 0 ? totalCost / totalQuantity : 0;
+};
+
+export const isLowStock = (fabric, threshold = 10) => {
+  const totalQty = calculateTotalQuantity(fabric);
+  return totalQty <= threshold;
+};
+
+// FIFO sale calculation for inventory reduction
+export const calculateFifoSale = (
+  fifoBatches,
+  quantityNeeded,
+  color = null
+) => {
+  let remainingQuantity = quantityNeeded;
+  let totalCost = 0;
+  const batchesUsed = [];
+
+  // Sort batches by purchase date (FIFO)
+  const sortedBatches = [...fifoBatches].sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
   );
 
   for (const batch of sortedBatches) {
-    if (remainingQty <= 0) {
-      updatedBatches.push(batch);
-      continue;
-    }
+    if (remainingQuantity <= 0) break;
 
-    const usedQty = Math.min(remainingQty, batch.quantity);
-    if (usedQty > 0) {
-      costOfGoodsSold.push({
+    const availableQuantity = batch.quantity || 0;
+
+    if (availableQuantity > 0) {
+      const quantityToUse = Math.min(availableQuantity, remainingQuantity);
+      const batchCost = batch.unitCost || 0;
+
+      totalCost += quantityToUse * batchCost;
+      remainingQuantity -= quantityToUse;
+
+      batchesUsed.push({
         batchId: batch.id,
-        quantity: usedQty,
-        unitCost: batch.unitCost,
+        quantityUsed: quantityToUse,
+        unitCost: batchCost,
+        totalCost: quantityToUse * batchCost,
       });
-
-      const remainingBatchQty = batch.quantity - usedQty;
-      if (remainingBatchQty > 0) {
-        updatedBatches.push({
-          ...batch,
-          quantity: remainingBatchQty,
-        });
-      }
     }
-    remainingQty -= usedQty;
   }
 
-  if (remainingQty > 0) {
-    throw new Error("Insufficient stock available");
+  if (remainingQuantity > 0) {
+    throw new Error(
+      `Insufficient stock. Only ${
+        quantityNeeded - remainingQuantity
+      } units available.`
+    );
   }
 
   return {
-    costOfGoodsSold,
-    updatedBatches,
-    totalCost: costOfGoodsSold.reduce(
-      (sum, item) => sum + item.quantity * item.unitCost,
-      0
-    ),
+    totalCost,
+    batchesUsed,
+    quantitySold: quantityNeeded,
   };
-}
+};
