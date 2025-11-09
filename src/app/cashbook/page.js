@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import logger from "@/utils/logger";
 import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
@@ -93,11 +93,9 @@ export default function CashBookPage() {
     [dailyCashIncome, dailyCashExpense]
   );
 
-  // Add useEffect to handle initial loading state
   useEffect(() => {
     const initializeData = async () => {
       try {
-        // Wait for dailyCashTransactions to be available
         if (dailyCashIncome !== undefined && dailyCashExpense !== undefined) {
           setLoadingState((prev) => ({ ...prev, initial: false }));
         }
@@ -115,27 +113,6 @@ export default function CashBookPage() {
     initializeData();
   }, [dailyCashIncome, dailyCashExpense, toast]);
 
-  // Add useEffect to handle initial loading state
-  useEffect(() => {
-    const initializeData = async () => {
-      try {
-        // Wait for dailyCashTransactions to be available
-        if (dailyCashIncome !== undefined && dailyCashExpense !== undefined) {
-          setLoadingState((prev) => ({ ...prev, initial: false }));
-        }
-      } catch (error) {
-        logger.error("Error loading initial data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load data. Please refresh the page.",
-          variant: "destructive",
-        });
-        setLoadingState((prev) => ({ ...prev, initial: false }));
-      }
-    };
-
-    initializeData();
-  }, [dailyCashIncome, dailyCashExpense, toast]);
   useEffect(() => {
     if (date && dailyCashTransactions) {
       const previousDay = new Date(date);
@@ -147,9 +124,8 @@ export default function CashBookPage() {
         .reduce((acc, t) => acc + (t.cashIn || 0) - (t.cashOut || 0), 0);
       setOpeningBalance(balance);
     }
-  }, [date, dailyCashTransactions, openingBalance]);
+  }, [date, dailyCashTransactions]);
 
-  // Remove debug logging in production
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
       logger.info("Loading state:", loadingState);
@@ -157,13 +133,9 @@ export default function CashBookPage() {
         "Daily cash transactions count:",
         dailyCashTransactions?.length || 0
       );
-      logger.info("dailyCashIncome:", dailyCashIncome);
-      logger.info("dailyCashExpense:", dailyCashExpense);
-      logger.info("dailyCashTransactions:", dailyCashTransactions);
     }
-  }, [loadingState, dailyCashTransactions, dailyCashIncome, dailyCashExpense]);
+  }, [loadingState, dailyCashTransactions]);
 
-  // Memoize calculations for better performance with defensive programming
   const { dailyCash, financials, monthlyTotals } = useMemo(() => {
     if (
       !Array.isArray(dailyCashTransactions) ||
@@ -294,86 +266,101 @@ export default function CashBookPage() {
     return { groupedEntries: grouped, sortedDates: sorted };
   }, [dailyCashTransactions, date, searchTerm, openingBalance]);
 
-  const handleEditClick = (entry) => {
+  const handleDeleteTransaction = useCallback(
+    async (transactionId) => {
+      if (
+        !window.confirm("Are you sure you want to delete this transaction?")
+      ) {
+        return;
+      }
+
+      setLoadingState((prev) => ({ ...prev, actions: true }));
+      try {
+        await deleteDailyCashTransaction(transactionId);
+        toast({
+          title: "Success",
+          description: "Transaction deleted successfully",
+        });
+      } catch (error) {
+        logger.error("Error deleting transaction:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete transaction. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingState((prev) => ({ ...prev, actions: false }));
+      }
+    },
+    [deleteDailyCashTransaction, toast]
+  );
+
+  const handleEditClick = useCallback((entry) => {
     setEditingTransaction(entry);
-  };
+  }, []);
 
-  const handleDeleteClick = (id) => {
-    handleDeleteTransaction(id);
-  };
+  const handleDeleteClick = useCallback(
+    (id) => {
+      handleDeleteTransaction(id);
+    },
+    [handleDeleteTransaction]
+  );
 
-  const handleAddTransaction = async (transaction) => {
-    setLoadingState((prev) => ({ ...prev, actions: true }));
-    try {
-      await addDailyCashTransaction(transaction);
+  const handleAddTransaction = useCallback(
+    async (transaction) => {
+      setLoadingState((prev) => ({ ...prev, actions: true }));
+      try {
+        await addDailyCashTransaction(transaction);
 
-      toast({
-        title: "Success",
-        description: "Transaction added successfully",
-      });
-    } catch (error) {
-      logger.error("Error adding transaction:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add transaction. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
-    }
-  };
+        toast({
+          title: "Success",
+          description: "Transaction added successfully",
+        });
+      } catch (error) {
+        logger.error("Error adding transaction:", error);
+        toast({
+          title: "Error",
+          description: "Failed to add transaction. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingState((prev) => ({ ...prev, actions: false }));
+      }
+    },
+    [addDailyCashTransaction, toast]
+  );
 
-  const handleEditTransaction = async (transactionId, updatedData) => {
-    setLoadingState((prev) => ({ ...prev, actions: true }));
+  const handleEditTransaction = useCallback(
+    async (transactionId, updatedData) => {
+      setLoadingState((prev) => ({ ...prev, actions: true }));
 
-    try {
-      await updateDailyCashTransaction(transactionId, updatedData);
-      toast({
-        title: "Success",
-        description: "Transaction updated successfully",
-      });
-    } catch (error) {
-      logger.error("Error updating transaction:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update transaction. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
-    }
-  };
+      try {
+        await updateDailyCashTransaction(transactionId, updatedData);
+        toast({
+          title: "Success",
+          description: "Transaction updated successfully",
+        });
+        setEditingTransaction(null);
+      } catch (error) {
+        logger.error("Error updating transaction:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update transaction. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingState((prev) => ({ ...prev, actions: false }));
+      }
+    },
+    [updateDailyCashTransaction, toast]
+  );
 
-  const handleDeleteTransaction = async (transactionId) => {
-    if (!window.confirm("Are you sure you want to delete this transaction?")) {
-      return;
-    }
-
-    setLoadingState((prev) => ({ ...prev, actions: true }));
-    try {
-      // Pass reference if it exists
-      await deleteDailyCashTransaction(transactionId);
-      toast({
-        title: "Success",
-        description: "Transaction deleted successfully",
-      });
-    } catch (error) {
-      logger.error("Error deleting transaction:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete transaction. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
-    }
-  };
-
-  const handleClearFilter = () => {
+  const handleClearFilter = useCallback(() => {
     setDate(null);
-  };
+    setSearchTerm("");
+  }, []);
 
-  const handleExportCSV = () => {
+  const handleExportCSV = useCallback(() => {
     const data = dailyCashTransactions.map((t) => ({
       Date: formatDate(t.date),
       Description: t.description,
@@ -382,9 +369,13 @@ export default function CashBookPage() {
       Balance: (t.cashIn || 0) - (t.cashOut || 0),
     }));
     exportToCSV(data, "cashbook-report.csv");
-  };
+    toast({
+      title: "Success",
+      description: "CSV exported successfully",
+    });
+  }, [dailyCashTransactions, toast]);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = useCallback(() => {
     const start = new Date(pdfStartDate);
     start.setUTCHours(0, 0, 0, 0);
     const end = new Date(pdfEndDate);
@@ -422,9 +413,12 @@ export default function CashBookPage() {
       endDate: pdfEndDate,
     };
     exportCashbookToPDF(data);
-  };
+    toast({
+      title: "Success",
+      description: "PDF exported successfully",
+    });
+  }, [pdfStartDate, pdfEndDate, dailyCash, toast]);
 
-  // Loading skeleton components (static placeholders — must not reference runtime variables)
   const SummaryCardSkeleton = () => (
     <Card className="overflow-hidden border-none shadow-md">
       <CardContent className="p-4">
@@ -493,435 +487,479 @@ export default function CashBookPage() {
   return (
     <ErrorBoundary>
       <div className="p-4 md:p-8 max-w-7xl mx-auto">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Cash Book</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage and track all cash transactions
-            </p>
+        {loadingState.initial ? (
+          <div className="space-y-8">
+            <SummaryCardSkeleton />
+            <SearchFilterSkeleton />
+            <TableSkeleton />
           </div>
-          <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
-            <AddCashTransactionDialog onAddTransaction={handleAddTransaction}>
-              <Button
-                className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
-                disabled={loadingState.actions}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Transaction
-              </Button>
-            </AddCashTransactionDialog>
-            <Popover>
-              <PopoverTrigger asChild>
+        ) : (
+          <>
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Cash Book</h1>
+                <p className="text-muted-foreground mt-1">
+                  Manage and track all cash transactions
+                </p>
+              </div>
+              <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
+                <AddCashTransactionDialog
+                  onAddTransaction={handleAddTransaction}
+                >
+                  <Button
+                    className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
+                    disabled={loadingState.actions}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Transaction
+                  </Button>
+                </AddCashTransactionDialog>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      className="w-full md:w-auto"
+                      variant="outline"
+                      disabled={loadingState.actions}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      {pdfStartDate && pdfEndDate
+                        ? `Export PDF (${formatDate(
+                            pdfStartDate
+                          )} - ${formatDate(pdfEndDate)})`
+                        : "Export PDF"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-4">
+                    <div className="space-y-4">
+                      <h4 className="font-medium leading-none">Export PDF</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Select a date range for the PDF report.
+                      </p>
+                      <div className="grid gap-2">
+                        <div className="grid grid-cols-3 items-center gap-4">
+                          <label htmlFor="pdf-start-date">Start Date</label>
+                          <Input
+                            id="pdf-start-date"
+                            type="date"
+                            value={pdfStartDate}
+                            onChange={(e) => setPdfStartDate(e.target.value)}
+                            className="col-span-2 h-8"
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 items-center gap-4">
+                          <label htmlFor="pdf-end-date">End Date</label>
+                          <Input
+                            id="pdf-end-date"
+                            type="date"
+                            value={pdfEndDate}
+                            onChange={(e) => setPdfEndDate(e.target.value)}
+                            className="col-span-2 h-8"
+                          />
+                        </div>
+                      </div>
+                      <Button onClick={handleExportPDF} className="w-full">
+                        Export
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <Button
+                  onClick={handleExportCSV}
                   className="w-full md:w-auto"
                   variant="outline"
                   disabled={loadingState.actions}
                 >
-                  <FileText className="mr-2 h-4 w-4" />
-                  {pdfStartDate && pdfEndDate
-                    ? `Export PDF (${formatDate(pdfStartDate)} - ${formatDate(
-                        pdfEndDate
-                      )})`
-                    : "Export PDF"}
+                  <Download className="mr-2 h-4 w-4" />
+                  Export CSV
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-4">
-                <div className="space-y-4">
-                  <h4 className="font-medium leading-none">Export PDF</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Select a date range for the PDF report.
-                  </p>
-                  <div className="grid gap-2">
-                    <div className="grid grid-cols-3 items-center gap-4">
-                      <label htmlFor="pdf-start-date">Start Date</label>
-                      <Input
-                        id="pdf-start-date"
-                        type="date"
-                        value={pdfStartDate}
-                        onChange={(e) => setPdfStartDate(e.target.value)}
-                        className="col-span-2 h-8"
-                      />
+              </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <Card className="overflow-hidden border-none shadow-md">
+                <CardContent className="p-0">
+                  <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-green-100 dark:border-green-800">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-medium text-green-800 dark:text-green-300">
+                        Total Cash In
+                      </h3>
+                      <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
                     </div>
-                    <div className="grid grid-cols-3 items-center gap-4">
-                      <label htmlFor="pdf-end-date">End Date</label>
-                      <Input
-                        id="pdf-end-date"
-                        type="date"
-                        value={pdfEndDate}
-                        onChange={(e) => setPdfEndDate(e.target.value)}
-                        className="col-span-2 h-8"
+                  </div>
+                  <div className="p-4">
+                    <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
+                      ৳{financials.totalCashIn.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
+                      All time income
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="overflow-hidden border-none shadow-md">
+                <CardContent className="p-0">
+                  <div className="bg-red-50 dark:bg-red-900/20 p-4 border-b border-red-100 dark:border-red-800">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
+                        Total Cash Out
+                      </h3>
+                      <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <p className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
+                      ৳{financials.totalCashOut.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
+                      All time expenses
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="overflow-hidden border-none shadow-md">
+                <CardContent className="p-0">
+                  <div
+                    className={`${
+                      financials.availableCash >= 0
+                        ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800"
+                        : "bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800"
+                    } p-4 border-b`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <h3
+                        className={`text-sm font-medium ${
+                          financials.availableCash >= 0
+                            ? "text-blue-800 dark:text-blue-300"
+                            : "text-amber-800 dark:text-amber-300"
+                        }`}
+                      >
+                        Available Balance
+                      </h3>
+                      <RefreshCw
+                        className={`h-4 w-4 ${
+                          financials.availableCash >= 0
+                            ? "text-blue-600 dark:text-blue-400"
+                            : "text-amber-600 dark:text-amber-400"
+                        }`}
                       />
                     </div>
                   </div>
-                  <Button onClick={handleExportPDF} className="w-full">
-                    Export
+                  <div className="p-4">
+                    <p
+                      className={`text-2xl md:text-3xl font-bold ${
+                        financials.availableCash >= 0
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-amber-600 dark:text-amber-400"
+                      }`}
+                    >
+                      ৳{financials.availableCash.toLocaleString()}
+                    </p>
+                    <p
+                      className={`text-xs ${
+                        financials.availableCash >= 0
+                          ? "text-blue-600/70 dark:text-blue-400/70"
+                          : "text-amber-600/70 dark:text-amber-400/70"
+                      } mt-1`}
+                    >
+                      Current balance
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Monthly Summary */}
+            <Card className="mb-8 border-none shadow-md overflow-hidden">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Monthly Summary</h3>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Month</TableHead>
+                        <TableHead className="text-right">Cash In</TableHead>
+                        <TableHead className="text-right">Cash Out</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {monthlyTotals.map(
+                        ({ month, cashIn, cashOut, balance }) => (
+                          <TableRow key={month}>
+                            <TableCell className="font-medium">
+                              {new Date(month).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "long",
+                              })}
+                            </TableCell>
+                            <TableCell className="text-right text-green-600">
+                              ৳{cashIn.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right text-red-600">
+                              ৳{cashOut.toLocaleString()}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right font-medium ${
+                                balance >= 0
+                                  ? "text-blue-600"
+                                  : "text-amber-600"
+                              }`}
+                            >
+                              ৳{balance.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Search and Filter Section */}
+            <Card className="mb-8 border-none shadow-md">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search transactions..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-9 w-full"
+                    />
+                  </div>
+                  <div className="relative flex-1">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="date"
+                      value={date || ""}
+                      onChange={(e) => setDate(e.target.value)}
+                      className="pl-9 w-full"
+                    />
+                  </div>
+                  <Button variant="ghost" onClick={handleClearFilter}>
+                    <X className="mr-2 h-4 w-4" />
+                    Clear Filter
                   </Button>
                 </div>
-              </PopoverContent>
-            </Popover>
-            <Button
-              onClick={handleExportCSV}
-              className="w-full md:w-auto"
-              variant="outline"
-              disabled={loadingState.actions}
+              </CardContent>
+            </Card>
+
+            {/* Transactions Tabs */}
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="mb-6"
             >
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
-          </div>
-        </div>
+              <TabsList className="mb-4">
+                <TabsTrigger value="all">All Transactions</TabsTrigger>
+                <TabsTrigger value="in">Cash In</TabsTrigger>
+                <TabsTrigger value="out">Cash Out</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="overflow-hidden border-none shadow-md">
-            <CardContent className="p-0">
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-green-100 dark:border-green-800">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-sm font-medium text-green-800 dark:text-green-300">
-                    Total Cash In
-                  </h3>
-                  <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-              <div className="p-4">
-                <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
-                  ৳{financials.totalCashIn}
-                </p>
-                <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
-                  All time income
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Transactions Table */}
+            <Card className="border-none shadow-md">
+              <CardContent>
+                <div className="space-y-4">
+                  {sortedDates.length > 0 ? (
+                    sortedDates.map((date) => {
+                      let { income, expense } = groupedEntries[date];
 
-          <Card className="overflow-hidden border-none shadow-md">
-            <CardContent className="p-0">
-              <div className="bg-red-50 dark:bg-red-900/20 p-4 border-b border-red-100 dark:border-red-800">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
-                    Total Cash Out
-                  </h3>
-                  <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
-                </div>
-              </div>
-              <div className="p-4">
-                <p className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
-                  ৳{financials.totalCashOut}
-                </p>
-                <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
-                  All time expenses
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                      if (activeTab === "in") {
+                        expense = [];
+                      } else if (activeTab === "out") {
+                        income = [];
+                      }
 
-          <Card className="overflow-hidden border-none shadow-md">
-            <CardContent className="p-0">
-              <div
-                className={`${
-                  financials.availableCash >= 0
-                    ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800"
-                    : "bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800"
-                } p-4 border-b`}
-              >
-                <div className="flex justify-between items-center">
-                  <h3
-                    className={`text-sm font-medium ${
-                      financials.availableCash >= 0
-                        ? "text-blue-800 dark:text-blue-300"
-                        : "text-amber-800 dark:text-amber-300"
-                    }`}
-                  >
-                    Available Balance
-                  </h3>
-                  <RefreshCw
-                    className={`h-4 w-4 ${
-                      financials.availableCash >= 0
-                        ? "text-blue-600 dark:text-blue-400"
-                        : "text-amber-600 dark:text-amber-400"
-                    }`}
-                  />
-                </div>
-              </div>
-              <div className="p-4">
-                <p
-                  className={`text-2xl md:text-3xl font-bold ${
-                    financials.availableCash >= 0
-                      ? "text-blue-600 dark:text-blue-400"
-                      : "text-amber-600 dark:text-amber-400"
-                  }`}
-                >
-                  ৳{financials.availableCash}
-                </p>
-                <p
-                  className={`text-xs ${
-                    financials.availableCash >= 0
-                      ? "text-blue-600/70 dark:text-blue-400/70"
-                      : "text-amber-600/70 dark:text-amber-400/70"
-                  } mt-1`}
-                >
-                  Current balance
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                      if (income.length === 0 && expense.length === 0)
+                        return null;
 
-        {/* Monthly Summary */}
-        <Card className="mb-8 border-none shadow-md overflow-hidden">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Monthly Summary</h3>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Month</TableHead>
-                    <TableHead className="text-right">Cash In</TableHead>
-                    <TableHead className="text-right">Cash Out</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {monthlyTotals.map(({ month, cashIn, cashOut, balance }) => (
-                    <TableRow key={month}>
-                      <TableCell className="font-medium">
-                        {new Date(month).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                        })}
-                      </TableCell>
-                      <TableCell className="text-right text-green-600">
-                        {cashIn}
-                      </TableCell>
-                      <TableCell className="text-right text-red-600">
-                        {cashOut}
-                      </TableCell>
-                      <TableCell
-                        className={`text-right font-medium ${
-                          balance >= 0 ? "text-blue-600" : "text-amber-600"
-                        }`}
-                      >
-                        ৳{balance.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                      const dailyIncomeTotal = income.reduce(
+                        (sum, i) => sum + i.amount,
+                        0
+                      );
+                      const dailyExpenseTotal = expense.reduce(
+                        (sum, e) => sum + e.amount,
+                        0
+                      );
 
-        {/* Search and Filter Section */}
-        <Card className="mb-8 border-none shadow-md">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search transactions..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 w-full"
-                />
-              </div>
-              <div className="relative flex-1">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="date"
-                  value={date || ""}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="pl-9 w-full"
-                />
-              </div>
-              <Button variant="ghost" onClick={handleClearFilter}>
-                <X className="mr-2 h-4 w-4" />
-                Clear Filter
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Transactions Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-          <TabsList className="mb-4">
-            <TabsTrigger value="all">All Transactions</TabsTrigger>
-            <TabsTrigger value="in">Cash In</TabsTrigger>
-            <TabsTrigger value="out">Cash Out</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {/* Transactions Table */}
-        <Card className="border-none shadow-md">
-          <CardContent>
-            <div className="space-y-4">
-              {sortedDates.length > 0 ? (
-                sortedDates.map((date) => {
-                  let { income, expense } = groupedEntries[date];
-
-                  if (activeTab === "in") {
-                    expense = [];
-                  } else if (activeTab === "out") {
-                    income = [];
-                  }
-
-                  if (income.length === 0 && expense.length === 0) return null;
-
-                  const dailyIncomeTotal = income.reduce(
-                    (sum, i) => sum + i.amount,
-                    0
-                  );
-                  const dailyExpenseTotal = expense.reduce(
-                    (sum, e) => sum + e.amount,
-                    0
-                  );
-
-                  return (
-                    <div
-                      key={date}
-                      className="border rounded-lg overflow-hidden shadow-sm"
-                    >
-                      <div className="bg-muted/50 px-4 py-2 border-b">
-                        <h3 className="font-semibold text-lg">
-                          {new Date(date + "T00:00:00").toLocaleDateString(
-                            "en-US",
-                            {
-                              weekday: "long",
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            }
-                          )}
-                        </h3>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2">
-                        {income.length > 0 && (
-                          <div className="p-4 md:border-r">
-                            <h4 className="font-medium mb-2 text-green-600">
-                              INCOME
-                            </h4>
-                            <div className="space-y-2 min-h-[50px]">
-                              {income.map((entry) => (
-                                <div
-                                  key={entry.id}
-                                  className="flex justify-between items-center text-sm group"
-                                >
-                                  <div>
-                                    <p className="font-medium">
-                                      {entry.description}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {entry.category}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <span className="font-medium">
-                                      ৳{entry.amount.toFixed(2)}
-                                    </span>
-
-                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
-                                        onClick={() => handleEditClick(entry)}
+                      return (
+                        <div
+                          key={date}
+                          className="border rounded-lg overflow-hidden shadow-sm"
+                        >
+                          <div className="bg-muted/50 px-4 py-2 border-b">
+                            <h3 className="font-semibold text-lg">
+                              {new Date(date + "T00:00:00").toLocaleDateString(
+                                "en-US",
+                                {
+                                  weekday: "long",
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                }
+                              )}
+                            </h3>
+                          </div>
+                          {/* FIXED: Always show both columns in grid layout */}
+                          <div className="grid grid-cols-1 md:grid-cols-2">
+                            {/* Income Section - Always visible */}
+                            <div className="p-4 md:border-r">
+                              <h4 className="font-medium mb-2 text-green-600">
+                                INCOME
+                              </h4>
+                              {income.length > 0 ? (
+                                <>
+                                  <div className="space-y-2 min-h-[50px]">
+                                    {income.map((entry) => (
+                                      <div
+                                        key={entry.id}
+                                        className="flex justify-between items-center text-sm group"
                                       >
-                                        <PencilIcon className="h-3 w-3" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 text-destructive"
-                                        onClick={(e) =>
-                                          handleDeleteClick(entry.id)
-                                        }
-                                      >
-                                        <TrashIcon className="h-3 w-3" />
-                                      </Button>
-                                    </div>
+                                        <div>
+                                          <p className="font-medium">
+                                            {entry.description}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {entry.category}
+                                          </p>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-medium">
+                                            ৳{entry.amount.toFixed(2)}
+                                          </span>
+
+                                          <div className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6"
+                                              onClick={() =>
+                                                handleEditClick(entry)
+                                              }
+                                            >
+                                              <PencilIcon className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6 text-destructive"
+                                              onClick={() =>
+                                                handleDeleteClick(entry.id)
+                                              }
+                                            >
+                                              <TrashIcon className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
+                                  <div className="border-t mt-2 pt-2 flex justify-between font-bold text-green-600">
+                                    <span>Daily Total</span>
+                                    <span>৳{dailyIncomeTotal.toFixed(2)}</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="space-y-2 min-h-[50px] flex items-center justify-center text-muted-foreground text-sm">
+                                  No income transactions
                                 </div>
-                              ))}
+                              )}
                             </div>
-                            <div className="border-t mt-2 pt-2 flex justify-between font-bold text-green-600">
-                              <span>Daily Total</span>
-                              <span>৳{dailyIncomeTotal.toFixed(2)}</span>
+
+                            {/* Expense Section - Always visible */}
+                            <div className="p-4">
+                              <h4 className="font-medium mb-2 text-destructive">
+                                EXPENSE
+                              </h4>
+                              {expense.length > 0 ? (
+                                <>
+                                  <div className="space-y-2 min-h-[50px]">
+                                    {expense.map((entry) => (
+                                      <div
+                                        key={entry.id}
+                                        className="flex justify-between items-center text-sm group"
+                                      >
+                                        <div>
+                                          <p className="font-medium">
+                                            {entry.description}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {entry.category}
+                                          </p>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-medium">
+                                            ৳{entry.amount.toFixed(2)}
+                                          </span>
+
+                                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6"
+                                              onClick={() =>
+                                                handleEditClick(entry)
+                                              }
+                                            >
+                                              <PencilIcon className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6 text-destructive"
+                                              onClick={() =>
+                                                handleDeleteClick(entry.id)
+                                              }
+                                            >
+                                              <TrashIcon className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="border-t mt-2 pt-2 flex justify-between font-bold text-destructive">
+                                    <span>Daily Total</span>
+                                    <span>৳{dailyExpenseTotal.toFixed(2)}</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="space-y-2 min-h-[50px] flex items-center justify-center text-muted-foreground text-sm">
+                                  No expense transactions
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )}
-                        {expense.length > 0 && (
-                          <div className="p-4">
-                            <h4 className="font-medium mb-2 text-destructive">
-                              EXPENSE
-                            </h4>
-                            <div className="space-y-2 min-h-[50px]">
-                              {expense.map((entry) => (
-                                <div
-                                  key={entry.id}
-                                  className="flex justify-between items-center text-sm group"
-                                >
-                                  <div>
-                                    <p className="font-medium">
-                                      {entry.description}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {entry.category}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <span className="font-medium">
-                                      ৳{entry.amount.toFixed(2)}
-                                    </span>
-
-                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
-                                        onClick={() => handleEditClick(entry)}
-                                      >
-                                        <PencilIcon className="h-3 w-3" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 text-destructive"
-                                        onClick={(e) =>
-                                          handleDeleteClick(entry.id)
-                                        }
-                                      >
-                                        <TrashIcon className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="border-t mt-2 pt-2 flex justify-between font-bold text-destructive">
-                              <span>Daily Total</span>
-                              <span>৳{dailyExpenseTotal.toFixed(2)}</span>
-                            </div>
+                          <div className="bg-muted/50 px-4 py-3 border-t font-bold flex justify-between">
+                            <span>Daily Balance</span>
+                            <span>
+                              ৳
+                              {(dailyIncomeTotal - dailyExpenseTotal).toFixed(
+                                2
+                              )}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                      <div className="bg-muted/50 px-4 py-3 border-t font-bold flex justify-between">
-                        <span>Daily Balance</span>
-                        <span>
-                          ৳{(dailyIncomeTotal - dailyExpenseTotal).toFixed(2)}
-                        </span>
-                      </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-16 text-muted-foreground">
+                      No entries found matching your filters.
                     </div>
-                  );
-                })
-              ) : (
-                <div className="text-center py-16 text-muted-foreground">
-                  No entries found matching your filters.
+                  )}
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </>
+        )}
 
         {/* Edit Transaction Dialog */}
         {editingTransaction && (
@@ -933,7 +971,6 @@ export default function CashBookPage() {
             }}
             onEditTransaction={(updated) => {
               handleEditTransaction(editingTransaction.id, updated);
-              setEditingTransaction(null);
             }}
           />
         )}
