@@ -2,7 +2,6 @@
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,8 +22,6 @@ import {
   Receipt,
   Settings,
   LogOut,
-  Menu,
-  X,
   Bell,
   User,
   BarChart3,
@@ -33,7 +30,6 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 
 export function Navbar() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -90,7 +86,7 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center space-x-1">
-            {navItems.map((item) => {
+            {navItems.slice(0, 5).map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
@@ -107,6 +103,38 @@ export function Navbar() {
                 </Link>
               );
             })}
+            {navItems.length > 5 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+                  >
+                    More
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {navItems.slice(4).map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <DropdownMenuItem key={item.href} asChild>
+                        <Link
+                          href={item.href}
+                          className={`flex items-center ${
+                            isActive
+                              ? "bg-accent text-accent-foreground"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <item.icon className="h-4 w-4 mr-2" />
+                          {item.label}
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
           <div className="flex items-center space-x-2">
@@ -127,11 +155,12 @@ export function Navbar() {
 
             <UserNav handleLogout={handleLogout} router={router} />
 
-            <div className="md:hidden">
+            <div className="block md:hidden">
               <MobileNav
                 handleLogout={handleLogout}
                 router={router}
                 pathname={pathname}
+                navItems={navItems}
               />
             </div>
           </div>

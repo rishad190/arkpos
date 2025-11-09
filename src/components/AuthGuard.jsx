@@ -1,35 +1,40 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 export function AuthGuard({ children }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, loading } = useAuth();
 
   useEffect(() => {
-    const checkAuth = () => {
-      const auth = localStorage.getItem("isAuthenticated");
-      setIsAuthenticated(auth === "true");
-      setIsLoading(false);
+    // Redirect to login if not authenticated and not already on login page
+    if (!loading && !user && pathname !== "/login") {
+      console.warn("[AUTH] Redirecting to login - user not authenticated");
+      router.push("/login");
+    }
 
-      if (!auth && pathname !== "/login") {
-        router.push("/login");
-      }
-    };
+    // Redirect to dashboard if authenticated and on login page
+    if (!loading && user && pathname === "/login") {
+      console.warn(
+        "[AUTH] Redirecting to dashboard - user already authenticated"
+      );
+      router.push("/");
+    }
+  }, [user, loading, pathname, router]);
 
-    checkAuth();
-  }, [pathname, router]);
-
-  if (isLoading) {
+  // Show loading spinner while checking authentication
+  if (loading) {
     return <LoadingSpinner />;
   }
 
-  if (!isAuthenticated && pathname !== "/login") {
-    return null;
+  // Allow access if authenticated or on login page
+  if (user || pathname === "/login") {
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  // Show nothing while redirecting
+  return null;
 }

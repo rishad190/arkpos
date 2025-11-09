@@ -1,37 +1,28 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.jsx";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet.jsx";
 import {
-  Menu,
+  Menu as MenuIcon,
+  Settings,
+  LogOut,
   LayoutDashboard,
   BookOpen,
   Users,
   Package,
   Receipt,
-  TrendingUp,
-  Settings,
-  LogOut,
+  GitMerge,
+  BarChart3,
 } from "lucide-react";
 
-const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/customers", label: "Customers", icon: Users },
-  { href: "/cashbook", label: "Cash Book", icon: BookOpen },
-  { href: "/suppliers", label: "Suppliers", icon: Package },
-  { href: "/inventory", label: "Inventory", icon: Package },
-  { href: "/inventory-profit", label: "Inventory Profit", icon: TrendingUp },
-  { href: "/cashmemo", label: "Cash Memo", icon: Receipt },
-];
-
-export function MobileNav({ handleLogout, router, pathname }) {
+export function MobileNav({ handleLogout, router, pathname, navItems }) {
   const [isOpen, setIsOpen] = React.useState(false);
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="md:hidden">
-          <Menu className="h-6 w-6" />
+          <MenuIcon className="h-6 w-6" />
           <span className="sr-only">Toggle Menu</span>
         </Button>
       </SheetTrigger>

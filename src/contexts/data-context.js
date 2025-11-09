@@ -2,31 +2,32 @@
 import {
   createContext,
   useContext,
-  useState,
   useEffect,
   useMemo,
   useCallback,
   useReducer,
+  useRef,
 } from "react";
 import {
   ref,
   onValue,
   push,
   set,
-  remove,
   update,
-  serverTimestamp,
-  get,
+  remove,
   query,
   orderByChild,
   equalTo,
-  onDisconnect,
-  goOffline,
-  goOnline,
+  get,
+  serverTimestamp,
 } from "firebase/database";
 
 import { db } from "@/lib/firebase";
 import logger from "@/utils/logger";
+import { CustomerService } from "@/services/customerService";
+import { TransactionService } from "@/services/transactionService";
+import { FabricService } from "@/services/fabricService";
+import { AtomicOperationService } from "@/services/atomicOperations";
 
 // Create context
 const DataContext = createContext(null);
@@ -35,7 +36,8 @@ const DataContext = createContext(null);
 const COLLECTION_REFS = {
   CUSTOMERS: "customers",
   TRANSACTIONS: "transactions",
-  DAILY_CASH: "dailyCash",
+  DAILY_CASH_INCOME: "dailyCashIncome",
+  DAILY_CASH_EXPENSE: "dailyCashExpense",
 
   SUPPLIERS: "suppliers",
   SUPPLIER_TRANSACTIONS: "supplierTransactions",
@@ -74,7 +76,8 @@ const ERROR_TYPES = {
 const initialState = {
   customers: [],
   transactions: [],
-  dailyCashTransactions: [],
+  dailyCashIncome: [],
+  dailyCashExpense: [],
 
   suppliers: [],
   supplierTransactions: [],
@@ -134,10 +137,16 @@ function reducer(state, action) {
         transactions: action.payload,
         loading: false,
       };
-    case "SET_DAILY_CASH_TRANSACTIONS":
+    case "SET_DAILY_CASH_INCOME":
       return {
         ...state,
-        dailyCashTransactions: action.payload,
+        dailyCashIncome: action.payload,
+        loading: false,
+      };
+    case "SET_DAILY_CASH_EXPENSE":
+      return {
+        ...state,
+        dailyCashExpense: action.payload,
         loading: false,
       };
 
@@ -224,86 +233,19 @@ function reducer(state, action) {
   }
 }
 
-// Helper functions for validation and performance
-const validateFabricData = (fabricData) => {
-  const errors = [];
-  if (!fabricData.name?.trim()) errors.push("Fabric name is required");
-  if (!fabricData.category?.trim()) errors.push("Category is required");
-  if (!fabricData.unit?.trim()) errors.push("Unit is required");
-  return errors;
-};
-
-const validateBatchData = (batchData) => {
-  const errors = [];
-  if (!batchData.fabricId) errors.push("Fabric ID is required");
-  if (
-    !batchData.items ||
-    !Array.isArray(batchData.items) ||
-    batchData.items.length === 0
-  ) {
-    errors.push("At least one item is required");
-  }
-  if (batchData.items) {
-    batchData.items.forEach((item, index) => {
-      if (!item.colorName?.trim())
-        errors.push(`Item ${index + 1}: Color name is required`);
-      if (!item.quantity || item.quantity <= 0)
-        errors.push(`Item ${index + 1}: Valid quantity is required`);
-    });
-  }
-  return errors;
-};
-
-const validateTransactionData = (transactionData) => {
-  const errors = [];
-  if (!transactionData.customerId) errors.push("Customer ID is required");
-  if (
-    (transactionData.total || 0) <= 0 &&
-    (transactionData.deposit || 0) <= 0
-  ) {
-    errors.push("Either total or deposit must be a positive amount");
-  }
-  return errors;
-};
-
-const trackPerformance = (operationName, startTime, dispatch) => {
-  const endTime = Date.now();
-  const duration = endTime - startTime;
-
-  const isSlow = duration > PERFORMANCE_THRESHOLDS.SLOW_OPERATION;
-  const isVerySlow = duration > PERFORMANCE_THRESHOLDS.VERY_SLOW_OPERATION;
-
-  dispatch({
-    type: "UPDATE_PERFORMANCE_METRICS",
-    payload: {
-      operationCount: state.performanceMetrics.operationCount + 1,
-      slowOperations:
-        state.performanceMetrics.slowOperations + (isSlow ? 1 : 0),
-      averageResponseTime:
-        (state.performanceMetrics.averageResponseTime *
-          state.performanceMetrics.operationCount +
-          duration) /
-        (state.performanceMetrics.operationCount + 1),
-      lastOperationTime: new Date().toISOString(),
-    },
-  });
-
-  if (isVerySlow) {
-    logger.warn(
-      `[Performance] Very slow operation: ${operationName} took ${duration}ms`
-    );
-  } else if (isSlow) {
-    logger.info(
-      `[Performance] Slow operation: ${operationName} took ${duration}ms`
-    );
-  }
-
-  return duration;
-};
-
 // Export the provider component
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const mountTime = useRef(Date.now());
+
+  useEffect(() => {
+    console.warn("[PERF DEBUG] DataContext mounted - monitoring performance");
+    console.warn(
+      "[PERF DEBUG] Initial state size:",
+      JSON.stringify(initialState).length,
+      "bytes"
+    );
+  }, []);
 
   // Connection state monitoring
   useEffect(() => {
@@ -364,88 +306,22 @@ export function DataProvider({ children }) {
     }
   }, [state.offlineQueue]);
 
-  // Atomic transaction helper
-  const executeAtomicOperation = useCallback(
-    async (operationName, operationFn, fallbackFn = null) => {
-      const operationId = `${operationName}_${Date.now()}`;
-      const startTime = Date.now();
-
-      dispatch({ type: "ADD_PENDING_OPERATION", payload: operationId });
-
-      try {
-        // Check connection state
-        if (state.connectionState === CONNECTION_STATES.DISCONNECTED) {
-          // Queue for offline processing
-          dispatch({
-            type: "ADD_TO_OFFLINE_QUEUE",
-            payload: {
-              id: operationId,
-              name: operationName,
-              fn: operationFn,
-              timestamp: new Date().toISOString(),
-            },
-          });
-          throw new Error("Operation queued for offline processing");
-        }
-
-        const result = await operationFn();
-
-        // Track performance
-        const duration = Date.now() - startTime;
-        const isSlow = duration > PERFORMANCE_THRESHOLDS.SLOW_OPERATION;
-        const isVerySlow =
-          duration > PERFORMANCE_THRESHOLDS.VERY_SLOW_OPERATION;
-
-        dispatch({
-          type: "UPDATE_PERFORMANCE_METRICS",
-          payload: {
-            operationCount: state.performanceMetrics.operationCount + 1,
-            slowOperations:
-              state.performanceMetrics.slowOperations + (isSlow ? 1 : 0),
-            averageResponseTime:
-              (state.performanceMetrics.averageResponseTime *
-                state.performanceMetrics.operationCount +
-                duration) /
-              (state.performanceMetrics.operationCount + 1),
-            lastOperationTime: new Date().toISOString(),
-          },
-        });
-
-        if (isVerySlow) {
-          logger.warn(
-            `[Performance] Very slow operation: ${operationName} took ${duration}ms`
-          );
-        } else if (isSlow) {
-          logger.info(
-            `[Performance] Slow operation: ${operationName} took ${duration}ms`
-          );
-        }
-
-        return result;
-      } catch (error) {
-        logger.error(
-          `[DataContext] Atomic operation failed: ${operationName}`,
-          error
-        );
-
-        // Execute fallback if provided
-        if (fallbackFn && typeof fallbackFn === "function") {
-          try {
-            await fallbackFn();
-          } catch (fallbackError) {
-            logger.error(
-              `[DataContext] Fallback operation failed: ${operationName}`,
-              fallbackError
-            );
-          }
-        }
-
-        throw error;
-      } finally {
-        dispatch({ type: "REMOVE_PENDING_OPERATION", payload: operationId });
-      }
-    },
-    [state.connectionState, state.performanceMetrics, dispatch]
+  // Initialize service instances
+  const atomicOperations = useMemo(
+    () => new AtomicOperationService(dispatch, () => state),
+    [dispatch, state]
+  );
+  const customerService = useMemo(
+    () => new CustomerService(db, logger, atomicOperations),
+    [db, logger, atomicOperations]
+  );
+  const transactionService = useMemo(
+    () => new TransactionService(db, logger, atomicOperations),
+    [db, logger, atomicOperations]
+  );
+  const fabricService = useMemo(
+    () => new FabricService(db, logger, atomicOperations),
+    [db, logger, atomicOperations]
   );
 
   // Debounced Firebase Subscriptions
@@ -488,26 +364,7 @@ export function DataProvider({ children }) {
           }
         },
       },
-      {
-        path: COLLECTION_REFS.DAILY_CASH,
-        setter: (data) => {
-          // Convert daily cash transactions object to array format for components
-          if (data && typeof data === "object") {
-            const dailyCashArray = Object.entries(data)
-              .map(([id, transactionData]) => ({
-                id,
-                ...transactionData,
-              }))
-              .filter(Boolean);
-            dispatch({
-              type: "SET_DAILY_CASH_TRANSACTIONS",
-              payload: dailyCashArray,
-            });
-          } else {
-            dispatch({ type: "SET_DAILY_CASH_TRANSACTIONS", payload: [] });
-          }
-        },
-      },
+
       {
         path: COLLECTION_REFS.SUPPLIERS,
         setter: (data) => {
@@ -568,7 +425,39 @@ export function DataProvider({ children }) {
         },
       },
       // Remove separate fabricBatches listener as batches are now nested in fabrics
-    ];
+      {
+        path: COLLECTION_REFS.DAILY_CASH_INCOME,
+        setter: (data) => {
+          if (data && typeof data === "object") {
+            const incomeArray = Object.entries(data)
+              .map(([id, transactionData]) => ({
+                id,
+                ...transactionData,
+              }))
+              .filter(Boolean);
+            dispatch({ type: "SET_DAILY_CASH_INCOME", payload: incomeArray });
+          } else {
+            dispatch({ type: "SET_DAILY_CASH_INCOME", payload: [] });
+          }
+        },
+      },
+      {
+        path: COLLECTION_REFS.DAILY_CASH_EXPENSE,
+        setter: (data) => {
+          if (data && typeof data === "object") {
+            const expenseArray = Object.entries(data)
+              .map(([id, transactionData]) => ({
+                id,
+                ...transactionData,
+              }))
+              .filter(Boolean);
+            dispatch({ type: "SET_DAILY_CASH_EXPENSE", payload: expenseArray });
+          } else {
+            dispatch({ type: "SET_DAILY_CASH_EXPENSE", payload: [] });
+          }
+        },
+      }
+    ]; // Closing the collections array
 
     try {
       collections.forEach(({ path, setter }) => {
@@ -654,160 +543,28 @@ export function DataProvider({ children }) {
     [customerDues]
   );
 
-  // Batch-level locking for inventory management
-  const acquireBatchLock = useCallback(async (batchId) => {
-    const lockRef = ref(db, `locks/batches/${batchId}`);
-    try {
-      await set(lockRef, {
-        lockedAt: serverTimestamp(),
-        sessionId: Math.random().toString(36).substr(2, 9),
-      });
-      return true;
-    } catch (error) {
-      logger.warn(
-        `[DataContext] Could not acquire lock for batch ${batchId}:`,
-        error
-      );
-      return false;
-    }
-  }, []);
-
-  const releaseBatchLock = useCallback(async (batchId) => {
-    const lockRef = ref(db, `locks/batches/${batchId}`);
-    try {
-      await remove(lockRef);
-    } catch (error) {
-      logger.warn(
-        `[DataContext] Could not release lock for batch ${batchId}:`,
-        error
-      );
-    }
-  }, []);
-
-  // Customer Operations with atomic execution and validation
+  // Customer Operations using service
   const customerOperations = useMemo(
     () => ({
-      addCustomer: async (customerData) => {
-        // Validate customer data
-        const validationErrors = [];
-        if (!customerData.name?.trim())
-          validationErrors.push("Customer name is required");
-        if (!customerData.phone?.trim())
-          validationErrors.push("Phone number is required");
-
-        if (validationErrors.length > 0) {
-          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
-        }
-
-        return executeAtomicOperation("addCustomer", async () => {
-          const customersRef = ref(db, COLLECTION_REFS.CUSTOMERS);
-          const newCustomerRef = push(customersRef);
-          await set(newCustomerRef, {
-            ...customerData,
-            createdAt: new Date().toISOString(),
-          });
-          return newCustomerRef.key;
-        });
-      },
-
-      updateCustomer: async (customerId, updatedData) => {
-        // Validate customer data
-        const validationErrors = [];
-        if (!updatedData.name?.trim())
-          validationErrors.push("Customer name is required");
-        if (!updatedData.phone?.trim())
-          validationErrors.push("Phone number is required");
-
-        if (validationErrors.length > 0) {
-          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
-        }
-
-        return executeAtomicOperation("updateCustomer", async () => {
-          const customerRef = ref(
-            db,
-            `${COLLECTION_REFS.CUSTOMERS}/${customerId}`
-          );
-          await update(customerRef, {
-            ...updatedData,
-            updatedAt: serverTimestamp(),
-          });
-        });
-      },
-
-      deleteCustomer: async (customerId) => {
-        return executeAtomicOperation("deleteCustomer", async () => {
-          // First delete associated transactions
-          const customerTransactions = state.transactions.filter(
-            (t) => t.customerId === customerId
-          );
-          for (const transaction of customerTransactions) {
-            await remove(
-              ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transaction.id}`)
-            );
-          }
-          // Then delete the customer
-          await remove(ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`));
-        });
-      },
-
+      addCustomer: customerService.addCustomer.bind(customerService),
+      updateCustomer: customerService.updateCustomer.bind(customerService),
+      deleteCustomer: customerService.deleteCustomer.bind(customerService),
       getCustomerDue,
     }),
-    [state.transactions, getCustomerDue]
+    [customerService, getCustomerDue]
   );
 
-  // Transaction Operations with atomic execution and validation
+  // Transaction Operations using service
   const transactionOperations = useMemo(
     () => ({
-      addTransaction: async (transactionData) => {
-        // Validate transaction data
-        const validationErrors = validateTransactionData(transactionData);
-        if (validationErrors.length > 0) {
-          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
-        }
-
-        return executeAtomicOperation("addTransaction", async () => {
-          const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
-          const newTransactionRef = push(transactionsRef);
-
-          const newTransaction = {
-            ...transactionData,
-            createdAt: new Date().toISOString(),
-          };
-
-          await set(newTransactionRef, newTransaction);
-
-          return newTransactionRef.key;
-        });
-      },
-
-      updateTransaction: async (transactionId, updatedData) => {
-        // Validate transaction data
-        const validationErrors = validateTransactionData(updatedData);
-        if (validationErrors.length > 0) {
-          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
-        }
-
-        return executeAtomicOperation("updateTransaction", async () => {
-          const transactionRef = ref(
-            db,
-            `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`
-          );
-          await update(transactionRef, {
-            ...updatedData,
-            updatedAt: serverTimestamp(),
-          });
-        });
-      },
-
-      deleteTransaction: async (transactionId) => {
-        return executeAtomicOperation("deleteTransaction", async () => {
-          await remove(
-            ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`)
-          );
-        });
-      },
+      addTransaction:
+        transactionService.addTransaction.bind(transactionService),
+      updateTransaction:
+        transactionService.updateTransaction.bind(transactionService),
+      deleteTransaction:
+        transactionService.deleteTransaction.bind(transactionService),
     }),
-    [state.transactions, getCustomerDue]
+    [transactionService]
   );
 
   // Supplier Operations with atomic execution and validation
@@ -825,7 +582,7 @@ export function DataProvider({ children }) {
           throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
         }
 
-        return executeAtomicOperation("addSupplier", async () => {
+        return atomicOperations.execute("addSupplier", async () => {
           const suppliersRef = ref(db, COLLECTION_REFS.SUPPLIERS);
           const newSupplierRef = push(suppliersRef);
           await set(newSupplierRef, {
@@ -849,7 +606,7 @@ export function DataProvider({ children }) {
           throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
         }
 
-        return executeAtomicOperation("updateSupplier", async () => {
+        return atomicOperations.execute("updateSupplier", async () => {
           const supplierRef = ref(
             db,
             `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
@@ -862,7 +619,7 @@ export function DataProvider({ children }) {
       },
 
       deleteSupplier: async (supplierId) => {
-        return executeAtomicOperation("deleteSupplier", async () => {
+        return atomicOperations.execute("deleteSupplier", async () => {
           // First delete associated transactions
           const supplierTransactions = state.transactions.filter(
             (t) => t.supplierId === supplierId
@@ -894,7 +651,7 @@ export function DataProvider({ children }) {
           throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
         }
 
-        return executeAtomicOperation("addSupplierTransaction", async () => {
+        return atomicOperations.execute("addSupplierTransaction", async () => {
           const transactionsRef = ref(
             db,
             COLLECTION_REFS.SUPPLIER_TRANSACTIONS
@@ -935,33 +692,39 @@ export function DataProvider({ children }) {
         amount,
         paidAmount
       ) => {
-        return executeAtomicOperation("deleteSupplierTransaction", async () => {
-          // Delete transaction
-          await remove(
-            ref(db, `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transactionId}`)
-          );
-
-          // Update supplier's total due
-          const supplierRef = ref(
-            db,
-            `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
-          );
-          const supplierSnapshot = await get(supplierRef);
-
-          if (supplierSnapshot.exists()) {
-            const supplier = supplierSnapshot.val();
-            const dueAmount = amount - (paidAmount || 0);
-            const newTotalDue = Math.max(
-              0,
-              (supplier.totalDue || 0) - dueAmount
+        return atomicOperations.execute(
+          "deleteSupplierTransaction",
+          async () => {
+            // Delete transaction
+            await remove(
+              ref(
+                db,
+                `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transactionId}`
+              )
             );
 
-            await update(supplierRef, {
-              totalDue: newTotalDue,
-              updatedAt: serverTimestamp(),
-            });
+            // Update supplier's total due
+            const supplierRef = ref(
+              db,
+              `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
+            );
+            const supplierSnapshot = await get(supplierRef);
+
+            if (supplierSnapshot.exists()) {
+              const supplier = supplierSnapshot.val();
+              const dueAmount = amount - (paidAmount || 0);
+              const newTotalDue = Math.max(
+                0,
+                (supplier.totalDue || 0) - dueAmount
+              );
+
+              await update(supplierRef, {
+                totalDue: newTotalDue,
+                updatedAt: serverTimestamp(),
+              });
+            }
           }
-        });
+        );
       },
     }),
     [state.transactions]
@@ -984,8 +747,12 @@ export function DataProvider({ children }) {
           throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
         }
 
-        return executeAtomicOperation("addDailyCashTransaction", async () => {
-          const dailyCashRef = ref(db, COLLECTION_REFS.DAILY_CASH);
+        return atomicOperations.execute("addDailyCashTransaction", async () => {
+          const collectionPath =
+            transaction.cashIn > 0
+              ? COLLECTION_REFS.DAILY_CASH_INCOME
+              : COLLECTION_REFS.DAILY_CASH_EXPENSE;
+          const dailyCashRef = ref(db, collectionPath);
           const newTransactionRef = push(dailyCashRef);
           await set(newTransactionRef, {
             ...transaction,
@@ -1020,15 +787,55 @@ export function DataProvider({ children }) {
         });
       },
 
-      deleteDailyCashTransaction: async (transactionId) => {
-        return executeAtomicOperation(
+      deleteDailyCashTransaction: async (transactionId, reference) => {
+        return atomicOperations.execute(
           "deleteDailyCashTransaction",
           async () => {
-            const transactionRef = ref(
-              db,
-              `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
+            let dailyCashData = null;
+            let collectionPath = null;
+
+            // Try to fetch from income collection
+            const incomeSnapshot = await get(
+              ref(db, `${COLLECTION_REFS.DAILY_CASH_INCOME}/${transactionId}`)
             );
-            await remove(transactionRef);
+            if (incomeSnapshot.exists()) {
+              dailyCashData = incomeSnapshot.val();
+              collectionPath = COLLECTION_REFS.DAILY_CASH_INCOME;
+            } else {
+              // If not found in income, try expense collection
+              const expenseSnapshot = await get(
+                ref(db, `${COLLECTION_REFS.DAILY_CASH_EXPENSE}/${transactionId}`)
+              );
+              if (expenseSnapshot.exists()) {
+                dailyCashData = expenseSnapshot.val();
+                collectionPath = COLLECTION_REFS.DAILY_CASH_EXPENSE;
+              }
+            }
+
+            if (!dailyCashData || !collectionPath) {
+              throw new Error("Transaction not found in any daily cash collection.");
+            }
+
+            // If it's a sale, update the related customer transaction
+            if (dailyCashData.type === "sale" && dailyCashData.reference) {
+              const customerTransactionRef = query(
+                ref(db, "transactions"),
+                orderByChild("memoNumber"),
+                equalTo(dailyCashData.reference)
+              );
+              const snapshot = await get(customerTransactionRef);
+
+              if (snapshot.exists()) {
+                const [id, transactionData] = Object.entries(snapshot.val())[0];
+                await update(ref(db, `transactions/${id}`), {
+                  deposit:
+                    (transactionData.deposit || 0) - (dailyCashData.cashIn || 0),
+                });
+              }
+            }
+
+            // Finally, remove the daily cash transaction from its determined collection
+            await remove(ref(db, `${collectionPath}/${transactionId}`));
           }
         );
       },
@@ -1047,22 +854,87 @@ export function DataProvider({ children }) {
           throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
         }
 
-        return executeAtomicOperation(
+        return atomicOperations.execute(
           "updateDailyCashTransaction",
           async () => {
-            const transactionRef = ref(
-              db,
-              `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
+            let originalData = null;
+            let originalCollectionPath = null;
+
+            // Try to fetch from income collection
+            const incomeSnapshot = await get(
+              ref(db, `${COLLECTION_REFS.DAILY_CASH_INCOME}/${transactionId}`)
             );
-            await update(transactionRef, {
-              ...updatedData,
-              updatedAt: serverTimestamp(),
-            });
+            if (incomeSnapshot.exists()) {
+              originalData = incomeSnapshot.val();
+              originalCollectionPath = COLLECTION_REFS.DAILY_CASH_INCOME;
+            } else {
+              // If not found in income, try expense collection
+              const expenseSnapshot = await get(
+                ref(db, `${COLLECTION_REFS.DAILY_CASH_EXPENSE}/${transactionId}`)
+              );
+              if (expenseSnapshot.exists()) {
+                originalData = expenseSnapshot.val();
+                originalCollectionPath = COLLECTION_REFS.DAILY_CASH_EXPENSE;
+              }
+            }
+
+            if (!originalData || !originalCollectionPath) {
+              throw new Error("Original transaction not found in any daily cash collection.");
+            }
+
+            const updatedCollectionPath =
+              updatedData.cashIn > 0
+                ? COLLECTION_REFS.DAILY_CASH_INCOME
+                : COLLECTION_REFS.DAILY_CASH_EXPENSE;
+
+            // If the collection path changes, move the transaction
+            if (originalCollectionPath !== updatedCollectionPath) {
+              // Delete from old collection
+              await remove(ref(db, `${originalCollectionPath}/${transactionId}`));
+
+              // Add to new collection
+              await set(ref(db, `${updatedCollectionPath}/${transactionId}`), {
+                ...updatedData,
+                updatedAt: serverTimestamp(),
+              });
+            } else {
+              // Update in the current collection
+              await update(ref(db, `${originalCollectionPath}/${transactionId}`), {
+                ...updatedData,
+                updatedAt: serverTimestamp(),
+              });
+            }
+
+            // If it's a sale, update the related customer transaction
+            if (
+              originalData &&
+              originalData.type === "sale" &&
+              originalData.reference
+            ) {
+              const customerTransactionRef = query(
+                ref(db, "transactions"),
+                orderByChild("memoNumber"),
+                equalTo(originalData.reference)
+              );
+              const snapshot = await get(customerTransactionRef);
+
+              if (snapshot.exists()) {
+                const [id, transactionData] = Object.entries(snapshot.val())[0];
+                const originalCashIn = originalData.cashIn || 0;
+                const newCashIn = updatedData.cashIn || 0;
+                const depositChange = newCashIn - originalCashIn;
+
+                await update(ref(db, `transactions/${id}`), {
+                  deposit: (transactionData.deposit || 0) + depositChange,
+                });
+              }
+            }
           }
         );
       },
     }),
-    []
+    // Add state as a dependency to ensure atomicOperations has the latest state
+    [state]
   );
 
   // Settings Operations with atomic execution and validation
@@ -1080,7 +952,7 @@ export function DataProvider({ children }) {
       throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
     }
 
-    return executeAtomicOperation("updateSettings", async () => {
+    return atomicOperations.execute("updateSettings", async () => {
       // Update settings in Firebase
       await update(ref(db, "settings"), newSettings);
 
@@ -1094,295 +966,35 @@ export function DataProvider({ children }) {
     });
   }, []);
 
-  // Fabric Operations with atomic execution, validation, and batch-level locking
-  // Updated for flattened structure where batches are nested within fabrics
+  // Placeholder for batch locking mechanisms
+  const acquireBatchLock = useCallback(async (batchId) => {
+    // In a real application, this would involve a distributed lock
+    // For now, we'll just log and return true
+    logger.info(`[Lock] Acquiring lock for batch: ${batchId}`);
+    return true;
+  }, []);
+
+  const releaseBatchLock = useCallback(async (batchId) => {
+    // In a real application, this would release the distributed lock
+    logger.info(`[Lock] Releasing lock for batch: ${batchId}`);
+  }, []);
+
+  // Fabric Operations using service
   const fabricOperations = useMemo(
     () => ({
-      addFabric: async (fabricData) => {
-        // Validate fabric data
-        const validationErrors = validateFabricData(fabricData);
-        if (validationErrors.length > 0) {
-          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
-        }
-
-        return executeAtomicOperation("addFabric", async () => {
-          const fabricsRef = ref(db, COLLECTION_REFS.FABRICS);
-          const newFabricRef = push(fabricsRef);
-          const fabricId = newFabricRef.key;
-
-          // Create fabric with empty batches object
-          await set(newFabricRef, {
-            ...fabricData,
-            batches: {},
-            createdAt: new Date().toISOString(),
-          });
-          return fabricId;
-        });
-      },
-
-      updateFabric: async (fabricId, updatedData) => {
-        // Validate fabric data
-        const validationErrors = validateFabricData(updatedData);
-        if (validationErrors.length > 0) {
-          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
-        }
-
-        return executeAtomicOperation("updateFabric", async () => {
-          const fabricRef = ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`);
-          await update(fabricRef, {
-            ...updatedData,
-            updatedAt: new Date().toISOString(),
-          });
-        });
-      },
-
-      deleteFabric: async (fabricId) => {
-        return executeAtomicOperation("deleteFabric", async () => {
-          // With flattened structure, batches are automatically deleted when fabric is deleted
-          await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
-        });
-      },
-
-      addFabricBatch: async (batchData) => {
-        // Validate batch data
-        const validationErrors = validateBatchData(batchData);
-        if (validationErrors.length > 0) {
-          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
-        }
-
-        const { fabricId, ...batchDetails } = batchData;
-
-        return executeAtomicOperation("addFabricBatch", async () => {
-          const fabricRef = ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`);
-          const fabricSnapshot = await get(fabricRef);
-
-          if (!fabricSnapshot.exists()) {
-            throw new Error(`Fabric with ID ${fabricId} not found`);
-          }
-
-          const fabricData = fabricSnapshot.val();
-          const batchId = `batch_${Date.now()}_${Math.random()
-            .toString(36)
-            .substr(2, 9)}`;
-
-          // Add batch to fabric's batches object
-          const updatedBatches = {
-            ...(fabricData.batches || {}),
-            [batchId]: {
-              ...batchDetails,
-              createdAt: new Date().toISOString(),
-            },
-          };
-
-          await update(fabricRef, {
-            batches: updatedBatches,
-            updatedAt: new Date().toISOString(),
-          });
-
-          return batchId;
-        });
-      },
-
-      updateFabricBatch: async (fabricId, batchId, updatedData) => {
-        // Validate batch data
-        const validationErrors = validateBatchData(updatedData);
-        if (validationErrors.length > 0) {
-          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
-        }
-
-        return executeAtomicOperation("updateFabricBatch", async () => {
-          const fabricRef = ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`);
-          const fabricSnapshot = await get(fabricRef);
-
-          if (!fabricSnapshot.exists()) {
-            throw new Error(`Fabric with ID ${fabricId} not found`);
-          }
-
-          const fabricData = fabricSnapshot.val();
-          if (!fabricData.batches || !fabricData.batches[batchId]) {
-            throw new Error(
-              `Batch with ID ${batchId} not found in fabric ${fabricId}`
-            );
-          }
-
-          // Update the specific batch
-          const updatedBatches = {
-            ...fabricData.batches,
-            [batchId]: {
-              ...fabricData.batches[batchId],
-              ...updatedData,
-              updatedAt: new Date().toISOString(),
-            },
-          };
-
-          await update(fabricRef, {
-            batches: updatedBatches,
-            updatedAt: new Date().toISOString(),
-          });
-        });
-      },
-
-      reduceInventory: async (saleProducts) => {
-        return executeAtomicOperation("reduceInventory", async () => {
-          logger.info(
-            "[DataContext] Reducing inventory for products:",
-            saleProducts
-          );
-
-          // Validate input products
-          if (!Array.isArray(saleProducts) || saleProducts.length === 0) {
-            throw new Error("No products provided for inventory reduction");
-          }
-
-          const updatePromises = [];
-          const lockedBatches = new Set();
-
-          try {
-            for (const product of saleProducts) {
-              logger.info(
-                `[DataContext] Processing product: ${product.name}, quantity: ${product.quantity}, color: ${product.color}`
-              );
-
-              // Validate product data
-              if (!product.fabricId) {
-                throw new Error(
-                  `Product "${product.name}" has no fabric ID. Please select a valid product.`
-                );
-              }
-
-              if (!product.quantity || product.quantity <= 0) {
-                throw new Error(
-                  `Invalid quantity for product "${product.name}"`
-                );
-              }
-
-              const fabricRef = ref(
-                db,
-                `${COLLECTION_REFS.FABRICS}/${product.fabricId}`
-              );
-              const fabricSnapshot = await get(fabricRef);
-
-              if (!fabricSnapshot.exists()) {
-                throw new Error(
-                  `Fabric "${product.name}" (ID: ${product.fabricId}) not found in database`
-                );
-              }
-
-              const fabricData = fabricSnapshot.val();
-              if (
-                !fabricData.batches ||
-                Object.keys(fabricData.batches).length === 0
-              ) {
-                throw new Error(
-                  `No batches found for fabric "${product.name}". Please purchase stock for this fabric first.`
-                );
-              }
-
-              let remainingQuantity = product.quantity;
-
-              // Sort batches by purchase date (FIFO)
-              const sortedBatches = Object.entries(fabricData.batches)
-                .map(([batchId, batch]) => ({ batchId, ...batch }))
-                .sort(
-                  (a, b) =>
-                    new Date(a.purchaseDate || a.createdAt) -
-                    new Date(b.purchaseDate || b.createdAt)
-                );
-
-              for (const batch of sortedBatches) {
-                if (remainingQuantity <= 0) break;
-
-                // Acquire lock for this batch
-                const lockAcquired = await acquireBatchLock(batch.batchId);
-                if (!lockAcquired) {
-                  throw new Error(
-                    `Could not acquire lock for batch ${batch.batchId}. Please try again.`
-                  );
-                }
-                lockedBatches.add(batch.batchId);
-
-                if (!batch.items || !Array.isArray(batch.items)) {
-                  logger.warn(
-                    `[DataContext] Batch ${batch.batchId} has no items array`
-                  );
-                  continue;
-                }
-
-                // Find items that match the color (if specified) or any item if no color
-                const eligibleItems = batch.items.filter((item) => {
-                  if (product.color) {
-                    return (
-                      item.colorName === product.color &&
-                      (item.quantity || 0) > 0
-                    );
-                  }
-                  return (item.quantity || 0) > 0;
-                });
-
-                for (const item of eligibleItems) {
-                  if (remainingQuantity <= 0) break;
-
-                  const availableQuantity = item.quantity || 0;
-                  const quantityToReduce = Math.min(
-                    availableQuantity,
-                    remainingQuantity
-                  );
-
-                  if (quantityToReduce > 0) {
-                    // Update the item quantity
-                    item.quantity = availableQuantity - quantityToReduce;
-                    remainingQuantity -= quantityToReduce;
-
-                    logger.info(
-                      `[DataContext] Reduced ${quantityToReduce} from batch ${
-                        batch.batchId
-                      }, item: ${item.colorName || "no color"}`
-                    );
-                  }
-                }
-
-                // If we modified any items in this batch, add to update promises
-                if (remainingQuantity < product.quantity) {
-                  updatePromises.push(
-                    fabricOperations.updateFabricBatch(
-                      product.fabricId,
-                      batch.batchId,
-                      {
-                        fabricId: product.fabricId, // Add this line
-                        items: batch.items,
-                      }
-                    )
-                  );
-                }
-              }
-
-              if (remainingQuantity > 0) {
-                logger.warn(
-                  `[DataContext] Could not reduce full quantity for ${product.name}. Remaining: ${remainingQuantity}`
-                );
-                throw new Error(
-                  `Insufficient stock for ${product.name}. Only ${
-                    product.quantity - remainingQuantity
-                  } units available.`
-                );
-              }
-            }
-
-            // Wait for all batch updates to complete
-            await Promise.all(updatePromises);
-            logger.info(
-              "[DataContext] Inventory reduction completed successfully"
-            );
-          } finally {
-            // Release all acquired locks
-            for (const batchId of lockedBatches) {
-              await releaseBatchLock(batchId);
-            }
-          }
-        });
-      },
+      addFabric: fabricService.addFabric.bind(fabricService),
+      updateFabric: fabricService.updateFabric.bind(fabricService),
+      deleteFabric: fabricService.deleteFabric.bind(fabricService),
+      addFabricBatch: fabricService.addFabricBatch.bind(fabricService),
+      updateFabricBatch: fabricService.updateFabricBatch.bind(fabricService),
+      reduceInventory: (saleProducts) =>
+        fabricService.reduceInventory(
+          saleProducts,
+          acquireBatchLock,
+          releaseBatchLock
+        ),
     }),
-    []
+    [fabricService, acquireBatchLock, releaseBatchLock]
   );
 
   const contextValue = useMemo(

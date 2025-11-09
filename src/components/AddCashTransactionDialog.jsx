@@ -32,8 +32,11 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.description || (!formData.cashIn && !formData.cashOut)) {
-      alert("Please fill in all required fields");
+    const cashIn = parseFloat(formData.cashIn) || 0;
+    const cashOut = parseFloat(formData.cashOut) || 0;
+
+    if (!formData.description || (cashIn === 0 && cashOut === 0)) {
+      alert("Please fill in description and at least one cash field.");
       return;
     }
 
@@ -117,6 +120,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, cashIn: e.target.value }))
                   }
+                  disabled={!!formData.cashOut}
                   placeholder="0.00"
                   min="0"
                   step="0.01"
@@ -134,6 +138,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                       cashOut: e.target.value,
                     }))
                   }
+                  disabled={!!formData.cashIn}
                   placeholder="0.00"
                   min="0"
                   step="0.01"
