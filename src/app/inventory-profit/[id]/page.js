@@ -1,7 +1,7 @@
 "use client";
 import React, { useMemo } from "react";
 import { useParams } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useData } from "@/contexts/data-context";
 import {
   Table,
   TableBody,

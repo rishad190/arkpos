@@ -317,7 +317,7 @@ export default function CashMemoPage() {
   );
 
   const handlePrint = () => {
-    utils.printElement("print-section", "Print Memo");
+    utils.printElement("print-section");
   };
 
   const handleSelectCustomer = (customer) => {

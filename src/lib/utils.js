@@ -176,8 +176,27 @@ export const exportToPDF = (data, filename, options = {}) => {
     return true;
   } catch (error) {
     console.error("Error exporting PDF:", error);
-    alert("Failed to export PDF. Please try again.");
     return false;
+  }
+};
+
+/**
+ * Prints the content of a specified HTML element.
+ * @param {string} elementId - The ID of the HTML element to print.
+ */
+export const printElement = (elementId) => {
+  const printContent = document.getElementById(elementId);
+  if (printContent) {
+    const originalContents = document.body.innerHTML;
+    const printArea = printContent.innerHTML;
+
+    document.body.innerHTML = printArea;
+    window.print();
+    document.body.innerHTML = originalContents;
+    window.location.reload(); // Reload to restore original state and scripts
+  } else {
+    console.error(`Element with ID "${elementId}" not found for printing.`);
+    alert("Could not find the content to print.");
   }
 };
 
