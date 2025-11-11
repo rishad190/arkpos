@@ -4,12 +4,17 @@ import autoTable from "jspdf-autotable";
 
 export const formatCurrencyForPDF = (amount) => {
   try {
-    if (amount === undefined || amount === null) return "৳0";
+    console.log("Formatting amount:", amount); // Log the input
+    if (amount === undefined || amount === null || amount === "") return "৳0";
     const numAmount = Number(amount);
     if (isNaN(numAmount)) {
-      throw new Error("Invalid amount");
+      console.warn("Invalid amount detected:", amount);
+      return "৳0";
     }
-    return `${numAmount}`;
+    return `${numAmount.toLocaleString("en-IN", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })}`;
   } catch (error) {
     console.error("Error formatting currency:", error);
     return "৳0";
@@ -91,10 +96,10 @@ export const exportToPDF = (entity, transactions, type) => {
     doc.setFontSize(24);
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.text("Sky Fabric's", 15, 20);
+    doc.text("ARK ENTERPRISE", 15, 20);
 
     // Document type
-    doc.setFontSize(16);
+    doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
     doc.text(
       `${type === "customer" ? "Customer" : "Supplier"} Statement`,
@@ -319,15 +324,23 @@ export const exportToPDF = (entity, transactions, type) => {
     }
 
     // Save PDF
-    const fileName = `${entity.name.replace(
-      /\s+/g,
-      "-"
-    )}-${type}-statement-${formatDate(new Date())}.pdf`;
-    doc.save(fileName);
-    return fileName;
+    try {
+      const fileName = `${entity.name.replace(
+        /\s+/g,
+        "-"
+      )}-${type}-statement-${formatDate(new Date())}.pdf`;
+      doc.save(fileName);
+      return fileName;
+    } catch (saveError) {
+      console.error("Error saving PDF:", saveError);
+      alert("Failed to save the PDF. Please try again.");
+      return null;
+    }
   } catch (error) {
     console.error("Error exporting PDF:", error);
-    alert("Failed to export PDF. Please try again.");
+    alert(
+      `Failed to export PDF due to an unexpected error: ${error.message}. Please check the console for more details.`
+    );
     return null;
   }
 };

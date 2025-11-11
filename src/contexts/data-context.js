@@ -595,17 +595,6 @@ export function DataProvider({ children }) {
       },
 
       updateSupplier: async (supplierId, updatedData) => {
-        // Validate supplier data
-        const validationErrors = [];
-        if (!updatedData.name?.trim())
-          validationErrors.push("Supplier name is required");
-        if (!updatedData.phone?.trim())
-          validationErrors.push("Phone number is required");
-
-        if (validationErrors.length > 0) {
-          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
-        }
-
         return atomicOperations.execute("updateSupplier", async () => {
           const supplierRef = ref(
             db,

@@ -53,7 +53,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { formatDate, exportToCSV, exportToPDF } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { exportToCSV, exportToPDF } from "@/utils/export";
 import { TRANSACTION_CONSTANTS, ERROR_MESSAGES } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -522,13 +523,30 @@ export default function CustomerDetail() {
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() =>
+                      onClick={() => {
+                        const validTransactions =
+                          customerTransactionsWithBalance.filter(
+                            (t) =>
+                              t.total !== null &&
+                              !isNaN(t.total) &&
+                              t.deposit !== null &&
+                              !isNaN(t.deposit)
+                          );
+                        if (validTransactions.length === 0) {
+                          toast({
+                            title: "No Data to Export",
+                            description:
+                              "There are no valid transactions to export.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
                         exportToPDF(
                           customer,
-                          customerTransactionsWithBalance,
+                          validTransactions,
                           "customer"
-                        )
-                      }
+                        );
+                      }}
                       disabled={loadingState.action}
                     >
                       <FileText className="mr-2 h-4 w-4" />

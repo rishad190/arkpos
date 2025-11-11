@@ -63,14 +63,7 @@ export default function SupplierDetail() {
     action: false,
   });
 
-  // Format date to DD-MM-YYYY
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}-${month}-${year}`;
-  };
+
 
   // Fetch supplier and transactions data
   useEffect(() => {
@@ -157,6 +150,7 @@ export default function SupplierDetail() {
         (transaction.totalAmount - (transaction.paidAmount || 0));
 
       await updateSupplier(params.id, {
+        ...supplier,
         totalDue: newTotalDue,
         updatedAt: new Date().toISOString(),
       });
@@ -223,6 +217,7 @@ export default function SupplierDetail() {
       await update(transactionRef, updatedData);
 
       await updateSupplier(params.id, {
+        ...supplier,
         totalDue: Math.max(0, (supplier.totalDue || 0) + dueDifference),
         updatedAt: new Date().toISOString(),
       });
@@ -295,6 +290,7 @@ export default function SupplierDetail() {
     try {
       setLoading((prev) => ({ ...prev, action: true }));
       await updateSupplier(params.id, {
+        ...supplier,
         totalDue: derivedTotalDue,
         updatedAt: new Date().toISOString(),
       });

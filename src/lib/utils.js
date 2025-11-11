@@ -158,7 +158,9 @@ export const exportToPDF = (data, filename, options = {}) => {
     autoTable(doc, {
       startY: 40,
       head: [columns.map((col) => col.header)],
-      body: data.map((row) => columns.map((col) => row[col.dataKey])),
+      body: data.map((row) =>
+        columns.map((col) => String(row[col.dataKey] ?? ""))
+      ),
       theme: "grid",
       headStyles: {
         fillColor: [51, 51, 51],
