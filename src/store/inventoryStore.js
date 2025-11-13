@@ -2,9 +2,7 @@ import { create } from "zustand";
 import { db } from "@/lib/firebase";
 import logger from "@/utils/logger";
 import { FabricService } from "@/services/fabricService";
-import { AtomicOperationService } from "@/services/atomicOperations";
-
-const fabricService = new FabricService(db, logger, new AtomicOperationService());
+import { useAppStore } from "@/store/appStore"; // Import app store
 
 // Placeholder for batch locking mechanisms
 const acquireBatchLock = async (batchId) => {
@@ -15,6 +13,31 @@ const acquireBatchLock = async (batchId) => {
 const releaseBatchLock = async (batchId) => {
   logger.info(`[Lock] Releasing lock for batch: ${batchId}`);
 };
+
+// Helper function to lazily get the initialized service
+const getAtomicService = () => {
+  const service = useAppStore.getState().atomicOperations;
+  if (!service) {
+    logger.error(
+      "AtomicOperationService not yet available in appStore",
+      "inventoryStore"
+    );
+    return {
+      execute: () => Promise.reject(new Error("Atomic service not ready.")),
+    };
+  }
+  return service;
+};
+
+// Create a lazy wrapper for the service
+const lazyAtomicOperations = {
+  execute: (operationName, operationFn, fallbackFn = null) => {
+    return getAtomicService().execute(operationName, operationFn, fallbackFn);
+  },
+};
+
+// Instantiate FabricService using the lazy wrapper
+const fabricService = new FabricService(db, logger, lazyAtomicOperations);
 
 export const useInventoryStore = create((set) => ({
   fabrics: [],
@@ -56,7 +79,10 @@ export const useInventoryStore = create((set) => ({
 
   addFabricBatch: async (fabricId, batchData) => {
     try {
-      const newBatchId = await fabricService.addFabricBatch(fabricId, batchData);
+      const newBatchId = await fabricService.addFabricBatch(
+        fabricId,
+        batchData
+      );
       // State updated by listener
       return newBatchId;
     } catch (error) {

@@ -14,16 +14,43 @@ import {
 import { db } from "@/lib/firebase";
 import logger from "@/utils/logger";
 import { TransactionService } from "@/services/transactionService";
-import { AtomicOperationService } from "@/services/atomicOperations";
-
-const transactionService = new TransactionService(db, logger, new AtomicOperationService());
-const atomicOperations = new AtomicOperationService();
+import { useAppStore } from "@/store/appStore"; // Import app store
 
 const COLLECTION_REFS = {
   TRANSACTIONS: "transactions",
   DAILY_CASH_INCOME: "dailyCashIncome",
   DAILY_CASH_EXPENSE: "dailyCashExpense",
 };
+
+// Helper function to lazily get the initialized service
+const getAtomicService = () => {
+  const service = useAppStore.getState().atomicOperations;
+  if (!service) {
+    logger.error(
+      "AtomicOperationService not yet available in appStore",
+      "transactionStore"
+    );
+    return {
+      execute: () => Promise.reject(new Error("Atomic service not ready.")),
+    };
+  }
+  return service;
+};
+
+// Create a lazy wrapper for the service
+const lazyAtomicOperations = {
+  execute: (operationName, operationFn, fallbackFn = null) => {
+    return getAtomicService().execute(operationName, operationFn, fallbackFn);
+  },
+};
+
+// Instantiate services using the lazy wrapper
+const transactionService = new TransactionService(
+  db,
+  logger,
+  lazyAtomicOperations
+);
+const atomicOperations = lazyAtomicOperations; // This store also uses it directly
 
 export const useTransactionStore = create((set, get) => ({
   transactions: [],
@@ -39,7 +66,9 @@ export const useTransactionStore = create((set, get) => ({
   // Transaction Operations
   addTransaction: async (transactionData) => {
     try {
-      const newTransactionId = await transactionService.addTransaction(transactionData);
+      const newTransactionId = await transactionService.addTransaction(
+        transactionData
+      );
       // State updated by listener
       return newTransactionId;
     } catch (error) {
@@ -72,49 +101,60 @@ export const useTransactionStore = create((set, get) => ({
   addDailyCashTransaction: async (transaction) => {
     const validationErrors = [];
     if (!transaction.date) validationErrors.push("Date is required");
-    if (!transaction.description?.trim()) validationErrors.push("Description is required");
+    if (!transaction.description?.trim())
+      validationErrors.push("Description is required");
     if ((transaction.cashIn || 0) < 0 || (transaction.cashOut || 0) < 0) {
       validationErrors.push("Cash amounts cannot be negative");
     }
 
     if (validationErrors.length > 0) {
-      const error = new Error(`Validation failed: ${validationErrors.join(", ")}`);
+      const error = new Error(
+        `Validation failed: ${validationErrors.join(", ")}`
+      );
       set({ error });
       throw error;
     }
 
     try {
-      return await atomicOperations.execute("addDailyCashTransaction", async () => {
-        const collectionPath =
-          transaction.cashIn > 0
-            ? COLLECTION_REFS.DAILY_CASH_INCOME
-            : COLLECTION_REFS.DAILY_CASH_EXPENSE;
-        const dailyCashRef = ref(db, collectionPath);
-        const newTransactionRef = push(dailyCashRef);
-        await set(newTransactionRef, {
-          ...transaction,
-          id: newTransactionRef.key,
-          createdAt: serverTimestamp(),
-        });
+      return await atomicOperations.execute(
+        "addDailyCashTransaction",
+        async () => {
+          const collectionPath =
+            transaction.cashIn > 0
+              ? COLLECTION_REFS.DAILY_CASH_INCOME
+              : COLLECTION_REFS.DAILY_CASH_EXPENSE;
+          const dailyCashRef = ref(db, collectionPath);
+          const newTransactionRef = push(dailyCashRef);
+          await set(newTransactionRef, {
+            ...transaction,
+            id: newTransactionRef.key,
+            createdAt: serverTimestamp(),
+          });
 
-        if (transaction.type === "sale" && transaction.reference) {
-          const customerTransactionRef = query(
-            ref(db, "transactions"),
-            orderByChild("memoNumber"),
-            equalTo(transaction.reference)
-          );
+          if (transaction.type === "sale" && transaction.reference) {
+            const customerTransactionRef = query(
+              ref(db, "transactions"),
+              orderByChild("memoNumber"),
+              equalTo(transaction.reference)
+            );
 
-          const snapshot = await get(customerTransactionRef);
-          if (snapshot.exists()) {
-            const [transactionId, transactionData] = Object.entries(snapshot.val())[0];
-            await update(ref(db, `transactions/${transactionId}`), {
-              deposit: (transactionData.deposit || 0) + (transaction.cashIn || 0),
-              due: transactionData.total - ((transactionData.deposit || 0) + (transaction.cashIn || 0)),
-            });
+            const snapshot = await get(customerTransactionRef);
+            if (snapshot.exists()) {
+              const [transactionId, transactionData] = Object.entries(
+                snapshot.val()
+              )[0];
+              await update(ref(db, `transactions/${transactionId}`), {
+                deposit:
+                  (transactionData.deposit || 0) + (transaction.cashIn || 0),
+                due:
+                  transactionData.total -
+                  ((transactionData.deposit || 0) + (transaction.cashIn || 0)),
+              });
+            }
           }
+          return newTransactionRef.key;
         }
-        return newTransactionRef.key;
-      });
+      );
     } catch (error) {
       logger.error("Error adding daily cash transaction:", error);
       set({ error });
@@ -123,44 +163,54 @@ export const useTransactionStore = create((set, get) => ({
 
   deleteDailyCashTransaction: async (transactionId) => {
     try {
-      return await atomicOperations.execute("deleteDailyCashTransaction", async () => {
-        let dailyCashData = null;
-        let collectionPath = null;
+      return await atomicOperations.execute(
+        "deleteDailyCashTransaction",
+        async () => {
+          let dailyCashData = null;
+          let collectionPath = null;
 
-        const incomeSnapshot = await get(ref(db, `${COLLECTION_REFS.DAILY_CASH_INCOME}/${transactionId}`));
-        if (incomeSnapshot.exists()) {
-          dailyCashData = incomeSnapshot.val();
-          collectionPath = COLLECTION_REFS.DAILY_CASH_INCOME;
-        } else {
-          const expenseSnapshot = await get(ref(db, `${COLLECTION_REFS.DAILY_CASH_EXPENSE}/${transactionId}`));
-          if (expenseSnapshot.exists()) {
-            dailyCashData = expenseSnapshot.val();
-            collectionPath = COLLECTION_REFS.DAILY_CASH_EXPENSE;
-          }
-        }
-
-        if (!dailyCashData || !collectionPath) {
-          throw new Error("Transaction not found in any daily cash collection.");
-        }
-
-        if (dailyCashData.type === "sale" && dailyCashData.reference) {
-          const customerTransactionRef = query(
-            ref(db, "transactions"),
-            orderByChild("memoNumber"),
-            equalTo(dailyCashData.reference)
+          const incomeSnapshot = await get(
+            ref(db, `${COLLECTION_REFS.DAILY_CASH_INCOME}/${transactionId}`)
           );
-          const snapshot = await get(customerTransactionRef);
-
-          if (snapshot.exists()) {
-            const [id, transactionData] = Object.entries(snapshot.val())[0];
-            await update(ref(db, `transactions/${id}`), {
-              deposit: (transactionData.deposit || 0) - (dailyCashData.cashIn || 0),
-            });
+          if (incomeSnapshot.exists()) {
+            dailyCashData = incomeSnapshot.val();
+            collectionPath = COLLECTION_REFS.DAILY_CASH_INCOME;
+          } else {
+            const expenseSnapshot = await get(
+              ref(db, `${COLLECTION_REFS.DAILY_CASH_EXPENSE}/${transactionId}`)
+            );
+            if (expenseSnapshot.exists()) {
+              dailyCashData = expenseSnapshot.val();
+              collectionPath = COLLECTION_REFS.DAILY_CASH_EXPENSE;
+            }
           }
-        }
 
-        await remove(ref(db, `${collectionPath}/${transactionId}`));
-      });
+          if (!dailyCashData || !collectionPath) {
+            throw new Error(
+              "Transaction not found in any daily cash collection."
+            );
+          }
+
+          if (dailyCashData.type === "sale" && dailyCashData.reference) {
+            const customerTransactionRef = query(
+              ref(db, "transactions"),
+              orderByChild("memoNumber"),
+              equalTo(dailyCashData.reference)
+            );
+            const snapshot = await get(customerTransactionRef);
+
+            if (snapshot.exists()) {
+              const [id, transactionData] = Object.entries(snapshot.val())[0];
+              await update(ref(db, `transactions/${id}`), {
+                deposit:
+                  (transactionData.deposit || 0) - (dailyCashData.cashIn || 0),
+              });
+            }
+          }
+
+          await remove(ref(db, `${collectionPath}/${transactionId}`));
+        }
+      );
     } catch (error) {
       logger.error("Error deleting daily cash transaction:", error);
       set({ error });
@@ -170,76 +220,89 @@ export const useTransactionStore = create((set, get) => ({
   updateDailyCashTransaction: async (transactionId, updatedData) => {
     const validationErrors = [];
     if (!updatedData.date) validationErrors.push("Date is required");
-    if (!updatedData.description?.trim()) validationErrors.push("Description is required");
+    if (!updatedData.description?.trim())
+      validationErrors.push("Description is required");
     if ((updatedData.cashIn || 0) < 0 || (updatedData.cashOut || 0) < 0) {
       validationErrors.push("Cash amounts cannot be negative");
     }
 
     if (validationErrors.length > 0) {
-      const error = new Error(`Validation failed: ${validationErrors.join(", ")}`);
+      const error = new Error(
+        `Validation failed: ${validationErrors.join(", ")}`
+      );
       set({ error });
       throw error;
     }
 
     try {
-      return await atomicOperations.execute("updateDailyCashTransaction", async () => {
-        let originalData = null;
-        let originalCollectionPath = null;
+      return await atomicOperations.execute(
+        "updateDailyCashTransaction",
+        async () => {
+          let originalData = null;
+          let originalCollectionPath = null;
 
-        const incomeSnapshot = await get(ref(db, `${COLLECTION_REFS.DAILY_CASH_INCOME}/${transactionId}`));
-        if (incomeSnapshot.exists()) {
-          originalData = incomeSnapshot.val();
-          originalCollectionPath = COLLECTION_REFS.DAILY_CASH_INCOME;
-        } else {
-          const expenseSnapshot = await get(ref(db, `${COLLECTION_REFS.DAILY_CASH_EXPENSE}/${transactionId}`));
-          if (expenseSnapshot.exists()) {
-            originalData = expenseSnapshot.val();
-            originalCollectionPath = COLLECTION_REFS.DAILY_CASH_EXPENSE;
-          }
-        }
-
-        if (!originalData || !originalCollectionPath) {
-          throw new Error("Original transaction not found.");
-        }
-
-        const updatedCollectionPath =
-          updatedData.cashIn > 0
-            ? COLLECTION_REFS.DAILY_CASH_INCOME
-            : COLLECTION_REFS.DAILY_CASH_EXPENSE;
-
-        if (originalCollectionPath !== updatedCollectionPath) {
-          await remove(ref(db, `${originalCollectionPath}/${transactionId}`));
-          await set(ref(db, `${updatedCollectionPath}/${transactionId}`), {
-            ...updatedData,
-            updatedAt: serverTimestamp(),
-          });
-        } else {
-          await update(ref(db, `${originalCollectionPath}/${transactionId}`), {
-            ...updatedData,
-            updatedAt: serverTimestamp(),
-          });
-        }
-
-        if (originalData.type === "sale" && originalData.reference) {
-          const customerTransactionRef = query(
-            ref(db, "transactions"),
-            orderByChild("memoNumber"),
-            equalTo(originalData.reference)
+          const incomeSnapshot = await get(
+            ref(db, `${COLLECTION_REFS.DAILY_CASH_INCOME}/${transactionId}`)
           );
-          const snapshot = await get(customerTransactionRef);
+          if (incomeSnapshot.exists()) {
+            originalData = incomeSnapshot.val();
+            originalCollectionPath = COLLECTION_REFS.DAILY_CASH_INCOME;
+          } else {
+            const expenseSnapshot = await get(
+              ref(db, `${COLLECTION_REFS.DAILY_CASH_EXPENSE}/${transactionId}`)
+            );
+            if (expenseSnapshot.exists()) {
+              originalData = expenseSnapshot.val();
+              originalCollectionPath = COLLECTION_REFS.DAILY_CASH_EXPENSE;
+            }
+          }
 
-          if (snapshot.exists()) {
-            const [id, transactionData] = Object.entries(snapshot.val())[0];
-            const originalCashIn = originalData.cashIn || 0;
-            const newCashIn = updatedData.cashIn || 0;
-            const depositChange = newCashIn - originalCashIn;
+          if (!originalData || !originalCollectionPath) {
+            throw new Error("Original transaction not found.");
+          }
 
-            await update(ref(db, `transactions/${id}`), {
-              deposit: (transactionData.deposit || 0) + depositChange,
+          const updatedCollectionPath =
+            updatedData.cashIn > 0
+              ? COLLECTION_REFS.DAILY_CASH_INCOME
+              : COLLECTION_REFS.DAILY_CASH_EXPENSE;
+
+          if (originalCollectionPath !== updatedCollectionPath) {
+            await remove(ref(db, `${originalCollectionPath}/${transactionId}`));
+            await set(ref(db, `${updatedCollectionPath}/${transactionId}`), {
+              ...updatedData,
+              updatedAt: serverTimestamp(),
             });
+          } else {
+            await update(
+              ref(db, `${originalCollectionPath}/${transactionId}`),
+              {
+                ...updatedData,
+                updatedAt: serverTimestamp(),
+              }
+            );
+          }
+
+          if (originalData.type === "sale" && originalData.reference) {
+            const customerTransactionRef = query(
+              ref(db, "transactions"),
+              orderByChild("memoNumber"),
+              equalTo(originalData.reference)
+            );
+            const snapshot = await get(customerTransactionRef);
+
+            if (snapshot.exists()) {
+              const [id, transactionData] = Object.entries(snapshot.val())[0];
+              const originalCashIn = originalData.cashIn || 0;
+              const newCashIn = updatedData.cashIn || 0;
+              const depositChange = newCashIn - originalCashIn;
+
+              await update(ref(db, `transactions/${id}`), {
+                deposit: (transactionData.deposit || 0) + depositChange,
+              });
+            }
           }
         }
-      });
+      );
     } catch (error) {
       logger.error("Error updating daily cash transaction:", error);
       set({ error });
@@ -249,7 +312,7 @@ export const useTransactionStore = create((set, get) => ({
   getExpenseCategories: () => {
     const { dailyCashExpense } = get();
     const categories = new Set();
-    dailyCashExpense.forEach(transaction => {
+    dailyCashExpense.forEach((transaction) => {
       if (transaction.category) {
         categories.add(transaction.category);
       }

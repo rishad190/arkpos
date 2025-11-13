@@ -56,12 +56,36 @@ export class CustomerService {
    */
   async deleteCustomer(customerId, customerTransactions = []) {
     return this.atomicOperations.execute("deleteCustomer", async () => {
-      // First delete associated transactions
-      for (const transaction of customerTransactions) {
-        await remove(ref(this.db, `transactions/${transaction.id}`));
+      this.logger.info(`Attempting to delete customer: ${customerId}`);
+      this.logger.info(
+        `Number of associated transactions to delete: ${customerTransactions.length}`
+      );
+
+      try {
+        // First delete associated transactions
+        for (const transaction of customerTransactions) {
+          this.logger.info(
+            `Attempting to delete transaction: ${transaction.id} for customer: ${customerId}`
+          );
+          await remove(ref(this.db, `transactions/${transaction.id}`));
+          this.logger.info(
+            `Successfully deleted transaction: ${transaction.id}`
+          );
+        }
+
+        // Then delete the customer
+        this.logger.info(`Attempting to delete customer record: ${customerId}`);
+        await remove(ref(this.db, `${COLLECTION_PATH}/${customerId}`));
+        this.logger.info(`Successfully deleted customer: ${customerId}`);
+      } catch (error) {
+        this.logger.error(
+          `Error during customer or transaction deletion for customer ${customerId}:`,
+          error.message,
+          error.code,
+          error
+        );
+        throw error; // Re-throw the error so it can be caught by the store
       }
-      // Then delete the customer
-      await remove(ref(this.db, `${COLLECTION_PATH}/${customerId}`));
     });
   }
 

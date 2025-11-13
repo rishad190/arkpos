@@ -186,7 +186,11 @@ export default function Dashboard() {
   const handleDeleteCustomer = async (customerId) => {
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await deleteCustomer(customerId);
+      // Filter transactions related to the customer
+      const customerTransactions = transactions.filter(
+        (t) => t.customerId === customerId
+      );
+      await deleteCustomer(customerId, customerTransactions);
       toastSuccess("Customer deleted successfully");
     } catch (error) {
       console.error(ERROR_MESSAGES.DELETE_ERROR, error);

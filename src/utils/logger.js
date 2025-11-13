@@ -22,26 +22,39 @@ class Logger {
     return level <= this.currentLevel;
   }
 
+  // --- START OF FIX ---
+  // Updated formatMessage to properly handle Error objects
   formatMessage(level, message, context = "") {
     const timestamp = new Date().toISOString();
     const levelStr = Object.keys(this.levels).find(
       (key) => this.levels[key] === level
     );
-    const contextStr = context ? `[${context}]` : "";
+
+    let logContext = context;
+
+    // Check if context is an Error and serialize it properly
+    if (context instanceof Error) {
+      logContext = {
+        message: context.message,
+        stack: context.stack,
+        name: context.name,
+      };
+    }
 
     return {
       timestamp,
       level: levelStr,
-      context,
+      context: logContext, // Use the serialized context
       message,
       environment: process.env.NODE_ENV,
     };
   }
+  // --- END OF FIX ---
 
   error(message, context = "") {
     if (this.shouldLog(this.levels.ERROR)) {
       const formatted = this.formatMessage(this.levels.ERROR, message, context);
-      console.error(JSON.stringify(formatted));
+      console.error(JSON.stringify(formatted, null, 2)); // Added null, 2 for readability
 
       // In production, you might want to send to error tracking service
       if (process.env.NODE_ENV === "production") {
@@ -53,21 +66,21 @@ class Logger {
   warn(message, context = "") {
     if (this.shouldLog(this.levels.WARN)) {
       const formatted = this.formatMessage(this.levels.WARN, message, context);
-      console.warn(JSON.stringify(formatted));
+      console.warn(JSON.stringify(formatted, null, 2)); // Added null, 2
     }
   }
 
   info(message, context = "") {
     if (this.shouldLog(this.levels.INFO)) {
       const formatted = this.formatMessage(this.levels.INFO, message, context);
-      console.info(JSON.stringify(formatted));
+      console.info(JSON.stringify(formatted, null, 2)); // Added null, 2
     }
   }
 
   debug(message, context = "") {
     if (this.shouldLog(this.levels.DEBUG)) {
       const formatted = this.formatMessage(this.levels.DEBUG, message, context);
-      console.debug(JSON.stringify(formatted));
+      console.debug(JSON.stringify(formatted, null, 2)); // Added null, 2
     }
   }
 
@@ -124,9 +137,9 @@ class Logger {
     };
 
     if (success) {
-      this.info(JSON.stringify(logData));
+      this.info(JSON.stringify(logData, null, 2)); // Added null, 2
     } else {
-      this.error(JSON.stringify(logData));
+      this.error(JSON.stringify(logData, null, 2)); // Added null, 2
     }
   }
 }

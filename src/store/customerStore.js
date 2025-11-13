@@ -2,9 +2,34 @@ import { create } from "zustand";
 import { db } from "@/lib/firebase";
 import logger from "@/utils/logger";
 import { CustomerService } from "@/services/customerService";
-import { AtomicOperationService } from "@/services/atomicOperations";
+import { useAppStore } from "@/store/appStore"; // Import the app store
 
-const customerService = new CustomerService(db, logger, new AtomicOperationService());
+// Helper function to lazily get the initialized service
+const getAtomicService = () => {
+  const service = useAppStore.getState().atomicOperations;
+  if (!service) {
+    logger.error(
+      "AtomicOperationService not yet available in appStore",
+      "customerStore"
+    );
+    // Return a mock service to prevent crashes, though operations will fail
+    return {
+      execute: () => Promise.reject(new Error("Atomic service not ready.")),
+    };
+  }
+  return service;
+};
+
+// Create a lazy wrapper for the service
+const lazyAtomicOperations = {
+  execute: (operationName, operationFn, fallbackFn = null) => {
+    // Get the service *at the time of execution*
+    return getAtomicService().execute(operationName, operationFn, fallbackFn);
+  },
+};
+
+// Instantiate CustomerService using the lazy wrapper
+const customerService = new CustomerService(db, logger, lazyAtomicOperations);
 
 export const useCustomerStore = create((set, get) => ({
   customers: [],
