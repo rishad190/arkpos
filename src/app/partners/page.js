@@ -428,12 +428,14 @@ export default function PartnerPage() {
             {partnerProducts.map((p) => (
               <Card
                 key={p.id}
-                onClick={() => router.push(`/partners/${p.id}`)}
-                className="cursor-pointer hover:shadow-lg transition-shadow"
+                className="hover:shadow-lg transition-shadow"
               >
                 <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
+                  <div className="flex justify-between items-start gap-4">
+                    <div
+                      className="flex-grow cursor-pointer"
+                      onClick={() => router.push(`/partners/${p.id}`)}
+                    >
                       <CardTitle className="text-base">
                         {p.productName}
                       </CardTitle>
@@ -447,26 +449,21 @@ export default function PartnerPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => e.stopPropagation()}
+                          className="h-8 w-8 flex-shrink-0"
                         >
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onSelect={() => {
-                            requestAnimationFrame(() => handleEdit(p));
-                          }}
+                          onSelect={() => handleEdit(p)}
                         >
                           <Edit className="mr-2 h-4 w-4" />
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-red-500"
-                          onSelect={() => {
-                            requestAnimationFrame(() => setDeleteTarget(p));
-                          }}
+                          onSelect={() => setDeleteTarget(p)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
@@ -475,42 +472,44 @@ export default function PartnerPage() {
                     </DropdownMenu>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Quantity (m)
-                      </span>
-                      <span className="font-medium">
-                        {Number(p.quantityMeter).toLocaleString()}
-                      </span>
+                <div className="cursor-pointer" onClick={() => router.push(`/partners/${p.id}`)}>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Quantity (m)
+                        </span>
+                        <span className="font-medium">
+                          {Number(p.quantityMeter).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Total (USD)
+                        </span>
+                        <span className="font-medium">
+                          ${Number(p.totalPriceDollar || 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Total (Taka)
+                        </span>
+                        <span className="font-medium">
+                          ৳{Number(p.totalPriceTaka || 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Price / Yard (Taka)
+                        </span>
+                        <span className="font-medium">
+                          ৳{Number(p.pricePerYard || 0).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Total (USD)
-                      </span>
-                      <span className="font-medium">
-                        ${Number(p.totalPriceDollar || 0).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Total (Taka)
-                      </span>
-                      <span className="font-medium">
-                        ৳{Number(p.totalPriceTaka || 0).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Price / Yard (Taka)
-                      </span>
-                      <span className="font-medium">
-                        ৳{Number(p.pricePerYard || 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
+                  </CardContent>
+                </div>
               </Card>
             ))}
           </div>

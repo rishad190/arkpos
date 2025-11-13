@@ -46,6 +46,7 @@ const COLLECTION_REFS = {
   FABRIC_BATCHES: "fabricBatches",
   SETTINGS: "settings",
   PERFORMANCE_METRICS: "performanceMetrics",
+  PARTNER_PRODUCTS: "partnerProducts",
 };
 
 // Connection state constants
@@ -82,6 +83,7 @@ const initialState = {
   suppliers: [],
   supplierTransactions: [],
   fabrics: [],
+  partnerProducts: [],
   // Remove fabricBatches from initial state as batches are now nested in fabrics
   loading: true,
   error: null,
@@ -166,6 +168,12 @@ function reducer(state, action) {
       return {
         ...state,
         fabrics: action.payload,
+        loading: false,
+      };
+    case "SET_PARTNER_PRODUCTS":
+      return {
+        ...state,
+        partnerProducts: action.payload,
         loading: false,
       };
     // Remove SET_FABRIC_BATCHES case as batches are now nested in fabrics
@@ -421,6 +429,25 @@ export function DataProvider({ children }) {
           } else {
             logger.info("[DataContext] No fabric data found");
             dispatch({ type: "SET_FABRICS", payload: [] });
+          }
+        },
+      },
+      {
+        path: COLLECTION_REFS.PARTNER_PRODUCTS,
+        setter: (data) => {
+          if (data && typeof data === "object") {
+            const partnerProductsArray = Object.entries(data)
+              .map(([id, productData]) => ({
+                id,
+                ...productData,
+              }))
+              .filter(Boolean);
+            dispatch({
+              type: "SET_PARTNER_PRODUCTS",
+              payload: partnerProductsArray,
+            });
+          } else {
+            dispatch({ type: "SET_PARTNER_PRODUCTS", payload: [] });
           }
         },
       },
@@ -719,6 +746,187 @@ export function DataProvider({ children }) {
     [state.transactions]
   );
 
+  // Partner Product Operations
+  const partnerProductOperations = useMemo(
+    () => ({
+      addPartnerProduct: async (productData) => {
+        return atomicOperations.execute("addPartnerProduct", async () => {
+          const productsRef = ref(db, COLLECTION_REFS.PARTNER_PRODUCTS);
+          const newProductRef = push(productsRef);
+          await set(newProductRef, {
+            ...productData,
+            createdAt: serverTimestamp(),
+          });
+          return newProductRef.key;
+        });
+      },
+      updatePartnerProduct: async (productId, updatedData) => {
+        return atomicOperations.execute("updatePartnerProduct", async () => {
+          const productRef = ref(
+            db,
+            `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`
+          );
+          await update(productRef, {
+            ...updatedData,
+            updatedAt: serverTimestamp(),
+          });
+        });
+      },
+      deletePartnerProduct: async (productId) => {
+        return atomicOperations.execute("deletePartnerProduct", async () => {
+          await remove(
+            ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`)
+          );
+        });
+      },
+
+      addPartnerToProduct: async (productId, partnerName) => {
+        return atomicOperations.execute("addPartnerToProduct", async () => {
+          const productRef = ref(
+            db,
+            `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`
+          );
+          const snapshot = await get(productRef);
+          if (snapshot.exists()) {
+            const productData = snapshot.val();
+            const partnerAccounts = productData.partnerAccounts || [];
+            // Avoid adding duplicate partners
+            if (partnerAccounts.some(p => p.name === partnerName)) {
+              console.warn(`Partner "${partnerName}" already exists for this product.`);
+              return;
+            }
+            const updatedPartnerAccounts = [
+              ...partnerAccounts,
+              { name: partnerName, transactions: [] },
+            ];
+            await update(productRef, { partnerAccounts: updatedPartnerAccounts });
+          }
+        });
+      },
+
+      addTransactionToPartner: async (productId, partnerName, transactionData) => {
+        return atomicOperations.execute("addTransactionToPartner", async () => {
+          const productRef = ref(
+            db,
+            `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`
+          );
+          const snapshot = await get(productRef);
+          if (snapshot.exists()) {
+            const productData = snapshot.val();
+            const partnerAccounts = productData.partnerAccounts || [];
+            const partnerIndex = partnerAccounts.findIndex(p => p.name === partnerName);
+
+            if (partnerIndex === -1) {
+              throw new Error(`Partner "${partnerName}" not found for this product.`);
+            }
+            
+            const newTransaction = {
+              id: Date.now(), // Simple unique ID
+              ...transactionData
+            };
+
+            const updatedPartnerAccounts = [...partnerAccounts];
+            updatedPartnerAccounts[partnerIndex].transactions = [
+              ...(updatedPartnerAccounts[partnerIndex].transactions || []),
+              newTransaction,
+            ];
+
+            await update(productRef, { partnerAccounts: updatedPartnerAccounts });
+          }
+        });
+      },
+
+      updatePartnerName: async (productId, oldName, newName) => {
+        return atomicOperations.execute("updatePartnerName", async () => {
+          const productRef = ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`);
+          const snapshot = await get(productRef);
+          if (snapshot.exists()) {
+            const productData = snapshot.val();
+            const partnerAccounts = productData.partnerAccounts || [];
+            const partnerIndex = partnerAccounts.findIndex(p => p.name === oldName);
+
+            if (partnerIndex === -1) {
+              throw new Error(`Partner "${oldName}" not found.`);
+            }
+
+            const updatedPartnerAccounts = [...partnerAccounts];
+            updatedPartnerAccounts[partnerIndex].name = newName;
+
+            await update(productRef, { partnerAccounts: updatedPartnerAccounts });
+          }
+        });
+      },
+
+      deletePartner: async (productId, partnerName) => {
+        return atomicOperations.execute("deletePartner", async () => {
+          const productRef = ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`);
+          const snapshot = await get(productRef);
+          if (snapshot.exists()) {
+            const productData = snapshot.val();
+            const partnerAccounts = productData.partnerAccounts || [];
+            const updatedPartnerAccounts = partnerAccounts.filter(p => p.name !== partnerName);
+            await update(productRef, { partnerAccounts: updatedPartnerAccounts });
+          }
+        });
+      },
+
+      updatePartnerTransaction: async (productId, partnerName, transactionId, newTransactionData) => {
+        return atomicOperations.execute("updatePartnerTransaction", async () => {
+          const productRef = ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`);
+          const snapshot = await get(productRef);
+          if (snapshot.exists()) {
+            const productData = snapshot.val();
+            const partnerAccounts = productData.partnerAccounts || [];
+            const partnerIndex = partnerAccounts.findIndex(p => p.name === partnerName);
+
+            if (partnerIndex === -1) {
+              throw new Error(`Partner "${partnerName}" not found.`);
+            }
+
+            const transactions = partnerAccounts[partnerIndex].transactions || [];
+            const transactionIndex = transactions.findIndex(t => t.id === transactionId);
+
+            if (transactionIndex === -1) {
+              throw new Error(`Transaction with ID "${transactionId}" not found.`);
+            }
+            
+            const updatedPartnerAccounts = [...partnerAccounts];
+            updatedPartnerAccounts[partnerIndex].transactions[transactionIndex] = {
+              ...updatedPartnerAccounts[partnerIndex].transactions[transactionIndex],
+              ...newTransactionData,
+            };
+
+            await update(productRef, { partnerAccounts: updatedPartnerAccounts });
+          }
+        });
+      },
+
+      deletePartnerTransaction: async (productId, partnerName, transactionId) => {
+        return atomicOperations.execute("deletePartnerTransaction", async () => {
+          const productRef = ref(db, `${COLLECTION_REFS.PARTNER_PRODUCTS}/${productId}`);
+          const snapshot = await get(productRef);
+          if (snapshot.exists()) {
+            const productData = snapshot.val();
+            const partnerAccounts = productData.partnerAccounts || [];
+            const partnerIndex = partnerAccounts.findIndex(p => p.name === partnerName);
+
+            if (partnerIndex === -1) {
+              throw new Error(`Partner "${partnerName}" not found.`);
+            }
+
+            const updatedPartnerAccounts = [...partnerAccounts];
+            updatedPartnerAccounts[partnerIndex].transactions = (updatedPartnerAccounts[partnerIndex].transactions || []).filter(
+              t => t.id !== transactionId
+            );
+
+            await update(productRef, { partnerAccounts: updatedPartnerAccounts });
+          }
+        });
+      },
+    }),
+    [atomicOperations]
+  );
+
   // Daily Cash Operations with atomic execution and validation
   const dailyCashOperations = useMemo(
     () => ({
@@ -993,6 +1201,7 @@ export function DataProvider({ children }) {
       ...customerOperations,
       ...transactionOperations,
       ...supplierOperations,
+      ...partnerProductOperations,
       ...dailyCashOperations,
       ...fabricOperations,
       settings: state.settings,
@@ -1003,6 +1212,7 @@ export function DataProvider({ children }) {
       customerOperations,
       transactionOperations,
       supplierOperations,
+      partnerProductOperations,
       dailyCashOperations,
       fabricOperations,
       updateSettings,
