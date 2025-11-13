@@ -1,7 +1,7 @@
 "use client";
 import React, { useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useData } from "@/contexts/data-context";
+import { useInventoryStore } from "@/store/inventoryStore";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,7 +24,7 @@ import { calculateTotalQuantity } from "@/lib/inventory-utils";
 export default function FabricDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { fabrics } = useData();
+  const fabrics = useInventoryStore((state) => state.fabrics);
 
   // Find the current fabric with its batches (new flattened structure)
   const fabric = useMemo(() => {

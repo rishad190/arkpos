@@ -2,7 +2,7 @@
 import React, { useState, useMemo, Suspense } from "react";
 import logger from "@/utils/logger";
 import { useRouter } from "next/navigation";
-import { useData } from "@/contexts/data-context";
+import { useInventoryStore } from "@/store/inventoryStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InventoryErrorBoundary } from "@/components/ErrorBoundary";
@@ -53,7 +53,7 @@ export default function InventoryPage() {
     deleteFabric,
     addFabricBatch,
     updateFabricBatch,
-  } = useData();
+  } = useInventoryStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingFabric, setEditingFabric] = useState(null);

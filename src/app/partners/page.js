@@ -1,7 +1,8 @@
 "use client";
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/contexts/data-context";
+import { useSupplierStore } from "@/store/supplierStore";
+import { useAppStore } from "@/store/appStore";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -45,13 +46,13 @@ const METER_TO_YARD = 1.09361;
 
 export default function PartnerPage() {
   const router = useRouter();
+  const { suppliers } = useSupplierStore();
   const {
-    suppliers,
     addPartnerProduct,
     partnerProducts,
     deletePartnerProduct,
     updatePartnerProduct,
-  } = useData();
+  } = useAppStore();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);

@@ -18,13 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useData } from "@/contexts/data-context";
-import { useToast } from "@/hooks/use-toast";
-
-const METER_TO_YARD = 1.09361;
-
+import { useSupplierStore } from "@/store/supplierStore";
+// ... other imports
 export function EditPartnerProductDialog({ product, isOpen, onClose, onSave }) {
-  const { suppliers } = useData();
+  const { suppliers } = useSupplierStore();
   const { toast } = useToast();
   const [formData, setFormData] = useState({});
   const [isSaving, setIsSaving] = useState(false);

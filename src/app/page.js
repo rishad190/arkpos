@@ -21,7 +21,10 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { SkeletonLoader } from "@/components/common/SkeletonLoader";
 import { QuickStatCard } from "@/components/QuickStatCard";
 import { RecentTransactions } from "@/components/RecentTransactions";
-import { useData } from "@/contexts/data-context";
+import { useCustomerStore } from "@/store/customerStore";
+import { useTransactionStore } from "@/store/transactionStore";
+import { useInventoryStore } from "@/store/inventoryStore";
+import { useSupplierStore } from "@/store/supplierStore";
 import { useAppToast } from "@/hooks/use-app-toast";
 import {
   CUSTOMER_CONSTANTS,
@@ -61,15 +64,15 @@ export default function Dashboard() {
   const router = useRouter();
   const {
     customers,
-    transactions,
-    fabrics,
-    suppliers,
-    error,
     addCustomer,
     updateCustomer,
     deleteCustomer,
     getCustomerDue,
-  } = useData();
+  } = useCustomerStore();
+  const { transactions } = useTransactionStore();
+  const { fabrics } = useInventoryStore();
+  const { suppliers } = useSupplierStore();
+  const error = null; // Or handle error from a store if available
   const { toastSuccess, toastError } = useAppToast();
 
   const [loadingState, setLoadingState] = useState({

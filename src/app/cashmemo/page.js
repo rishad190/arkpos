@@ -2,7 +2,9 @@
 import { useState, useMemo } from "react"; // REMOVED useRef
 import logger from "@/utils/logger";
 import { useRouter } from "next/navigation";
-import { useData } from "@/contexts/data-context";
+import { useCustomerStore } from "@/store/customerStore";
+import { useTransactionStore } from "@/store/transactionStore";
+import { useInventoryStore } from "@/store/inventoryStore";
 import { CashMemoPrint } from "@/components/CashMemoPrint";
 import { TransactionErrorBoundary } from "@/components/ErrorBoundary";
 // --- REMOVED: useReactToPrint ---
@@ -58,13 +60,9 @@ import { cn } from "@/lib/utils";
 export default function CashMemoPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const {
-    customers,
-    addTransaction,
-    addDailyCashTransaction,
-    fabrics,
-    reduceInventory,
-  } = useData();
+  const { customers } = useCustomerStore();
+  const { addTransaction, addDailyCashTransaction } = useTransactionStore();
+  const { fabrics, reduceInventory } = useInventoryStore();
   const [customerId, setCustomerId] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
