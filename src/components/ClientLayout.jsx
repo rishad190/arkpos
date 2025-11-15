@@ -1,14 +1,15 @@
 "use client";
 import { AuthProvider } from "@/contexts/auth-context";
+import { DataProvider } from "@/contexts/data-context";
 import { Toaster } from "@/components/ui/toaster";
-import { FirebaseDataSync } from "./FirebaseDataSync";
 
 export function ClientLayout({ children }) {
   return (
     <AuthProvider>
-      <FirebaseDataSync />
-      {children}
-      <Toaster />
+      <DataProvider>
+        {children}
+        <Toaster />
+      </DataProvider>
     </AuthProvider>
   );
 }

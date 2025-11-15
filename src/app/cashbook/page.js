@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import logger from "@/utils/logger";
-import { useTransactionStore } from "@/store/transactionStore";
+import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -65,7 +65,7 @@ export default function CashBookPage() {
     addDailyCashTransaction,
     updateDailyCashTransaction,
     deleteDailyCashTransaction,
-  } = useTransactionStore();
+  } = useData();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [date, setDate] = useState(() => {

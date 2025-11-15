@@ -4,7 +4,7 @@ import logger from "@/utils/logger";
 import { useState, useEffect } from "react";
 import { ref, onValue, push, update, remove } from "firebase/database";
 import { db } from "@/lib/firebase";
-import { useSupplierStore } from "@/store/supplierStore";
+import { useData } from "@/contexts/data-context";
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
 import {
@@ -52,7 +52,7 @@ export default function SupplierDetail() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const { updateSupplier, deleteSupplierTransaction } = useSupplierStore();
+  const { suppliers, updateSupplier, deleteSupplierTransaction } = useData();
   const [storeFilter, setStoreFilter] = useState("all");
   const [supplier, setSupplier] = useState(null);
   const [transactions, setTransactions] = useState([]);

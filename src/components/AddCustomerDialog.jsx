@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { FormField } from "@/components/ui/form-field";
 import { useForm } from "@/hooks/use-form";
-
+import { useData } from "@/contexts/data-context";
 import { useFirebaseCrud } from "@/hooks/use-firebase-crud";
 import { COLLECTION_REFS } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import { useState } from "react";
  */
 export function AddCustomerDialog({ onClose }) {
   const [customTag, setCustomTag] = useState("");
-  
+  const { addCustomer } = useData();
   const customerCrud = useFirebaseCrud(COLLECTION_REFS.CUSTOMERS, {
     successMessages: {
       create: "Customer added successfully",
