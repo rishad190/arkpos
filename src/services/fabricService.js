@@ -300,7 +300,7 @@ export class FabricService {
       batchData.items.forEach((item, index) => {
         if (!item.colorName?.trim())
           errors.push(`Item ${index + 1}: Color name is required`);
-        if (!item.quantity || item.quantity <= 0)
+        if (item.quantity == null || item.quantity < 0)
           errors.push(`Item ${index + 1}: Valid quantity is required`);
       });
     }
