@@ -9,6 +9,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /**
  * A reusable form dialog component that handles common dialog patterns
@@ -29,6 +30,7 @@ export function FormDialog({
   title,
   trigger,
   onSubmit,
+  open: controlledOpen,
   defaultOpen = false,
   onOpenChange,
   submitText = "Save",
@@ -36,18 +38,25 @@ export function FormDialog({
   size = "md",
   description,
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const formRef = useRef(null);
 
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+
   const handleOpenChange = (newOpen) => {
-    setOpen(newOpen);
-    if (onOpenChange) onOpenChange(newOpen);
+    if (!isControlled) {
+      setInternalOpen(newOpen);
+    }
+    if (onOpenChange) {
+      onOpenChange(newOpen);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (await onSubmit(e)) {
-      setOpen(false);
+      handleOpenChange(false);
     }
   };
 
@@ -63,7 +72,7 @@ export function FormDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent
-        className={sizeClasses[size] || sizeClasses.md}
+        className={cn(sizeClasses[size] || sizeClasses.md)}
         aria-labelledby="dialog-title"
         aria-describedby={description ? "dialog-description" : undefined}
       >
@@ -74,13 +83,13 @@ export function FormDialog({
           </DialogDescription>
         )}
         <form onSubmit={handleSubmit} className="space-y-4" ref={formRef}>
-          {children}
+          <div className="max-h-[60vh] overflow-y-auto pr-4">{children}</div>
 
           <div className="flex justify-end gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={() => handleOpenChange(false)}
             >
               {cancelText}
             </Button>

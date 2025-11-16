@@ -251,197 +251,199 @@ export function CashTransactionDialog({
         </DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.date}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, date: e.target.value }))
-              }
-              required
-              className={errors.date ? "border-red-500" : ""}
-            />
-            {errors.date && (
-              <p className="text-sm text-red-500">{errors.date}</p>
-            )}
+        <div className="max-h-[60vh] overflow-y-auto pr-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="date">Date</Label>
+              <Input
+                id="date"
+                type="date"
+                value={formData.date}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, date: e.target.value }))
+                }
+                required
+                className={errors.date ? "border-red-500" : ""}
+              />
+              {errors.date && (
+                <p className="text-sm text-red-500">{errors.date}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reference">Reference</Label>
+              <Input
+                id="reference"
+                value={formData.reference}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    reference: e.target.value,
+                  }))
+                }
+                placeholder="Optional reference"
+              />
+            </div>
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="reference">Reference</Label>
+            <Label htmlFor="description">Description</Label>
             <Input
-              id="reference"
-              value={formData.reference}
+              id="description"
+              value={formData.description}
               onChange={(e) =>
                 setFormData((prev) => ({
                   ...prev,
-                  reference: e.target.value,
+                  description: e.target.value,
                 }))
               }
-              placeholder="Optional reference"
+              placeholder="Enter transaction description"
+              required
+              className={errors.description ? "border-red-500" : ""}
             />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Input
-            id="description"
-            value={formData.description}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                description: e.target.value,
-              }))
-            }
-            placeholder="Enter transaction description"
-            required
-            className={errors.description ? "border-red-500" : ""}
-          />
-          {errors.description && (
-            <p className="text-sm text-red-500">{errors.description}</p>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="cashIn">Cash In</Label>
-            <Input
-              id="cashIn"
-              type="number"
-              value={formData.cashIn}
-              onChange={(e) => handleAmountChange("cashIn", e.target.value)}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              className={errors.cashIn ? "border-red-500" : ""}
-            />
-            {errors.cashIn && (
-              <p className="text-sm text-red-500">{errors.cashIn}</p>
-            )}
-            {formData.cashIn && (
-              <Select
-                value={formData.transactionType}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, transactionType: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select transaction type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {transactionTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {errors.description && (
+              <p className="text-sm text-red-500">{errors.description}</p>
             )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="cashOut">Cash Out</Label>
-            <Input
-              id="cashOut"
-              type="number"
-              value={formData.cashOut}
-              onChange={(e) => handleAmountChange("cashOut", e.target.value)}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              className={errors.cashOut ? "border-red-500" : ""}
-            />
-            {errors.cashOut && (
-              <p className="text-sm text-red-500">{errors.cashOut}</p>
-            )}
-          </div>
-        </div>
 
-        {errors.amount && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{errors.amount}</AlertDescription>
-          </Alert>
-        )}
-
-        {formData.cashOut && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="category">Category</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAddCategory(true)}
-                className="h-8 px-2"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Category
-              </Button>
-            </div>
-            {showAddCategory ? (
-              <div className="flex gap-2">
-                <Input
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  placeholder="Enter new category"
-                  className={errors.category ? "border-red-500" : ""}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleAddCategory}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="cashIn">Cash In</Label>
+              <Input
+                id="cashIn"
+                type="number"
+                value={formData.cashIn}
+                onChange={(e) => handleAmountChange("cashIn", e.target.value)}
+                placeholder="0.00"
+                min="0"
+                step="0.01"
+                className={errors.cashIn ? "border-red-500" : ""}
+              />
+              {errors.cashIn && (
+                <p className="text-sm text-red-500">{errors.cashIn}</p>
+              )}
+              {formData.cashIn && (
+                <Select
+                  value={formData.transactionType}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, transactionType: value }))
+                  }
                 >
-                  Add
-                </Button>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select transaction type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {transactionTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cashOut">Cash Out</Label>
+              <Input
+                id="cashOut"
+                type="number"
+                value={formData.cashOut}
+                onChange={(e) => handleAmountChange("cashOut", e.target.value)}
+                placeholder="0.00"
+                min="0"
+                step="0.01"
+                className={errors.cashOut ? "border-red-500" : ""}
+              />
+              {errors.cashOut && (
+                <p className="text-sm text-red-500">{errors.cashOut}</p>
+              )}
+            </div>
+          </div>
+
+          {errors.amount && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{errors.amount}</AlertDescription>
+            </Alert>
+          )}
+
+          {formData.cashOut && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="category">Category</Label>
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => {
-                    setShowAddCategory(false);
-                    setNewCategory("");
-                    setErrors({});
-                  }}
+                  size="sm"
+                  onClick={() => setShowAddCategory(true)}
+                  className="h-8 px-2"
                 >
-                  Cancel
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Category
                 </Button>
               </div>
-            ) : (
-              <Select
-                value={formData.category}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, category: value }))
-                }
-              >
-                <SelectTrigger
-                  id="category"
-                  className={errors.category ? "border-red-500" : ""}
+              {showAddCategory ? (
+                <div className="flex gap-2">
+                  <Input
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="Enter new category"
+                    className={errors.category ? "border-red-500" : ""}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAddCategory}
+                  >
+                    Add
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowAddCategory(false);
+                      setNewCategory("");
+                      setErrors({});
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, category: value }))
+                  }
                 >
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseCategories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="new">+ Add New Category</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            {errors.category && (
-              <p className="text-sm text-red-500">{errors.category}</p>
-            )}
-          </div>
-        )}
+                  <SelectTrigger
+                    id="category"
+                    className={errors.category ? "border-red-500" : ""}
+                  >
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {expenseCategories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="new">+ Add New Category</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              {errors.category && (
+                <p className="text-sm text-red-500">{errors.category}</p>
+              )}
+            </div>
+          )}
 
-        {errors.submit && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{errors.submit}</AlertDescription>
-          </Alert>
-        )}
+          {errors.submit && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{errors.submit}</AlertDescription>
+            </Alert>
+          )}
+        </div>
 
         <div className="flex justify-end gap-2">
           <Button

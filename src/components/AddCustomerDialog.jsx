@@ -14,7 +14,7 @@ import { useState } from "react";
 /**
  * Dialog component for adding a new customer
  */
-export function AddCustomerDialog({ onClose }) {
+export function AddCustomerDialog({ open, onOpenChange, onClose }) {
   const [customTag, setCustomTag] = useState("");
   const { addCustomer } = useData();
   const customerCrud = useFirebaseCrud(COLLECTION_REFS.CUSTOMERS, {
@@ -89,6 +89,7 @@ export function AddCustomerDialog({ onClose }) {
           createdAt: new Date().toISOString(),
         });
         onClose?.();
+        return true;
       } catch (error) {
         throw new Error(error.message || "Failed to add customer");
       }
@@ -139,8 +140,9 @@ export function AddCustomerDialog({ onClose }) {
   return (
     <FormDialog
       title="Add New Customer"
-      trigger={<Button>Add New Customer</Button>}
       onSubmit={handleSubmit}
+      open={open}
+      onOpenChange={onOpenChange}
     >
       <FormField
         label="Name"

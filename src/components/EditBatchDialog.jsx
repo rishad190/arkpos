@@ -61,51 +61,53 @@ export function EditBatchDialog({ batch, fabric, onSave }) {
           <DialogTitle>Edit Batch Details</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Quantity ({fabric.unit})*
-            </label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={formData.quantity}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  quantity: parseFloat(e.target.value),
-                })
-              }
-              className={errors.quantity ? "border-red-500" : ""}
-            />
-            {errors.quantity && (
-              <p className="text-sm text-red-500">{errors.quantity}</p>
+          <div className="max-h-[60vh] overflow-y-auto pr-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Quantity ({fabric.unit})*
+              </label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.quantity}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    quantity: parseFloat(e.target.value),
+                  })
+                }
+                className={errors.quantity ? "border-red-500" : ""}
+              />
+              {errors.quantity && (
+                <p className="text-sm text-red-500">{errors.quantity}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Unit Cost *</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.unitCost}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    unitCost: parseFloat(e.target.value),
+                  })
+                }
+                className={errors.unitCost ? "border-red-500" : ""}
+              />
+              {errors.unitCost && (
+                <p className="text-sm text-red-500">{errors.unitCost}</p>
+              )}
+            </div>
+
+            {errors.submit && (
+              <p className="text-sm text-red-500">{errors.submit}</p>
             )}
           </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Unit Cost *</label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={formData.unitCost}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  unitCost: parseFloat(e.target.value),
-                })
-              }
-              className={errors.unitCost ? "border-red-500" : ""}
-            />
-            {errors.unitCost && (
-              <p className="text-sm text-red-500">{errors.unitCost}</p>
-            )}
-          </div>
-
-          {errors.submit && (
-            <p className="text-sm text-red-500">{errors.submit}</p>
-          )}
 
           <div className="flex justify-end gap-2">
             <Button

@@ -109,131 +109,140 @@ export function EditCashTransactionDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <Button
-              type="button"
-              variant={transactionType === "in" ? "default" : "outline"}
-              onClick={() => setTransactionType("in")}
-              className={`h-24 flex flex-col items-center justify-center gap-2 ${
-                transactionType === "in"
-                  ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                  : ""
-              }`}
-              aria-pressed={transactionType === "in"}
-              aria-label="Select Cash In transaction type"
-            >
-              <ArrowUpRight
-                className={`h-6 w-6 ${
-                  transactionType === "in" ? "text-green-600" : "text-gray-400"
+          <div className="max-h-[60vh] overflow-y-auto pr-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                type="button"
+                variant={transactionType === "in" ? "default" : "outline"}
+                onClick={() => setTransactionType("in")}
+                className={`h-24 flex flex-col items-center justify-center gap-2 ${
+                  transactionType === "in"
+                    ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                    : ""
                 }`}
-                aria-hidden="true"
-              />
-              <span>Cash In</span>
-            </Button>
-
-            <Button
-              type="button"
-              variant={transactionType === "out" ? "default" : "outline"}
-              onClick={() => setTransactionType("out")}
-              className={`h-24 flex flex-col items-center justify-center gap-2 ${
-                transactionType === "out"
-                  ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                  : ""
-              }`}
-              aria-pressed={transactionType === "out"}
-              aria-label="Select Cash Out transaction type"
-            >
-              <ArrowDownRight
-                className={`h-6 w-6 ${
-                  transactionType === "out" ? "text-red-600" : "text-gray-400"
-                }`}
-                aria-hidden="true"
-              />
-              <span>Cash Out</span>
-            </Button>
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="transaction-date" className="text-sm font-medium">
-                Date
-              </Label>
-              <Input
-                id="transaction-date"
-                type="date"
-                value={formData.date}
-                onChange={(e) =>
-                  setFormData({ ...formData, date: e.target.value })
-                }
-                className="w-full"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="transaction-description"
-                className="text-sm font-medium"
+                aria-pressed={transactionType === "in"}
+                aria-label="Select Cash In transaction type"
               >
-                Description
-              </Label>
-              <Input
-                id="transaction-description"
-                placeholder="Enter transaction description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                className="w-full"
-                required
-                aria-invalid={!formData.description}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="transaction-amount"
-                className="text-sm font-medium"
-              >
-                Amount
-              </Label>
-              <div className="relative">
-                <span
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
-                  aria-hidden
-                >
-                  ৳
-                </span>
-                <Input
-                  id="transaction-amount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={
+                <ArrowUpRight
+                  className={`h-6 w-6 ${
                     transactionType === "in"
-                      ? formData.cashIn
-                      : formData.cashOut
-                  }
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
-                    if (transactionType === "in") {
-                      setFormData({ ...formData, cashIn: value, cashOut: 0 });
-                    } else {
-                      setFormData({ ...formData, cashOut: value, cashIn: 0 });
-                    }
-                  }}
-                  className="pl-8 w-full"
-                  required
-                  aria-label={`${
-                    transactionType === "in" ? "Cash in" : "Cash out"
-                  } amount`}
-                  aria-invalid={
-                    transactionType === "in"
-                      ? !formData.cashIn || formData.cashIn <= 0
-                      : !formData.cashOut || formData.cashOut <= 0
-                  }
+                      ? "text-green-600"
+                      : "text-gray-400"
+                  }`}
+                  aria-hidden="true"
                 />
+                <span>Cash In</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant={transactionType === "out" ? "default" : "outline"}
+                onClick={() => setTransactionType("out")}
+                className={`h-24 flex flex-col items-center justify-center gap-2 ${
+                  transactionType === "out"
+                    ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                    : ""
+                }`}
+                aria-pressed={transactionType === "out"}
+                aria-label="Select Cash Out transaction type"
+              >
+                <ArrowDownRight
+                  className={`h-6 w-6 ${
+                    transactionType === "out"
+                      ? "text-red-600"
+                      : "text-gray-400"
+                  }`}
+                  aria-hidden="true"
+                />
+                <span>Cash Out</span>
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label
+                  htmlFor="transaction-date"
+                  className="text-sm font-medium"
+                >
+                  Date
+                </Label>
+                <Input
+                  id="transaction-date"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) =>
+                    setFormData({ ...formData, date: e.target.value })
+                  }
+                  className="w-full"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label
+                  htmlFor="transaction-description"
+                  className="text-sm font-medium"
+                >
+                  Description
+                </Label>
+                <Input
+                  id="transaction-description"
+                  placeholder="Enter transaction description"
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  className="w-full"
+                  required
+                  aria-invalid={!formData.description}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label
+                  htmlFor="transaction-amount"
+                  className="text-sm font-medium"
+                >
+                  Amount
+                </Label>
+                <div className="relative">
+                  <span
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+                    aria-hidden
+                  >
+                    ৳
+                  </span>
+                  <Input
+                    id="transaction-amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={
+                      transactionType === "in"
+                        ? formData.cashIn
+                        : formData.cashOut
+                    }
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      if (transactionType === "in") {
+                        setFormData({ ...formData, cashIn: value, cashOut: 0 });
+                      } else {
+                        setFormData({ ...formData, cashOut: value, cashIn: 0 });
+                      }
+                    }}
+                    className="pl-8 w-full"
+                    required
+                    aria-label={`${
+                      transactionType === "in" ? "Cash in" : "Cash out"
+                    } amount`}
+                    aria-invalid={
+                      transactionType === "in"
+                        ? !formData.cashIn || formData.cashIn <= 0
+                        : !formData.cashOut || formData.cashOut <= 0
+                    }
+                  />
+                </div>
               </div>
             </div>
           </div>

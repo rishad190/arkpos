@@ -169,7 +169,7 @@ function PartnerAccounts({ product }) {
   return (
     <div className="mt-8">
       <PageHeader title="Partner Accounts" description="Manage financial transactions for this product import." />
-      <div className="flex items-center justify-between gap-4 mt-6">
+      <div className="flex flex-col md:flex-row items-start md:items-center md:justify-between gap-4 mt-6">
         <div className="flex gap-4">
           <Dialog open={isAddPartnerOpen} onOpenChange={setIsAddPartnerOpen}>
             <Button onClick={() => setIsAddPartnerOpen(true)}>Add Partners</Button>

@@ -50,24 +50,26 @@ export function SellFabricDialog({ fabric, onSellFabric }) {
           <DialogTitle>Sell Fabric</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <h4 className="font-medium">{fabric.name}</h4>
-            <p className="text-sm text-gray-500">
-              Available: {fabric.totalQuantity}
-            </p>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Quantity</label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              max={fabric.totalQuantity}
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              placeholder="Enter quantity to sell"
-            />
-            {error && <p className="text-sm text-red-500">{error}</p>}
+          <div className="max-h-[60vh] overflow-y-auto pr-4">
+            <div>
+              <h4 className="font-medium">{fabric.name}</h4>
+              <p className="text-sm text-gray-500">
+                Available: {fabric.totalQuantity}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Quantity</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max={fabric.totalQuantity}
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="Enter quantity to sell"
+              />
+              {error && <p className="text-sm text-red-500">{error}</p>}
+            </div>
           </div>
           <div className="flex justify-end gap-3">
             <Button

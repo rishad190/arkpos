@@ -79,78 +79,86 @@ export function EditSupplierTransactionDialog({ transaction, onSave }) {
           <DialogTitle>Edit Transaction</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Date *</label>
-            <Input
-              type="date"
-              value={formData.date}
-              onChange={(e) =>
-                setFormData({ ...formData, date: e.target.value })
-              }
-              className={errors.date ? "border-red-500" : ""}
-            />
-            {errors.date && (
-              <p className="text-sm text-red-500">{errors.date}</p>
+          <div className="max-h-[60vh] overflow-y-auto pr-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Date *</label>
+              <Input
+                type="date"
+                value={formData.date}
+                onChange={(e) =>
+                  setFormData({ ...formData, date: e.target.value })
+                }
+                className={errors.date ? "border-red-500" : ""}
+              />
+              {errors.date && (
+                <p className="text-sm text-red-500">{errors.date}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Invoice Number *</label>
+              <Input
+                value={formData.invoiceNumber}
+                onChange={(e) =>
+                  setFormData({ ...formData, invoiceNumber: e.target.value })
+                }
+                className={errors.invoiceNumber ? "border-red-500" : ""}
+              />
+              {errors.invoiceNumber && (
+                <p className="text-sm text-red-500">
+                  {errors.invoiceNumber}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Details</label>
+              <Input
+                value={formData.details}
+                onChange={(e) =>
+                  setFormData({ ...formData, details: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Total Amount *</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.totalAmount}
+                onChange={(e) =>
+                  handleNumberInput("totalAmount", e.target.value)
+                }
+                className={errors.totalAmount ? "border-red-500" : ""}
+              />
+              {errors.totalAmount && (
+                <p className="text-sm text-red-500">{errors.totalAmount}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Paid Amount</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.paidAmount}
+                onChange={(e) =>
+                  handleNumberInput("paidAmount", e.target.value)
+                }
+                className={errors.paidAmount ? "border-red-500" : ""}
+              />
+              {errors.paidAmount && (
+                <p className="text-sm text-red-500">{errors.paidAmount}</p>
+              )}
+            </div>
+
+            {errors.submit && (
+              <p className="text-sm text-red-500">{errors.submit}</p>
             )}
           </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Invoice Number *</label>
-            <Input
-              value={formData.invoiceNumber}
-              onChange={(e) =>
-                setFormData({ ...formData, invoiceNumber: e.target.value })
-              }
-              className={errors.invoiceNumber ? "border-red-500" : ""}
-            />
-            {errors.invoiceNumber && (
-              <p className="text-sm text-red-500">{errors.invoiceNumber}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Details</label>
-            <Input
-              value={formData.details}
-              onChange={(e) =>
-                setFormData({ ...formData, details: e.target.value })
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Total Amount *</label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={formData.totalAmount}
-              onChange={(e) => handleNumberInput("totalAmount", e.target.value)}
-              className={errors.totalAmount ? "border-red-500" : ""}
-            />
-            {errors.totalAmount && (
-              <p className="text-sm text-red-500">{errors.totalAmount}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Paid Amount</label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={formData.paidAmount}
-              onChange={(e) => handleNumberInput("paidAmount", e.target.value)}
-              className={errors.paidAmount ? "border-red-500" : ""}
-            />
-            {errors.paidAmount && (
-              <p className="text-sm text-red-500">{errors.paidAmount}</p>
-            )}
-          </div>
-
-          {errors.submit && (
-            <p className="text-sm text-red-500">{errors.submit}</p>
-          )}
 
           <div className="flex justify-end gap-2">
             <Button

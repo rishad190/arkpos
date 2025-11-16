@@ -69,80 +69,85 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         </DialogHeader>
         <FormErrorBoundary>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input
-                id="date"
-                type="date"
-                value={formData.date}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, date: e.target.value }))
-                }
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Input
-                id="description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    description: e.target.value,
-                  }))
-                }
-                placeholder="Enter transaction description"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="reference">Reference (Optional)</Label>
-              <Input
-                id="reference"
-                value={formData.reference}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    reference: e.target.value,
-                  }))
-                }
-                placeholder="Enter reference number"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="max-h-[60vh] overflow-y-auto pr-4">
               <div className="space-y-2">
-                <Label htmlFor="cashIn">Cash In</Label>
+                <Label htmlFor="date">Date</Label>
                 <Input
-                  id="cashIn"
-                  type="number"
-                  value={formData.cashIn}
+                  id="date"
+                  type="date"
+                  value={formData.date}
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, cashIn: e.target.value }))
+                    setFormData((prev) => ({ ...prev, date: e.target.value }))
                   }
-                  disabled={!!formData.cashOut}
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
+                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cashOut">Cash Out</Label>
+                <Label htmlFor="description">Description</Label>
                 <Input
-                  id="cashOut"
-                  type="number"
-                  value={formData.cashOut}
+                  id="description"
+                  value={formData.description}
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      cashOut: e.target.value,
+                      description: e.target.value,
                     }))
                   }
-                  disabled={!!formData.cashIn}
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
+                  placeholder="Enter transaction description"
+                  required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reference">Reference (Optional)</Label>
+                <Input
+                  id="reference"
+                  value={formData.reference}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      reference: e.target.value,
+                    }))
+                  }
+                  placeholder="Enter reference number"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cashIn">Cash In</Label>
+                  <Input
+                    id="cashIn"
+                    type="number"
+                    value={formData.cashIn}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        cashIn: e.target.value,
+                      }))
+                    }
+                    disabled={!!formData.cashOut}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cashOut">Cash Out</Label>
+                  <Input
+                    id="cashOut"
+                    type="number"
+                    value={formData.cashOut}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        cashOut: e.target.value,
+                      }))
+                    }
+                    disabled={!!formData.cashIn}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-2">

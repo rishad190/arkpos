@@ -36,31 +36,33 @@ export function SupplierPaymentDialog({
         <DialogHeader>
           <DialogTitle>Record Payment to {supplier?.name}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <Input
-            type="date"
-            label="Payment Date"
-            value={paymentData.date}
-            onChange={(e) =>
-              setPaymentData({ ...paymentData, date: e.target.value })
-            }
-          />
-          <Input
-            type="number"
-            label="Amount"
-            value={paymentData.amount}
-            onChange={(e) =>
-              setPaymentData({ ...paymentData, amount: e.target.value })
-            }
-          />
-          <Input
-            label="Reference Number"
-            value={paymentData.reference}
-            onChange={(e) =>
-              setPaymentData({ ...paymentData, reference: e.target.value })
-            }
-          />
-          <Button onClick={handleSubmit}>Record Payment</Button>
+        <div className="max-h-[60vh] overflow-y-auto pr-4">
+          <div className="space-y-4">
+            <Input
+              type="date"
+              label="Payment Date"
+              value={paymentData.date}
+              onChange={(e) =>
+                setPaymentData({ ...paymentData, date: e.target.value })
+              }
+            />
+            <Input
+              type="number"
+              label="Amount"
+              value={paymentData.amount}
+              onChange={(e) =>
+                setPaymentData({ ...paymentData, amount: e.target.value })
+              }
+            />
+            <Input
+              label="Reference Number"
+              value={paymentData.reference}
+              onChange={(e) =>
+                setPaymentData({ ...paymentData, reference: e.target.value })
+              }
+            />
+            <Button onClick={handleSubmit}>Record Payment</Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

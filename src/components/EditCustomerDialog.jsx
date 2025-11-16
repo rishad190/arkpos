@@ -68,7 +68,7 @@ export function EditCustomerDialog({
     <FormDialog
       title="Edit Customer"
       onSubmit={handleSubmit}
-      defaultOpen={isOpen}
+      open={isOpen}
       onOpenChange={onClose}
       submitText="Update Customer"
     >
