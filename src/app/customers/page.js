@@ -21,11 +21,23 @@ import logger from "@/utils/logger";
 export default function CustomersPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { customers, getCustomerDue, deleteCustomer, updateCustomer } = useData();
+  const { 
+    customers, 
+    getCustomerDue, 
+    getCustomerTransactionsByMemo,
+    deleteCustomer, 
+    updateCustomer 
+  } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
+
+  // Get memo count for a customer
+  const getCustomerMemoCount = (customerId) => {
+    const memoGroups = getCustomerTransactionsByMemo(customerId);
+    return memoGroups.length;
+  };
 
   const filteredCustomers = useMemo(() => {
     if (!Array.isArray(customers)) return [];
@@ -110,6 +122,7 @@ export default function CustomersPage() {
           <CustomerTable
             customers={filteredCustomers}
             getCustomerDue={getCustomerDue}
+            getCustomerMemoCount={getCustomerMemoCount}
             onRowClick={handleRowClick}
             onEdit={handleEdit}
             onDelete={handleDelete}

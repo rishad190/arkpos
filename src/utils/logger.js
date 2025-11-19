@@ -22,8 +22,13 @@ class Logger {
     return level <= this.currentLevel;
   }
 
-  // --- START OF FIX ---
-  // Updated formatMessage to properly handle Error objects
+  /**
+   * Format log message with proper Error object handling
+   * @param {number} level - Log level
+   * @param {string} message - Log message
+   * @param {any} context - Additional context (can be Error object or any data)
+   * @returns {Object} - Formatted log entry
+   */
   formatMessage(level, message, context = "") {
     const timestamp = new Date().toISOString();
     const levelStr = Object.keys(this.levels).find(
@@ -38,18 +43,20 @@ class Logger {
         message: context.message,
         stack: context.stack,
         name: context.name,
+        type: context.type, // For AppError
+        timestamp: context.timestamp, // For AppError
+        context: context.context, // For AppError nested context
       };
     }
 
     return {
       timestamp,
       level: levelStr,
-      context: logContext, // Use the serialized context
+      context: logContext,
       message,
       environment: process.env.NODE_ENV,
     };
   }
-  // --- END OF FIX ---
 
   error(message, context = "") {
     if (this.shouldLog(this.levels.ERROR)) {

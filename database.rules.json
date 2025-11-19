@@ -1,0 +1,36 @@
+{
+    "rules": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "customers": {
+            "$customerId": {
+                ".read": "auth != null",
+                ".write": "auth != null"
+            }
+        },
+        "transactions": {
+            "$transactionId": {
+                ".read": "auth != null",
+                ".write": "auth != null"
+            }
+        },
+        "fabrics": {
+            "$fabricId": {
+                ".read": "auth != null",
+                ".write": "auth != null"
+            }
+        },
+        "suppliers": {
+            "$supplierId": {
+                ".read": "auth != null",
+                ".write": "auth != null"
+            }
+        },
+        "cashTransactions": {
+            "$cashTransactionId": {
+                ".read": "auth != null",
+                ".write": "auth != null"
+            }
+        }
+    }
+}

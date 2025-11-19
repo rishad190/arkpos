@@ -25,6 +25,7 @@ import {
 export function CustomerTable({
   customers,
   getCustomerDue,
+  getCustomerMemoCount,
   onRowClick,
   onEdit,
   onDelete,
@@ -49,6 +50,19 @@ export function CustomerTable({
     {
       accessorKey: "storeId",
       header: "Store ID",
+    },
+    {
+      accessorKey: "memoCount",
+      header: "Memos",
+      cell: ({ row }) => {
+        if (!row.original) return null;
+        const memoCount = getCustomerMemoCount ? getCustomerMemoCount(row.original.id) : 0;
+        return (
+          <div className="text-center">
+            {memoCount}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "due",

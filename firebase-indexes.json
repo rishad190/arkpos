@@ -1,0 +1,67 @@
+{
+    "rules": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "customers": {
+            ".indexOn": [
+                "name",
+                "phone",
+                "createdAt",
+                "totalDue"
+            ]
+        },
+        "transactions": {
+            ".indexOn": [
+                "customerId",
+                "memoNumber",
+                "date",
+                "createdAt",
+                "type"
+            ]
+        },
+        "fabrics": {
+            ".indexOn": [
+                "name",
+                "category",
+                "createdAt"
+            ]
+        },
+        "suppliers": {
+            ".indexOn": [
+                "name",
+                "phone",
+                "createdAt",
+                "totalDue"
+            ]
+        },
+        "supplierTransactions": {
+            ".indexOn": [
+                "supplierId",
+                "date",
+                "createdAt"
+            ]
+        },
+        "dailyCashIncome": {
+            ".indexOn": [
+                "date",
+                "type",
+                "reference",
+                "createdAt"
+            ]
+        },
+        "dailyCashExpense": {
+            ".indexOn": [
+                "date",
+                "type",
+                "reference",
+                "createdAt"
+            ]
+        },
+        "partnerProducts": {
+            ".indexOn": [
+                "name",
+                "createdAt"
+            ]
+        }
+    }
+}

@@ -28,6 +28,7 @@ import {
   GitMerge,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { ConnectionIndicator } from "@/components/ConnectionIndicator";
 
 export function Navbar() {
   const { user, logout } = useAuth();
@@ -140,6 +141,8 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center space-x-2">
+            <ConnectionIndicator />
+            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">

@@ -2,6 +2,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useData } from "@/contexts/data-context";
+import { CustomerMemoList } from "@/components/CustomerMemoList";
+import { MemoDetailsDialog } from "@/components/MemoDetailsDialog";
+import { AddPaymentDialog } from "@/components/AddPaymentDialog";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -73,6 +76,9 @@ export default function CustomerDetail() {
     deleteTransaction,
     updateTransaction,
     getCustomerDue,
+    getCustomerTransactionsByMemo,
+    getMemoDetails,
+    addPaymentToMemo,
   } = useData();
 
   const [loadingState, setLoadingState] = useState({
@@ -85,8 +91,18 @@ export default function CustomerDetail() {
   );
   const [dateRange, setDateRange] = useState({ from: null, to: null });
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState("transactions"); // "transactions" or "memos"
+  const [selectedMemo, setSelectedMemo] = useState(null);
+  const [showMemoDetails, setShowMemoDetails] = useState(false);
+  const [showAddPayment, setShowAddPayment] = useState(false);
 
   const customer = customers?.find((c) => c.id === params.id);
+
+  // Get memo groups for this customer
+  const customerMemoGroups = useMemo(() => {
+    if (!params.id) return [];
+    return getCustomerTransactionsByMemo(params.id);
+  }, [params.id, getCustomerTransactionsByMemo]);
 
   const customerTransactionsWithBalance = useMemo(() => {
     if (!transactions) return [];
@@ -232,6 +248,47 @@ export default function CustomerDetail() {
       Store: t.storeId,
     }));
     exportToCSV(data, `${customer?.name}-transactions-${params.id}.csv`);
+  };
+
+  // Handle memo click - show details dialog
+  const handleMemoClick = (memo) => {
+    const memoDetails = getMemoDetails(memo.memoNumber);
+    setSelectedMemo(memoDetails);
+    setShowMemoDetails(true);
+  };
+
+  // Handle add payment button click
+  const handleAddPaymentClick = (memo) => {
+    const memoDetails = getMemoDetails(memo.memoNumber);
+    setSelectedMemo(memoDetails);
+    setShowAddPayment(true);
+  };
+
+  // Handle payment submission
+  const handleAddPayment = async (paymentData) => {
+    try {
+      setLoadingState((prev) => ({ ...prev, action: true }));
+      await addPaymentToMemo(
+        selectedMemo.memoNumber,
+        paymentData,
+        params.id
+      );
+      toast({
+        title: "Success",
+        description: "Payment added successfully",
+      });
+      setShowAddPayment(false);
+      setSelectedMemo(null);
+    } catch (error) {
+      console.error("Error adding payment:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add payment",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingState((prev) => ({ ...prev, action: false }));
+    }
   };
 
   const TransactionFilters = () => (
@@ -563,18 +620,71 @@ export default function CustomerDetail() {
             </Card>
           </div>
 
+          {/* View Mode Toggle */}
+          <div className="mb-6">
+            <div className="flex gap-2">
+              <Button
+                variant={viewMode === "memos" ? "default" : "outline"}
+                onClick={() => setViewMode("memos")}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Memo View
+              </Button>
+              <Button
+                variant={viewMode === "transactions" ? "default" : "outline"}
+                onClick={() => setViewMode("transactions")}
+              >
+                Transaction List
+              </Button>
+            </div>
+          </div>
+
+          {/* Memo View */}
+          {viewMode === "memos" && (
+            <>
+              <CustomerMemoList
+                memoGroups={customerMemoGroups}
+                onMemoClick={handleMemoClick}
+                onAddPayment={handleAddPaymentClick}
+                showOnlyDues={false}
+              />
+              
+              {/* Memo Details Dialog */}
+              <MemoDetailsDialog
+                open={showMemoDetails}
+                onOpenChange={setShowMemoDetails}
+                memoDetails={selectedMemo}
+                onAddPayment={() => {
+                  setShowMemoDetails(false);
+                  setShowAddPayment(true);
+                }}
+              />
+
+              {/* Add Payment Dialog */}
+              <AddPaymentDialog
+                open={showAddPayment}
+                onOpenChange={setShowAddPayment}
+                memoNumber={selectedMemo?.memoNumber}
+                remainingDue={selectedMemo?.remainingDue || 0}
+                onAddPayment={handleAddPayment}
+                isLoading={loadingState.action}
+              />
+            </>
+          )}
+
           {/* Transactions Table */}
-          <Card className="border-none shadow-md">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                <div>
-                  <h2 className="text-xl font-semibold">Transactions</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    View and manage customer transactions
-                  </p>
+          {viewMode === "transactions" && (
+            <Card className="border-none shadow-md">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold">Transactions</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      View and manage customer transactions
+                    </p>
+                  </div>
+                  <TransactionFilters />
                 </div>
-                <TransactionFilters />
-              </div>
               <ScrollArea className="h-[600px]">
                 <Table>
                   <TableHeader>
@@ -716,6 +826,7 @@ export default function CustomerDetail() {
               </ScrollArea>
             </CardContent>
           </Card>
+          )}
 
           {/* Footer Section */}
           <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

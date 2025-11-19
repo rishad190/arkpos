@@ -28,6 +28,79 @@ import { CustomerService } from "@/services/customerService";
 import { TransactionService } from "@/services/transactionService";
 import { FabricService } from "@/services/fabricService";
 import { AtomicOperationService } from "@/services/atomicOperations";
+import performanceTracker from "@/lib/performanceTracker";
+import { memoizedCalculations } from "@/lib/memoization";
+
+/**
+ * @fileoverview Data Context Provider - Manages global application state and Firebase operations
+ * @typedef {import('../types/models').Customer} Customer
+ * @typedef {import('../types/models').Transaction} Transaction
+ * @typedef {import('../types/models').Fabric} Fabric
+ * @typedef {import('../types/models').Supplier} Supplier
+ * @typedef {import('../types/models').SupplierTransaction} SupplierTransaction
+ * @typedef {import('../types/models').DailyCashTransaction} DailyCashTransaction
+ * @typedef {import('../types/models').Settings} Settings
+ * @typedef {import('../types/models').PerformanceMetrics} PerformanceMetrics
+ * @typedef {import('../types/models').PartnerProduct} PartnerProduct
+ * @typedef {import('../types/models').MemoGroup} MemoGroup
+ * @typedef {import('../types/models').MemoDetails} MemoDetails
+ * @typedef {import('../types/models').PaymentData} PaymentData
+ * @typedef {import('../types/models').BatchData} BatchData
+ * @typedef {import('../types/models').Product} Product
+ */
+
+/**
+ * @typedef {Object} DataContextState
+ * @property {Array<Customer>} customers - Array of all customers
+ * @property {Array<Transaction>} transactions - Array of all transactions
+ * @property {Array<DailyCashTransaction>} dailyCashIncome - Array of daily cash income transactions
+ * @property {Array<DailyCashTransaction>} dailyCashExpense - Array of daily cash expense transactions
+ * @property {Array<Supplier>} suppliers - Array of all suppliers
+ * @property {Array<SupplierTransaction>} supplierTransactions - Array of supplier transactions
+ * @property {Array<Fabric>} fabrics - Array of all fabrics
+ * @property {Array<PartnerProduct>} partnerProducts - Array of partner products
+ * @property {boolean} loading - Loading state
+ * @property {string|null} error - Error message if any
+ * @property {'connected'|'connecting'|'disconnected'|'offline'} connectionState - Firebase connection state
+ * @property {Array<Object>} offlineQueue - Queue of operations to execute when online
+ * @property {Set<string>} pendingOperations - Set of pending operation IDs
+ * @property {PerformanceMetrics} performanceMetrics - Performance tracking metrics
+ * @property {Settings} settings - Application settings
+ */
+
+/**
+ * @typedef {Object} CustomerOperations
+ * @property {(customerData: Partial<Customer>) => Promise<string>} addCustomer - Add a new customer
+ * @property {(customerId: string, updatedData: Partial<Customer>) => Promise<void>} updateCustomer - Update a customer
+ * @property {(customerId: string, customerTransactions: Array<Transaction>) => Promise<void>} deleteCustomer - Delete a customer
+ * @property {(customerId: string) => number} getCustomerDue - Get customer due amount
+ */
+
+/**
+ * @typedef {Object} TransactionOperations
+ * @property {(transactionData: Partial<Transaction>) => Promise<string>} addTransaction - Add a new transaction
+ * @property {(transactionId: string, updatedData: Partial<Transaction>) => Promise<void>} updateTransaction - Update a transaction
+ * @property {(transactionId: string) => Promise<void>} deleteTransaction - Delete a transaction
+ * @property {(customerId: string) => Array<MemoGroup>} getCustomerTransactionsByMemo - Get customer transactions grouped by memo
+ * @property {(memoNumber: string) => MemoDetails|null} getMemoDetails - Get memo details with payments
+ * @property {(memoNumber: string, paymentData: PaymentData, customerId: string) => Promise<string>} addPaymentToMemo - Add payment to a memo
+ * @property {(customerId: string) => number} calculateCustomerTotalDue - Calculate total due for customer
+ * @property {(customerId: string) => Array<MemoGroup>} getCustomerMemosWithDues - Get memos with outstanding dues
+ */
+
+/**
+ * @typedef {Object} FabricOperations
+ * @property {(fabricData: Partial<Fabric>) => Promise<string>} addFabric - Add a new fabric
+ * @property {(fabricId: string, updatedData: Partial<Fabric>) => Promise<void>} updateFabric - Update a fabric
+ * @property {(fabricId: string) => Promise<void>} deleteFabric - Delete a fabric
+ * @property {(batchData: BatchData) => Promise<string>} addFabricBatch - Add a batch to a fabric
+ * @property {(fabricId: string, batchId: string, updatedData: Partial<BatchData>) => Promise<void>} updateFabricBatch - Update a fabric batch
+ * @property {(saleProducts: Array<Product>) => Promise<void>} reduceInventory - Reduce inventory for sale
+ */
+
+/**
+ * @typedef {DataContextState & CustomerOperations & TransactionOperations & FabricOperations} DataContextValue
+ */
 
 // Create context
 const DataContext = createContext(null);
@@ -208,6 +281,15 @@ function reducer(state, action) {
           (_, index) => index !== action.payload
         ),
       };
+    case "UPDATE_OFFLINE_QUEUE_ITEM":
+      return {
+        ...state,
+        offlineQueue: state.offlineQueue.map((item, index) =>
+          index === action.payload.index
+            ? { ...item, ...action.payload.updates }
+            : item
+        ),
+      };
     case "CLEAR_OFFLINE_QUEUE":
       return {
         ...state,
@@ -241,7 +323,12 @@ function reducer(state, action) {
   }
 }
 
-// Export the provider component
+/**
+ * Data Provider Component - Provides global state and operations to the application
+ * @param {Object} props
+ * @param {React.ReactNode} props.children - Child components
+ * @returns {JSX.Element}
+ */
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const mountTime = useRef(Date.now());
@@ -260,22 +347,34 @@ export function DataProvider({ children }) {
     const connectedRef = ref(db, ".info/connected");
     const connectionUnsubscribe = onValue(connectedRef, (snapshot) => {
       const connected = snapshot.val();
+      const previousState = state.connectionState;
+      const newState = connected
+        ? CONNECTION_STATES.CONNECTED
+        : CONNECTION_STATES.DISCONNECTED;
+
       dispatch({
         type: "SET_CONNECTION_STATE",
-        payload: connected
-          ? CONNECTION_STATES.CONNECTED
-          : CONNECTION_STATES.DISCONNECTED,
+        payload: newState,
       });
 
       if (connected) {
         logger.info("[DataContext] Firebase connection established");
+        
+        // Process offline queue when connection is restored
+        if (previousState === CONNECTION_STATES.DISCONNECTED) {
+          logger.info("[DataContext] Connection restored, processing offline queue");
+          // Use setTimeout to ensure state is updated before processing
+          setTimeout(() => {
+            atomicOperations.processOfflineQueue();
+          }, 100);
+        }
       } else {
         logger.warn("[DataContext] Firebase connection lost");
       }
     });
 
     return () => connectionUnsubscribe();
-  }, [dispatch]);
+  }, [dispatch, state.connectionState, atomicOperations]);
 
   // Process offline queue when connection is restored
   const processOfflineQueue = useCallback(async () => {
@@ -542,8 +641,16 @@ export function DataProvider({ children }) {
     };
   }, [dispatch]);
 
-  // Add memoization for customer dues
+  /**
+   * Memoized customer dues calculation with performance tracking
+   * @type {Object<string, number>}
+   */
   const customerDues = useMemo(() => {
+    const handle = performanceTracker.startOperation('calculateCustomerDues', {
+      customerCount: state.customers?.length || 0,
+      transactionCount: state.transactions?.length || 0,
+    });
+
     const dues = {};
 
     // Handle both array and object formats for customers
@@ -555,14 +662,23 @@ export function DataProvider({ children }) {
 
     customersArray?.forEach((customer) => {
       if (customer && customer.id) {
-        dues[customer.id] = state.transactions
-          ?.filter((t) => t.customerId === customer.id)
-          .reduce((total, t) => total + ((t.total || 0) - (t.deposit || 0)), 0);
+        // Use memoized calculation for each customer
+        dues[customer.id] = memoizedCalculations.calculateCustomerDue(
+          state.transactions || [],
+          customer.id
+        );
       }
     });
+
+    performanceTracker.endOperation(handle);
     return dues;
   }, [state.customers, state.transactions]);
 
+  /**
+   * Get customer due amount
+   * @param {string} customerId - The customer ID
+   * @returns {number} The due amount
+   */
   const getCustomerDue = useCallback(
     (customerId) => {
       return customerDues[customerId] || 0;
@@ -581,7 +697,7 @@ export function DataProvider({ children }) {
     [customerService, getCustomerDue]
   );
 
-  // Transaction Operations using service
+  // Transaction Operations using service with memoization
   const transactionOperations = useMemo(
     () => ({
       addTransaction:
@@ -590,8 +706,41 @@ export function DataProvider({ children }) {
         transactionService.updateTransaction.bind(transactionService),
       deleteTransaction:
         transactionService.deleteTransaction.bind(transactionService),
+      // Memo-wise transaction methods with memoization
+      getCustomerTransactionsByMemo: (customerId) => {
+        const handle = performanceTracker.startOperation('getCustomerTransactionsByMemo', { customerId });
+        const result = memoizedCalculations.groupTransactionsByMemo(
+          state.transactions || [],
+          customerId
+        );
+        performanceTracker.endOperation(handle);
+        return result;
+      },
+      getMemoDetails: (memoNumber) =>
+        transactionService.getMemoDetails(memoNumber, state.transactions),
+      addPaymentToMemo: (memoNumber, paymentData, customerId) =>
+        transactionService.addPaymentToMemo(memoNumber, paymentData, customerId),
+      calculateCustomerTotalDue: (customerId) => {
+        const handle = performanceTracker.startOperation('calculateCustomerTotalDue', { customerId });
+        const result = transactionService.calculateCustomerTotalDue(
+          customerId,
+          state.transactions
+        );
+        performanceTracker.endOperation(handle);
+        return result;
+      },
+      getCustomerMemosWithDues: (customerId) => {
+        const handle = performanceTracker.startOperation('getCustomerMemosWithDues', { customerId });
+        const memoGroups = memoizedCalculations.groupTransactionsByMemo(
+          state.transactions || [],
+          customerId
+        );
+        const result = memoGroups.filter((memo) => memo.dueAmount > 0);
+        performanceTracker.endOperation(handle);
+        return result;
+      },
     }),
-    [transactionService]
+    [transactionService, state.transactions]
   );
 
   // Supplier Operations with atomic execution and validation
@@ -1134,7 +1283,12 @@ export function DataProvider({ children }) {
     [state]
   );
 
-  // Settings Operations with atomic execution and validation
+  /**
+   * Update application settings
+   * @param {Partial<Settings>} newSettings - New settings to apply
+   * @returns {Promise<boolean>} True if successful
+   * @throws {Error} If validation fails
+   */
   const updateSettings = useCallback(async (newSettings) => {
     // Validate settings data
     const validationErrors = [];
@@ -1163,7 +1317,11 @@ export function DataProvider({ children }) {
     });
   }, []);
 
-  // Placeholder for batch locking mechanisms
+  /**
+   * Acquire a lock on a batch for inventory operations
+   * @param {string} batchId - The batch ID to lock
+   * @returns {Promise<boolean>} True if lock acquired
+   */
   const acquireBatchLock = useCallback(async (batchId) => {
     // In a real application, this would involve a distributed lock
     // For now, we'll just log and return true
@@ -1171,6 +1329,11 @@ export function DataProvider({ children }) {
     return true;
   }, []);
 
+  /**
+   * Release a lock on a batch
+   * @param {string} batchId - The batch ID to unlock
+   * @returns {Promise<void>}
+   */
   const releaseBatchLock = useCallback(async (batchId) => {
     // In a real application, this would release the distributed lock
     logger.info(`[Lock] Releasing lock for batch: ${batchId}`);
@@ -1194,6 +1357,22 @@ export function DataProvider({ children }) {
     [fabricService, acquireBatchLock, releaseBatchLock]
   );
 
+  /**
+   * Get performance metrics
+   * @returns {Object} Performance report
+   */
+  const getPerformanceMetrics = useCallback(() => {
+    return performanceTracker.getMetrics();
+  }, []);
+
+  /**
+   * Get performance bottlenecks
+   * @returns {Array<Object>} List of bottlenecks
+   */
+  const getPerformanceBottlenecks = useCallback(() => {
+    return performanceTracker.identifyBottlenecks();
+  }, []);
+
   const contextValue = useMemo(
     () => ({
       // State
@@ -1206,6 +1385,9 @@ export function DataProvider({ children }) {
       ...fabricOperations,
       settings: state.settings,
       updateSettings,
+      // Performance monitoring
+      getPerformanceMetrics,
+      getPerformanceBottlenecks,
     }),
     [
       state,
@@ -1216,6 +1398,8 @@ export function DataProvider({ children }) {
       dailyCashOperations,
       fabricOperations,
       updateSettings,
+      getPerformanceMetrics,
+      getPerformanceBottlenecks,
     ]
   );
 
@@ -1224,7 +1408,11 @@ export function DataProvider({ children }) {
   );
 }
 
-// Export the hook to use the context
+/**
+ * Hook to access the Data Context
+ * @returns {DataContextValue} The data context value with state and operations
+ * @throws {Error} If used outside of DataProvider
+ */
 export function useData() {
   const context = useContext(DataContext);
   if (!context) {
