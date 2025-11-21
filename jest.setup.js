@@ -9,10 +9,20 @@ jest.mock('firebase/app', () => ({
 }))
 
 jest.mock('firebase/auth', () => ({
-  getAuth: jest.fn(),
+  getAuth: jest.fn(() => ({
+    currentUser: { uid: 'test-user-123', email: 'test@example.com' },
+  })),
   signInWithEmailAndPassword: jest.fn(),
   signOut: jest.fn(),
   onAuthStateChanged: jest.fn(),
+}))
+
+// Mock the auth instance from lib/firebase
+jest.mock('@/lib/firebase', () => ({
+  db: {},
+  auth: {
+    currentUser: { uid: 'test-user-123', email: 'test@example.com' },
+  },
 }))
 
 jest.mock('firebase/database', () => ({

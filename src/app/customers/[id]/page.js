@@ -64,6 +64,8 @@ import { Input } from "@/components/ui/input";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ErrorDisplay } from "@/components/ErrorDisplay";
+import { ERROR_TYPES } from "@/lib/errors";
 
 export default function CustomerDetail() {
   const params = useParams();
@@ -95,6 +97,7 @@ export default function CustomerDetail() {
   const [selectedMemo, setSelectedMemo] = useState(null);
   const [showMemoDetails, setShowMemoDetails] = useState(false);
   const [showAddPayment, setShowAddPayment] = useState(false);
+  const [error, setError] = useState(null);
 
   const customer = customers?.find((c) => c.id === params.id);
 
@@ -145,6 +148,7 @@ export default function CustomerDetail() {
   const handleAddTransaction = async (transactionData) => {
     try {
       setLoadingState((prev) => ({ ...prev, action: true }));
+      setError(null);
       await addTransaction({
         ...transactionData,
         customerId: params.id,
@@ -156,9 +160,13 @@ export default function CustomerDetail() {
       });
     } catch (error) {
       console.error(ERROR_MESSAGES.ADD_ERROR, error);
+      setError({
+        type: ERROR_TYPES.NETWORK,
+        message: error.message || ERROR_MESSAGES.ADD_ERROR,
+      });
       toast({
         title: "Error",
-        description: ERROR_MESSAGES.ADD_ERROR,
+        description: error.message || ERROR_MESSAGES.ADD_ERROR,
         variant: "destructive",
       });
     } finally {
@@ -169,6 +177,7 @@ export default function CustomerDetail() {
   const handleDeleteTransaction = async (transactionId) => {
     try {
       setLoadingState((prev) => ({ ...prev, action: true }));
+      setError(null);
       await deleteTransaction(transactionId);
       toast({
         title: "Success",
@@ -176,9 +185,13 @@ export default function CustomerDetail() {
       });
     } catch (error) {
       console.error(ERROR_MESSAGES.DELETE_ERROR, error);
+      setError({
+        type: ERROR_TYPES.NETWORK,
+        message: error.message || ERROR_MESSAGES.DELETE_ERROR,
+      });
       toast({
         title: "Error",
-        description: ERROR_MESSAGES.DELETE_ERROR,
+        description: error.message || ERROR_MESSAGES.DELETE_ERROR,
         variant: "destructive",
       });
     } finally {
@@ -189,6 +202,7 @@ export default function CustomerDetail() {
   const handleEditTransaction = async (transactionId, updatedData) => {
     try {
       setLoadingState((prev) => ({ ...prev, action: true }));
+      setError(null);
 
       if (!transactionId) {
         throw new Error("Transaction ID is required");
@@ -220,6 +234,10 @@ export default function CustomerDetail() {
       });
     } catch (error) {
       console.error(ERROR_MESSAGES.UPDATE_ERROR, error);
+      setError({
+        type: error.message?.includes("Invalid") ? ERROR_TYPES.VALIDATION : ERROR_TYPES.NETWORK,
+        message: error.message || ERROR_MESSAGES.UPDATE_ERROR,
+      });
       toast({
         title: "Error",
         description: error.message || ERROR_MESSAGES.UPDATE_ERROR,
@@ -268,6 +286,7 @@ export default function CustomerDetail() {
   const handleAddPayment = async (paymentData) => {
     try {
       setLoadingState((prev) => ({ ...prev, action: true }));
+      setError(null);
       await addPaymentToMemo(
         selectedMemo.memoNumber,
         paymentData,
@@ -281,6 +300,10 @@ export default function CustomerDetail() {
       setSelectedMemo(null);
     } catch (error) {
       console.error("Error adding payment:", error);
+      setError({
+        type: ERROR_TYPES.NETWORK,
+        message: error.message || "Failed to add payment",
+      });
       toast({
         title: "Error",
         description: error.message || "Failed to add payment",
@@ -393,6 +416,21 @@ export default function CustomerDetail() {
               </p>
             </div>
           </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="mb-6">
+              <ErrorDisplay
+                errorType={error.type}
+                message={error.message}
+                onDismiss={() => setError(null)}
+                onRetry={() => {
+                  setError(null);
+                  window.location.reload();
+                }}
+              />
+            </div>
+          )}
 
           {/* Customer Info and Financial Summary */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">

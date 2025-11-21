@@ -8,6 +8,8 @@ import {
   validatePositiveNumber,
   formatValidationErrors,
 } from "@/lib/validation";
+import { requireAuth } from "@/lib/authValidation";
+import { sanitizeObject } from "@/lib/sanitization";
 
 const COLLECTION_PATH = "transactions";
 
@@ -40,12 +42,18 @@ export class TransactionService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async addTransaction(transactionData) {
-    const validationResult = this.validateTransactionData(transactionData);
+    // Validate authentication
+    requireAuth();
+
+    // Sanitize input data
+    const sanitizedData = sanitizeObject(transactionData);
+
+    const validationResult = this.validateTransactionData(sanitizedData);
     if (!validationResult.isValid) {
       throw new AppError(
         `Validation failed: ${formatValidationErrors(validationResult)}`,
         ERROR_TYPES.VALIDATION,
-        { transactionData, validationErrors: validationResult.errors }
+        { transactionData: sanitizedData, validationErrors: validationResult.errors }
       );
     }
 
@@ -71,19 +79,25 @@ export class TransactionService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async updateTransaction(transactionId, updatedData) {
-    const validationResult = this.validateTransactionData(updatedData);
+    // Validate authentication
+    requireAuth();
+
+    // Sanitize input data
+    const sanitizedData = sanitizeObject(updatedData);
+
+    const validationResult = this.validateTransactionData(sanitizedData);
     if (!validationResult.isValid) {
       throw new AppError(
         `Validation failed: ${formatValidationErrors(validationResult)}`,
         ERROR_TYPES.VALIDATION,
-        { transactionId, updatedData, validationErrors: validationResult.errors }
+        { transactionId, updatedData: sanitizedData, validationErrors: validationResult.errors }
       );
     }
 
     return this.atomicOperations.execute("updateTransaction", async () => {
       const transactionRef = ref(this.db, `${COLLECTION_PATH}/${transactionId}`);
       await update(transactionRef, {
-        ...updatedData,
+        ...sanitizedData,
         updatedAt: new Date().toISOString(),
       });
     });
@@ -95,6 +109,9 @@ export class TransactionService {
    * @returns {Promise<void>}
    */
   async deleteTransaction(transactionId) {
+    // Validate authentication
+    requireAuth();
+
     return this.atomicOperations.execute("deleteTransaction", async () => {
       await remove(ref(this.db, `${COLLECTION_PATH}/${transactionId}`));
     });
@@ -205,75 +222,109 @@ export class TransactionService {
 
   /**
    * Get all transactions for a customer, grouped by memo
+   * 
+   * This method implements the memo-based transaction organization pattern.
+   * Each memo represents a sale, and can have multiple payment transactions
+   * linked to it. This allows tracking of partial payments and outstanding dues
+   * on a per-sale basis.
+   * 
    * @param {string} customerId - The customer ID
    * @param {Array<Object>} allTransactions - All transactions from context
    * @returns {Array<MemoGroup>} Array of memo groups with payment details
+   * 
+   * @example
+   * const memoGroups = getCustomerTransactionsByMemo('customer123', transactions);
+   * // Returns: [
+   * //   {
+   * //     memoNumber: 'MEMO-001',
+   * //     totalAmount: 1000,
+   * //     paidAmount: 700,
+   * //     dueAmount: 300,
+   * //     status: 'partial',
+   * //     saleTransaction: {...},
+   * //     paymentTransactions: [{...}, {...}]
+   * //   }
+   * // ]
    */
   getCustomerTransactionsByMemo(customerId, allTransactions = []) {
-    // Filter transactions for this customer
+    // Step 1: Filter to get only this customer's transactions
+    // This reduces the dataset we need to process
     const customerTransactions = allTransactions.filter(
       (t) => t.customerId === customerId
     );
 
-    // Group transactions by memo number
+    // Step 2: Create a Map to group transactions by memo number
+    // Using Map instead of Object for better performance with dynamic keys
     const memoMap = new Map();
 
+    // Step 3: Iterate through transactions and organize them by memo
     customerTransactions.forEach((transaction) => {
       const memoNumber = transaction.memoNumber;
-      if (!memoNumber) return; // Skip transactions without memo numbers
+      
+      // Skip transactions without memo numbers (shouldn't happen in normal flow)
+      if (!memoNumber) return;
 
+      // Initialize memo group if this is the first transaction for this memo
       if (!memoMap.has(memoNumber)) {
-        // Initialize memo group
         memoMap.set(memoNumber, {
           memoNumber,
           customerId,
-          saleTransaction: null,
-          paymentTransactions: [],
-          totalAmount: 0,
-          paidAmount: 0,
-          dueAmount: 0,
-          saleDate: null,
-          status: 'unpaid'
+          saleTransaction: null,      // Will hold the original sale
+          paymentTransactions: [],    // Will hold all payments
+          totalAmount: 0,              // Total sale amount
+          paidAmount: 0,               // Sum of all payments
+          dueAmount: 0,                // Calculated: total - paid
+          saleDate: null,              // Date of original sale
+          status: 'unpaid'             // Will be calculated: paid/partial/unpaid
         });
       }
 
       const memoGroup = memoMap.get(memoNumber);
 
-      // Categorize transaction by type
+      // Step 4: Categorize transaction by type and update memo group
       if (transaction.type === 'sale' || !transaction.type) {
-        // Original sale transaction
+        // This is the original sale transaction
+        // Store it separately as it contains product details and total amount
         memoGroup.saleTransaction = transaction;
         memoGroup.totalAmount = transaction.total || 0;
         memoGroup.saleDate = transaction.date || transaction.createdAt;
+        // Initial deposit from the sale counts as first payment
         memoGroup.paidAmount = transaction.deposit || 0;
       } else if (transaction.type === 'payment') {
-        // Payment transaction
+        // This is a subsequent payment transaction
+        // Add it to the payments array and accumulate the paid amount
         memoGroup.paymentTransactions.push(transaction);
+        // Payment amount can be in 'deposit' or 'amount' field depending on context
         memoGroup.paidAmount += transaction.deposit || transaction.amount || 0;
       }
     });
 
-    // Calculate due amounts and status for each memo
+    // Step 5: Calculate final due amounts and determine payment status
     const memoGroups = Array.from(memoMap.values()).map((memo) => {
+      // Calculate remaining due amount
       memo.dueAmount = memo.totalAmount - memo.paidAmount;
       
-      // Determine status
+      // Determine payment status based on due amount
       if (memo.dueAmount <= 0) {
+        // Fully paid (or overpaid)
         memo.status = 'paid';
       } else if (memo.paidAmount > 0) {
+        // Partially paid (some payment made, but still has due)
         memo.status = 'partial';
       } else {
+        // Unpaid (no payments made yet)
         memo.status = 'unpaid';
       }
 
       return memo;
     });
 
-    // Sort by sale date (most recent first)
+    // Step 6: Sort memos by sale date (most recent first)
+    // This ensures the UI shows the latest sales at the top
     return memoGroups.sort((a, b) => {
       const dateA = new Date(a.saleDate || 0);
       const dateB = new Date(b.saleDate || 0);
-      return dateB - dateA;
+      return dateB - dateA; // Descending order (newest first)
     });
   }
 
@@ -342,6 +393,12 @@ export class TransactionService {
    * @returns {Promise<string>} The new payment transaction ID
    */
   async addPaymentToMemo(memoNumber, paymentData, customerId) {
+    // Validate authentication
+    requireAuth();
+
+    // Sanitize input data
+    const sanitizedPaymentData = sanitizeObject(paymentData);
+
     // Validate payment data
     const result = createValidResult();
 

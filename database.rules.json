@@ -3,33 +3,85 @@
         ".read": "auth != null",
         ".write": "auth != null",
         "customers": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            ".indexOn": [
+                "name",
+                "phone",
+                "createdAt"
+            ],
             "$customerId": {
                 ".read": "auth != null",
-                ".write": "auth != null"
+                ".write": "auth != null",
+                ".validate": "newData.hasChildren(['name', 'phone', 'createdAt']) && newData.child('name').isString() && newData.child('phone').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 100"
             }
         },
         "transactions": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            ".indexOn": [
+                "customerId",
+                "memoNumber",
+                "date",
+                "type"
+            ],
             "$transactionId": {
                 ".read": "auth != null",
-                ".write": "auth != null"
+                ".write": "auth != null",
+                ".validate": "newData.hasChildren(['customerId', 'memoNumber', 'type', 'date']) && newData.child('customerId').isString() && newData.child('memoNumber').isString() && (newData.child('type').val() === 'sale' || newData.child('type').val() === 'payment')"
             }
         },
         "fabrics": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            ".indexOn": [
+                "name",
+                "category",
+                "createdAt"
+            ],
             "$fabricId": {
                 ".read": "auth != null",
-                ".write": "auth != null"
+                ".write": "auth != null",
+                ".validate": "newData.hasChildren(['name', 'category', 'unit']) && newData.child('name').isString() && newData.child('category').isString() && newData.child('name').val().length > 0"
             }
         },
         "suppliers": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            ".indexOn": [
+                "name",
+                "createdAt"
+            ],
             "$supplierId": {
                 ".read": "auth != null",
-                ".write": "auth != null"
+                ".write": "auth != null",
+                ".validate": "newData.hasChildren(['name']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 100"
             }
         },
         "cashTransactions": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            ".indexOn": [
+                "date",
+                "type"
+            ],
             "$cashTransactionId": {
                 ".read": "auth != null",
-                ".write": "auth != null"
+                ".write": "auth != null",
+                ".validate": "newData.hasChildren(['type', 'amount', 'date']) && (newData.child('type').val() === 'in' || newData.child('type').val() === 'out') && newData.child('amount').isNumber() && newData.child('amount').val() >= 0"
+            }
+        },
+        "expenses": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            ".indexOn": [
+                "date",
+                "category"
+            ],
+            "$expenseId": {
+                ".read": "auth != null",
+                ".write": "auth != null",
+                ".validate": "newData.hasChildren(['amount', 'date']) && newData.child('amount').isNumber() && newData.child('amount').val() >= 0"
             }
         }
     }

@@ -10,6 +10,8 @@ import {
   validateEmail,
   formatValidationErrors,
 } from "@/lib/validation";
+import { requireAuth } from "@/lib/authValidation";
+import { sanitizeObject } from "@/lib/sanitization";
 
 const COLLECTION_PATH = "customers";
 
@@ -39,12 +41,18 @@ export class CustomerService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async addCustomer(customerData) {
-    const validationResult = this.validateCustomerData(customerData);
+    // Validate authentication
+    requireAuth();
+
+    // Sanitize input data
+    const sanitizedData = sanitizeObject(customerData);
+
+    const validationResult = this.validateCustomerData(sanitizedData);
     if (!validationResult.isValid) {
       throw new AppError(
         `Validation failed: ${formatValidationErrors(validationResult)}`,
         ERROR_TYPES.VALIDATION,
-        { customerData, validationErrors: validationResult.errors }
+        { customerData: sanitizedData, validationErrors: validationResult.errors }
       );
     }
 
@@ -52,7 +60,7 @@ export class CustomerService {
       const customersRef = ref(this.db, COLLECTION_PATH);
       const newCustomerRef = push(customersRef);
       await set(newCustomerRef, {
-        ...customerData,
+        ...sanitizedData,
         createdAt: new Date().toISOString(),
       });
       return newCustomerRef.key;
@@ -67,19 +75,25 @@ export class CustomerService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async updateCustomer(customerId, updatedData) {
-    const validationResult = this.validateCustomerData(updatedData);
+    // Validate authentication
+    requireAuth();
+
+    // Sanitize input data
+    const sanitizedData = sanitizeObject(updatedData);
+
+    const validationResult = this.validateCustomerData(sanitizedData);
     if (!validationResult.isValid) {
       throw new AppError(
         `Validation failed: ${formatValidationErrors(validationResult)}`,
         ERROR_TYPES.VALIDATION,
-        { customerId, updatedData, validationErrors: validationResult.errors }
+        { customerId, updatedData: sanitizedData, validationErrors: validationResult.errors }
       );
     }
 
     return this.atomicOperations.execute("updateCustomer", async () => {
       const customerRef = ref(this.db, `${COLLECTION_PATH}/${customerId}`);
       await update(customerRef, {
-        ...updatedData,
+        ...sanitizedData,
         updatedAt: new Date().toISOString(),
       });
     });
@@ -93,6 +107,9 @@ export class CustomerService {
    * @throws {AppError} If deletion fails or customer not found
    */
   async deleteCustomer(customerId, customerTransactions = []) {
+    // Validate authentication
+    requireAuth();
+
     return this.atomicOperations.execute("deleteCustomer", async () => {
       this.logger.info(`Attempting to delete customer: ${customerId}`);
       this.logger.info(
@@ -150,6 +167,9 @@ export class CustomerService {
    * @returns {Promise<Customer|null>} The customer object or null if not found
    */
   async getCustomer(customerId) {
+    // Validate authentication
+    requireAuth();
+
     const customerRef = ref(this.db, `${COLLECTION_PATH}/${customerId}`);
     const snapshot = await get(customerRef);
     return snapshot.exists() ? { id: customerId, ...snapshot.val() } : null;

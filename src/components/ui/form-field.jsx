@@ -20,6 +20,7 @@ import {
  * @param {string} props.error - Error message
  * @param {boolean} props.required - Whether the field is required
  * @param {string} props.placeholder - Placeholder text
+ * @param {string} props.helpText - Help text to display below the field
  * @param {Object} props.options - Options for select fields
  * @param {any} props.min - Min value for number inputs
  * @param {any} props.max - Max value for number inputs
@@ -35,6 +36,7 @@ export function FormField({
   error,
   required = false,
   placeholder,
+  helpText,
   options = [],
   min,
   max,
@@ -89,6 +91,9 @@ export function FormField({
       </label>
       {renderInput()}
       {error && <p className="text-sm text-red-500">{error}</p>}
+      {!error && helpText && (
+        <p className="text-xs text-muted-foreground">{helpText}</p>
+      )}
     </div>
   );
 }

@@ -214,24 +214,47 @@ export class FabricService {
   }
 
   /**
-   * Reduce inventory for sale products using FIFO strategy
+   * Reduce inventory for sale products using FIFO (First-In-First-Out) strategy
+   * 
+   * This method implements the FIFO inventory management pattern, which ensures that
+   * the oldest inventory batches are used first. This is critical for:
+   * 1. Accurate cost accounting (using oldest purchase prices first)
+   * 2. Preventing stock expiration issues
+   * 3. Maintaining consistent inventory valuation
+   * 
+   * The method uses a two-pass approach:
+   * - Pass 1: Validate all products and check stock availability (fail-fast)
+   * - Pass 2: Perform actual inventory reduction with batch locking
+   * 
    * @param {Array<Product>} saleProducts - Array of products to reduce from inventory
    * @param {Function} acquireBatchLock - Function to acquire lock on a batch (batchId) => Promise<boolean>
    * @param {Function} releaseBatchLock - Function to release lock on a batch (batchId) => Promise<void>
    * @returns {Promise<void>}
    * @throws {AppError} If insufficient stock, invalid product data, or lock acquisition fails
+   * 
+   * @example
+   * await fabricService.reduceInventory(
+   *   [{ fabricId: 'f123', name: 'Cotton', quantity: 50, color: 'Red' }],
+   *   acquireLock,
+   *   releaseLock
+   * );
    */
   async reduceInventory(saleProducts, acquireBatchLock, releaseBatchLock) {
     return this.atomicOperations.execute("reduceInventory", async () => {
       const updatePromises = [];
-      const lockedBatches = new Set();
+      const lockedBatches = new Set(); // Track locked batches for cleanup
 
       try {
-        // First pass: Validate all products and check stock availability
+        // ============================================================
+        // PASS 1: VALIDATION PHASE
+        // Validate all products and check stock availability BEFORE
+        // making any changes. This fail-fast approach prevents partial
+        // inventory updates if any product has insufficient stock.
+        // ============================================================
         const validationResults = [];
         
         for (const product of saleProducts) {
-          // Validate product data
+          // Step 1.1: Validate product has required fields
           if (!product.fabricId) {
             throw new AppError(
               `Product "${product.name}" has no fabric ID. Please select a valid product.`,
@@ -248,6 +271,7 @@ export class FabricService {
             );
           }
 
+          // Step 1.2: Fetch fabric data from database
           const fabricRef = ref(this.db, `${COLLECTION_PATH}/${product.fabricId}`);
           const fabricSnapshot = await get(fabricRef);
 
@@ -260,6 +284,8 @@ export class FabricService {
           }
 
           const fabricData = fabricSnapshot.val();
+          
+          // Step 1.3: Verify fabric has batches
           if (
             !fabricData.batches ||
             Object.keys(fabricData.batches).length === 0
@@ -271,7 +297,9 @@ export class FabricService {
             );
           }
 
-          // Calculate total available stock for this product
+          // Step 1.4: Sort batches by purchase date (FIFO - oldest first)
+          // This is the core of the FIFO strategy: we always use the oldest
+          // inventory first to maintain proper cost accounting
           let totalAvailable = 0;
           const sortedBatches = Object.entries(fabricData.batches)
             .map(([batchId, batch]) => ({ batchId, ...batch }))
@@ -281,6 +309,8 @@ export class FabricService {
                 new Date(b.purchaseDate || b.createdAt)
             );
 
+          // Step 1.5: Calculate total available stock across all batches
+          // This includes filtering by color if specified
           for (const batch of sortedBatches) {
             if (!batch.items || !Array.isArray(batch.items)) {
               continue;
@@ -288,10 +318,12 @@ export class FabricService {
 
             const eligibleItems = batch.items.filter((item) => {
               if (product.color) {
+                // If color is specified, only count matching color items
                 return (
                   item.colorName === product.color && (item.quantity || 0) > 0
                 );
               }
+              // If no color specified, count all items with positive quantity
               return (item.quantity || 0) > 0;
             });
 
@@ -300,7 +332,8 @@ export class FabricService {
             }
           }
 
-          // Validate sufficient stock before proceeding
+          // Step 1.6: Validate sufficient stock exists
+          // This prevents overselling and ensures data integrity
           if (totalAvailable < product.quantity) {
             throw new AppError(
               `Insufficient stock for ${product.name}. Requested: ${product.quantity}, Available: ${totalAvailable}`,
@@ -314,6 +347,7 @@ export class FabricService {
             );
           }
 
+          // Store validation results for use in Pass 2
           validationResults.push({
             product,
             fabricData,
@@ -322,14 +356,21 @@ export class FabricService {
           });
         }
 
-        // Second pass: Perform actual inventory reduction
+        // ============================================================
+        // PASS 2: INVENTORY REDUCTION PHASE
+        // Now that all products are validated, perform the actual
+        // inventory reduction using FIFO strategy with batch locking
+        // to prevent race conditions in concurrent operations.
+        // ============================================================
         for (const { product, fabricData, sortedBatches } of validationResults) {
           let remainingQuantity = product.quantity;
 
+          // Step 2.1: Iterate through batches in FIFO order (oldest first)
           for (const batch of sortedBatches) {
-            if (remainingQuantity <= 0) break;
+            if (remainingQuantity <= 0) break; // All quantity fulfilled
 
-            // Acquire lock for this batch
+            // Step 2.2: Acquire lock on this batch to prevent concurrent modifications
+            // This is critical for maintaining data consistency in multi-user scenarios
             const lockAcquired = await acquireBatchLock(batch.batchId);
             if (!lockAcquired) {
               throw new AppError(
@@ -344,7 +385,7 @@ export class FabricService {
               continue;
             }
 
-            // Find items that match the color (if specified) or any item if no color
+            // Step 2.3: Find items that match the product criteria
             const eligibleItems = batch.items.filter((item) => {
               if (product.color) {
                 return (
@@ -354,17 +395,20 @@ export class FabricService {
               return (item.quantity || 0) > 0;
             });
 
+            // Step 2.4: Reduce quantity from eligible items in this batch
             for (const item of eligibleItems) {
               if (remainingQuantity <= 0) break;
 
               const availableQuantity = item.quantity || 0;
+              // Take as much as we can from this item (up to remaining needed)
               const quantityToReduce = Math.min(
                 availableQuantity,
                 remainingQuantity
               );
 
               if (quantityToReduce > 0) {
-                // Validate that reduction won't result in negative stock
+                // Step 2.5: Validate that reduction won't result in negative stock
+                // This is a safety check that should never fail if Pass 1 worked correctly
                 const newQuantity = availableQuantity - quantityToReduce;
                 if (newQuantity < 0) {
                   throw new AppError(
@@ -381,13 +425,14 @@ export class FabricService {
                   );
                 }
                 
-                // Update the item quantity
+                // Step 2.6: Update the item quantity (in-memory)
                 item.quantity = newQuantity;
                 remainingQuantity -= quantityToReduce;
               }
             }
 
-            // Add to update promises
+            // Step 2.7: Queue the batch update to be written to database
+            // Updates are batched for better performance
             updatePromises.push(
               this.updateFabricBatch(product.fabricId, batch.batchId, {
                 fabricId: product.fabricId,

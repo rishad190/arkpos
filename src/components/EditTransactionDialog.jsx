@@ -152,7 +152,8 @@ export function EditTransactionDialog({
         onChange={handleChange}
         error={errors.memoNumber}
         required
-        placeholder="Enter memo number"
+        placeholder="e.g., MEMO-2024-001"
+        helpText="Unique identifier for this transaction"
       />
 
       <FormField
@@ -160,7 +161,7 @@ export function EditTransactionDialog({
         name="details"
         value={formData.details}
         onChange={handleChange}
-        placeholder="Enter transaction details"
+        placeholder="Enter transaction details (optional)"
       />
 
       <FormField
@@ -172,7 +173,8 @@ export function EditTransactionDialog({
         error={errors.total}
         min="0"
         step="0.01"
-        placeholder="Enter total amount"
+        placeholder="0.00"
+        required
       />
 
       <FormField
@@ -184,8 +186,25 @@ export function EditTransactionDialog({
         error={errors.deposit}
         min="0"
         step="0.01"
-        placeholder="Enter deposit amount"
+        placeholder="0.00"
+        helpText="Amount paid at the time of transaction"
       />
+
+      {/* Due Amount Display */}
+      {formData.total && formData.deposit && (
+        <div className="bg-muted p-3 rounded-lg">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Due Amount:</span>
+            <span className="text-lg font-bold text-red-600">
+              ৳
+              {(
+                (parseFloat(formData.total) || 0) -
+                (parseFloat(formData.deposit) || 0)
+              ).toLocaleString()}
+            </span>
+          </div>
+        </div>
+      )}
 
       <FormField
         label="Store"

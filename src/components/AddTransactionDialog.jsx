@@ -6,9 +6,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Receipt } from "lucide-react";
 
 export function AddTransactionDialog({ customerId, onAddTransaction }) {
   const [open, setOpen] = useState(false);
@@ -93,15 +97,30 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
       <DialogTrigger asChild>
         <Button>Add Transaction</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>New Transaction</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Receipt className="h-5 w-5" />
+            New Transaction
+          </DialogTitle>
+          <DialogDescription>
+            Create a new transaction for this customer
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="max-h-[60vh] overflow-y-auto pr-4">
+          {errors.submit && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{errors.submit}</AlertDescription>
+            </Alert>
+          )}
+          <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Date *</label>
+              <Label htmlFor="date">
+                Date <span className="text-red-500">*</span>
+              </Label>
               <Input
+                id="date"
                 type="date"
                 value={formData.date}
                 onChange={(e) =>
@@ -115,9 +134,12 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Memo Number *</label>
+              <Label htmlFor="memoNumber">
+                Memo Number <span className="text-red-500">*</span>
+              </Label>
               <Input
-                placeholder="Enter memo number"
+                id="memoNumber"
+                placeholder="e.g., MEMO-2024-001"
                 value={formData.memoNumber}
                 onChange={(e) =>
                   setFormData({ ...formData, memoNumber: e.target.value })
@@ -127,12 +149,16 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
               {errors.memoNumber && (
                 <p className="text-red-500 text-sm">{errors.memoNumber}</p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Enter a unique memo number for this transaction
+              </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Details</label>
+              <Label htmlFor="details">Details</Label>
               <Input
-                placeholder="Enter transaction details"
+                id="details"
+                placeholder="Enter transaction details (optional)"
                 value={formData.details}
                 onChange={(e) =>
                   setFormData({ ...formData, details: e.target.value })
@@ -141,12 +167,15 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Total Bill *</label>
+              <Label htmlFor="total">
+                Total Bill <span className="text-red-500">*</span>
+              </Label>
               <Input
+                id="total"
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Enter total amount"
+                placeholder="0.00"
                 value={formData.total}
                 onChange={(e) =>
                   setFormData({ ...formData, total: e.target.value })
@@ -159,12 +188,13 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Deposit</label>
+              <Label htmlFor="deposit">Initial Deposit</Label>
               <Input
+                id="deposit"
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Enter deposit amount"
+                placeholder="0.00"
                 value={formData.deposit}
                 onChange={(e) =>
                   setFormData({ ...formData, deposit: e.target.value })
@@ -174,11 +204,31 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
               {errors.deposit && (
                 <p className="text-red-500 text-sm">{errors.deposit}</p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Amount paid at the time of transaction
+              </p>
             </div>
 
+            {/* Due Amount Display */}
+            {formData.total && formData.deposit && (
+              <div className="bg-muted p-3 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Due Amount:</span>
+                  <span className="text-lg font-bold text-red-600">
+                    ৳
+                    {(
+                      (parseFloat(formData.total) || 0) -
+                      (parseFloat(formData.deposit) || 0)
+                    ).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">Store</label>
+              <Label htmlFor="storeId">Store</Label>
               <select
+                id="storeId"
                 className={`w-full border rounded-md px-3 py-2 ${
                   errors.storeId ? "border-red-500" : ""
                 }`}
@@ -196,7 +246,7 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <Button
               type="button"
               variant="outline"
