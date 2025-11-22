@@ -277,12 +277,15 @@ export const memoizedCalculations = {
 
         const memoGroup = memoMap.get(memoNumber);
 
-        if (transaction.type === 'sale' || !transaction.type) {
+        // Normalize type to lowercase for comparison
+        const transactionType = transaction.type?.toLowerCase();
+
+        if (transactionType === 'sale' || !transaction.type) {
           memoGroup.saleTransaction = transaction;
           memoGroup.totalAmount = transaction.total || 0;
           memoGroup.saleDate = transaction.date || transaction.createdAt;
           memoGroup.paidAmount = transaction.deposit || 0;
-        } else if (transaction.type === 'payment') {
+        } else if (transactionType === 'payment') {
           memoGroup.paymentTransactions.push(transaction);
           memoGroup.paidAmount += transaction.deposit || transaction.amount || 0;
         }

@@ -1,0 +1,338 @@
+{
+    "alerts": {
+        "application": {
+            "downtime": {
+                "enabled": true,
+                "threshold": "1 minute",
+                "severity": "critical",
+                "notification_channels": [
+                    "email",
+                    "slack"
+                ],
+                "description": "Application is not responding"
+            },
+            "error_rate": {
+                "enabled": true,
+                "threshold": "5%",
+                "window": "5 minutes",
+                "severity": "high",
+                "notification_channels": [
+                    "email",
+                    "slack"
+                ],
+                "description": "Error rate exceeds acceptable threshold"
+            },
+            "response_time": {
+                "enabled": true,
+                "threshold": "3000ms",
+                "window": "10 minutes",
+                "severity": "medium",
+                "notification_channels": [
+                    "slack"
+                ],
+                "description": "Average response time is too slow"
+            },
+            "slow_operations": {
+                "enabled": true,
+                "threshold": "2000ms",
+                "frequency": "10 per hour",
+                "severity": "medium",
+                "notification_channels": [
+                    "slack"
+                ],
+                "description": "Too many slow operations detected"
+            }
+        },
+        "firebase": {
+            "database_quota": {
+                "enabled": true,
+                "threshold": "80%",
+                "severity": "medium",
+                "notification_channels": [
+                    "email"
+                ],
+                "description": "Firebase database quota usage is high"
+            },
+            "read_operations": {
+                "enabled": true,
+                "threshold": "100000 per day",
+                "severity": "low",
+                "notification_channels": [
+                    "email"
+                ],
+                "description": "Firebase read operations approaching quota"
+            },
+            "write_operations": {
+                "enabled": true,
+                "threshold": "50000 per day",
+                "severity": "low",
+                "notification_channels": [
+                    "email"
+                ],
+                "description": "Firebase write operations approaching quota"
+            },
+            "authentication_failures": {
+                "enabled": true,
+                "threshold": "10 per minute",
+                "severity": "high",
+                "notification_channels": [
+                    "email",
+                    "slack"
+                ],
+                "description": "High rate of authentication failures detected"
+            },
+            "security_rule_violations": {
+                "enabled": true,
+                "threshold": "5 per minute",
+                "severity": "high",
+                "notification_channels": [
+                    "email",
+                    "slack"
+                ],
+                "description": "Security rule violations detected"
+            }
+        },
+        "infrastructure": {
+            "cpu_usage": {
+                "enabled": true,
+                "threshold": "80%",
+                "window": "5 minutes",
+                "severity": "medium",
+                "notification_channels": [
+                    "slack"
+                ],
+                "description": "CPU usage is high"
+            },
+            "memory_usage": {
+                "enabled": true,
+                "threshold": "90%",
+                "window": "5 minutes",
+                "severity": "high",
+                "notification_channels": [
+                    "email",
+                    "slack"
+                ],
+                "description": "Memory usage is critical"
+            },
+            "disk_space": {
+                "enabled": true,
+                "threshold": "80%",
+                "severity": "medium",
+                "notification_channels": [
+                    "email"
+                ],
+                "description": "Disk space is running low"
+            },
+            "ssl_certificate": {
+                "enabled": true,
+                "threshold": "30 days",
+                "severity": "medium",
+                "notification_channels": [
+                    "email"
+                ],
+                "description": "SSL certificate expiring soon"
+            }
+        },
+        "security": {
+            "failed_login_attempts": {
+                "enabled": true,
+                "threshold": "5 per user per hour",
+                "severity": "high",
+                "notification_channels": [
+                    "email",
+                    "slack"
+                ],
+                "description": "Multiple failed login attempts detected"
+            },
+            "session_timeout_violations": {
+                "enabled": true,
+                "threshold": "10 per hour",
+                "severity": "medium",
+                "notification_channels": [
+                    "slack"
+                ],
+                "description": "Multiple session timeout violations"
+            },
+            "input_sanitization_failures": {
+                "enabled": true,
+                "threshold": "5 per minute",
+                "severity": "high",
+                "notification_channels": [
+                    "email",
+                    "slack"
+                ],
+                "description": "Input sanitization blocking suspicious inputs"
+            },
+            "dependency_vulnerabilities": {
+                "enabled": true,
+                "severity": "high",
+                "notification_channels": [
+                    "email"
+                ],
+                "description": "Security vulnerabilities found in dependencies",
+                "check_frequency": "daily"
+            }
+        },
+        "business": {
+            "transaction_failures": {
+                "enabled": true,
+                "threshold": "5%",
+                "window": "1 hour",
+                "severity": "high",
+                "notification_channels": [
+                    "email",
+                    "slack"
+                ],
+                "description": "High rate of transaction failures"
+            },
+            "inventory_sync_failures": {
+                "enabled": true,
+                "threshold": "3 per hour",
+                "severity": "medium",
+                "notification_channels": [
+                    "slack"
+                ],
+                "description": "Inventory synchronization failures detected"
+            },
+            "offline_queue_size": {
+                "enabled": true,
+                "threshold": "50 operations",
+                "severity": "medium",
+                "notification_channels": [
+                    "slack"
+                ],
+                "description": "Offline queue is growing large"
+            }
+        }
+    },
+    "notification_channels": {
+        "email": {
+            "enabled": true,
+            "recipients": [
+                "admin@example.com",
+                "dev-team@example.com"
+            ],
+            "rate_limit": "1 per 5 minutes per alert type"
+        },
+        "slack": {
+            "enabled": true,
+            "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+            "channel": "#alerts",
+            "rate_limit": "1 per 1 minute per alert type"
+        },
+        "sms": {
+            "enabled": false,
+            "recipients": [
+                "+1234567890"
+            ],
+            "rate_limit": "1 per 30 minutes per alert type",
+            "critical_only": true
+        }
+    },
+    "health_checks": {
+        "application": {
+            "enabled": true,
+            "interval": "5 minutes",
+            "timeout": "10 seconds",
+            "endpoints": [
+                {
+                    "name": "Homepage",
+                    "url": "https://your-app-url.com",
+                    "expected_status": 200
+                },
+                {
+                    "name": "Login",
+                    "url": "https://your-app-url.com/login",
+                    "expected_status": 200
+                }
+            ]
+        },
+        "firebase": {
+            "enabled": true,
+            "interval": "10 minutes",
+            "checks": [
+                "database_connectivity",
+                "authentication_service",
+                "security_rules"
+            ]
+        }
+    },
+    "metrics": {
+        "collection_interval": "1 minute",
+        "retention_period": "30 days",
+        "aggregation_windows": [
+            "5m",
+            "1h",
+            "24h",
+            "7d"
+        ],
+        "custom_metrics": [
+            {
+                "name": "transaction_count",
+                "type": "counter",
+                "description": "Total number of transactions created"
+            },
+            {
+                "name": "customer_count",
+                "type": "gauge",
+                "description": "Total number of active customers"
+            },
+            {
+                "name": "inventory_value",
+                "type": "gauge",
+                "description": "Total inventory value"
+            },
+            {
+                "name": "offline_queue_size",
+                "type": "gauge",
+                "description": "Number of operations in offline queue"
+            },
+            {
+                "name": "operation_duration",
+                "type": "histogram",
+                "description": "Duration of operations in milliseconds"
+            }
+        ]
+    },
+    "dashboards": {
+        "main": {
+            "name": "BhaiyaPos Overview",
+            "widgets": [
+                "application_uptime",
+                "error_rate",
+                "response_time",
+                "active_users",
+                "transaction_count",
+                "firebase_usage"
+            ]
+        },
+        "performance": {
+            "name": "Performance Metrics",
+            "widgets": [
+                "response_time_histogram",
+                "slow_operations",
+                "database_query_time",
+                "memory_usage",
+                "cpu_usage"
+            ]
+        },
+        "security": {
+            "name": "Security Monitoring",
+            "widgets": [
+                "failed_login_attempts",
+                "security_rule_violations",
+                "session_timeouts",
+                "input_sanitization_blocks"
+            ]
+        },
+        "business": {
+            "name": "Business Metrics",
+            "widgets": [
+                "transaction_count",
+                "customer_count",
+                "inventory_value",
+                "revenue_trend"
+            ]
+        }
+    }
+}

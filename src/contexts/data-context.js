@@ -342,6 +342,12 @@ export function DataProvider({ children }) {
     );
   }, []);
 
+  // Initialize service instances first
+  const atomicOperations = useMemo(
+    () => new AtomicOperationService(dispatch, () => state),
+    [dispatch]
+  );
+
   // Connection state monitoring
   useEffect(() => {
     const connectedRef = ref(db, ".info/connected");
@@ -412,12 +418,6 @@ export function DataProvider({ children }) {
       );
     }
   }, [state.offlineQueue]);
-
-  // Initialize service instances
-  const atomicOperations = useMemo(
-    () => new AtomicOperationService(dispatch, () => state),
-    [dispatch, state]
-  );
   const customerService = useMemo(
     () => new CustomerService(db, logger, atomicOperations),
     [db, logger, atomicOperations]

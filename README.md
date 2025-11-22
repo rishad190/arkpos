@@ -31,7 +31,8 @@ A modern, feature-rich Point of Sale (POS) system built with Next.js and Firebas
 - **Performance Optimization**: Memoization, pagination, and debounced updates
 - **Type Safety**: JSDoc annotations throughout the codebase
 - **Comprehensive Testing**: Unit tests, property-based tests, and integration tests
-- **Security**: Input sanitization, authentication validation, and session management
+- **Security**: Input sanitization, authentication validation, session management, and Firebase security rules
+- **Security Monitoring**: Automated security checks and vulnerability scanning
 
 ## Tech Stack
 
@@ -120,6 +121,22 @@ A modern, feature-rich Point of Sale (POS) system built with Next.js and Firebas
    npm run lint
    ```
 
+### Security Checks
+
+```bash
+# Run comprehensive security check
+node scripts/security-check.js
+
+# Run security tests only
+npm test -- --testPathPatterns="(authValidation|sanitization|sessionManager|sessionTimeout|authenticationValidation)" --watchAll=false
+
+# Check for dependency vulnerabilities
+npm audit
+
+# Fix dependency vulnerabilities
+npm audit fix
+```
+
 ### Production Build
 
 ```bash
@@ -132,6 +149,27 @@ npm start
 # Build and analyze bundle size
 npm run build:analyze
 ```
+
+### Deployment
+
+```bash
+# Run pre-deployment checks
+npm run predeploy
+
+# Deploy to staging
+npm run deploy:staging
+
+# Deploy to production
+npm run deploy:production
+
+# Run health check
+npm run health-check:production
+
+# Rollback if needed
+npm run rollback:production
+```
+
+For detailed deployment instructions, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Project Structure
 
@@ -289,7 +327,12 @@ Comprehensive documentation is available in the `docs/` directory:
 - **[TESTING.md](docs/TESTING.md)**: Testing strategy and guidelines
 - **[ONBOARDING.md](docs/ONBOARDING.md)**: Developer onboarding guide
 - **[SECURITY.md](docs/SECURITY.md)**: Security practices and guidelines
+- **[SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md)**: Comprehensive security audit report
+- **[SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md)**: Security maintenance checklist
 - **[PERFORMANCE.md](docs/PERFORMANCE.md)**: Performance optimization guide
+- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)**: Deployment guide and procedures
+- **[DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md)**: Pre-deployment checklist
+- **[ROLLBACK_PLAN.md](docs/ROLLBACK_PLAN.md)**: Rollback procedures and recovery steps
 
 ## Contributing
 

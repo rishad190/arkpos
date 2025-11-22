@@ -125,11 +125,24 @@ export default function CustomerDetail() {
       .reduce((acc, transaction) => {
         const previousBalance =
           acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
+        
+        // Calculate balance change based on transaction type
+        let balanceChange = 0;
+        const transactionType = transaction.type?.toLowerCase();
+        
+        if (transactionType === 'payment') {
+          // Payment transactions reduce the balance
+          balanceChange = -(transaction.amount || transaction.deposit || 0);
+        } else {
+          // Sale transactions (or transactions without type) add to balance
+          balanceChange = transaction.due || 0;
+        }
+        
         return [
           ...acc,
           {
             ...transaction,
-            cumulativeBalance: previousBalance + (transaction.due || 0),
+            cumulativeBalance: previousBalance + balanceChange,
           },
         ];
       }, []);
@@ -270,14 +283,44 @@ export default function CustomerDetail() {
 
   // Handle memo click - show details dialog
   const handleMemoClick = (memo) => {
-    const memoDetails = getMemoDetails(memo.memoNumber);
+    // The memo object from customerMemoGroups already has all the data we need
+    // Transform it to match the MemoDetailsDialog expected format
+    const memoDetails = {
+      memoNumber: memo.memoNumber,
+      saleTransaction: memo.saleTransaction,
+      paymentTransactions: memo.paymentTransactions || [],
+      totalAmount: memo.totalAmount || 0,
+      totalPaid: memo.paidAmount || 0,
+      remainingDue: memo.dueAmount || 0,
+      status: memo.status || 'unpaid'
+    };
+    
+    if (!memoDetails.saleTransaction) {
+      toast({
+        title: "Error",
+        description: "Could not load memo details. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setSelectedMemo(memoDetails);
     setShowMemoDetails(true);
   };
 
   // Handle add payment button click
   const handleAddPaymentClick = (memo) => {
-    const memoDetails = getMemoDetails(memo.memoNumber);
+    // Transform memo data to match expected format
+    const memoDetails = {
+      memoNumber: memo.memoNumber,
+      saleTransaction: memo.saleTransaction,
+      paymentTransactions: memo.paymentTransactions || [],
+      totalAmount: memo.totalAmount || 0,
+      totalPaid: memo.paidAmount || 0,
+      remainingDue: memo.dueAmount || 0,
+      status: memo.status || 'unpaid'
+    };
+    
     setSelectedMemo(memoDetails);
     setShowAddPayment(true);
   };
@@ -756,8 +799,12 @@ export default function CustomerDetail() {
                     {loadingState.transactions ? (
                       <TableSkeleton />
                     ) : (
-                      filteredTransactions.map((transaction) => (
-                        <TableRow key={transaction.id}>
+                      filteredTransactions.map((transaction) => {
+                        const isPayment = transaction.type?.toLowerCase() === 'payment';
+                        const paymentAmount = transaction.amount || transaction.deposit || 0;
+                        
+                        return (
+                        <TableRow key={transaction.id} className={isPayment ? "bg-green-50/50" : ""}>
                           <TableCell className="whitespace-nowrap">
                             {new Date(transaction.date)
                               .toLocaleDateString("en-GB", {
@@ -769,18 +816,29 @@ export default function CustomerDetail() {
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
                             {transaction.memoNumber}
+                            {isPayment && (
+                              <span className="ml-2 text-xs text-green-600 font-medium">
+                                (Payment)
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
-                            {transaction.details}
+                            {transaction.details || (isPayment ? transaction.note || 'Payment received' : '-')}
                           </TableCell>
                           <TableCell className="text-right whitespace-nowrap">
-                            ৳{transaction.total.toLocaleString()}
+                            {isPayment ? '-' : `৳${transaction.total.toLocaleString()}`}
                           </TableCell>
                           <TableCell className="text-right whitespace-nowrap">
-                            ৳{transaction.deposit.toLocaleString()}
+                            {isPayment ? (
+                              <span className="text-green-600 font-medium">
+                                ৳{paymentAmount.toLocaleString()}
+                              </span>
+                            ) : (
+                              `৳${transaction.deposit.toLocaleString()}`
+                            )}
                           </TableCell>
                           <TableCell className="text-right whitespace-nowrap">
-                            ৳{transaction.due.toLocaleString()}
+                            {isPayment ? '-' : `৳${transaction.due.toLocaleString()}`}
                           </TableCell>
                           <TableCell
                             className={`text-right font-medium whitespace-nowrap ${
@@ -792,7 +850,7 @@ export default function CustomerDetail() {
                             ৳{transaction.cumulativeBalance.toLocaleString()}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
-                            {transaction.storeId}
+                            {transaction.storeId || '-'}
                           </TableCell>
                           <TableCell>
                             <div className="flex justify-end">
@@ -857,7 +915,8 @@ export default function CustomerDetail() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

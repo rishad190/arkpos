@@ -40,39 +40,43 @@ import { useReactToPrint } from "react-to-print";
 import ExpenseReportPrint from "@/components/ExpenseReportPrint";
 
 export default function ExpenseReportPage() {
-  const { dailyCashTransactions, loading, getExpenseCategories } = useData();
+  const { dailyCashTransactions, loading } = useData();
   const [selectedPeriod, setSelectedPeriod] = useState(
     new Date().toISOString().slice(0, 7)
   );
   const [viewMode, setViewMode] = useState("monthly"); // monthly, yearly, all-time
-  const [expenseCategories, setExpenseCategories] = useState([]);
 
   const printRef = useRef();
 
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const categories = await getExpenseCategories();
-        setExpenseCategories(categories);
-      } catch (error) {
-        console.error("Error loading categories:", error);
-        // Handle error appropriately, maybe show a toast
+  // Extract unique categories from transactions
+  const expenseCategories = useMemo(() => {
+    const transactions = Array.isArray(dailyCashTransactions) ? dailyCashTransactions : [];
+    const categories = new Set();
+    
+    transactions.forEach((transaction) => {
+      if (transaction.transactionType === "cash" && transaction.cashOut > 0) {
+        const category = transaction.category || "Uncategorized";
+        categories.add(category);
       }
-    };
-    loadCategories();
-  }, [getExpenseCategories]);
+    });
+    
+    return Array.from(categories).sort();
+  }, [dailyCashTransactions]);
 
   const filteredTransactions = useMemo(() => {
+    // Ensure dailyCashTransactions is an array
+    const transactions = Array.isArray(dailyCashTransactions) ? dailyCashTransactions : [];
+    
     if (viewMode === "monthly") {
-      return dailyCashTransactions.filter((t) =>
-        t.date.startsWith(selectedPeriod)
+      return transactions.filter((t) =>
+        t.date?.startsWith(selectedPeriod)
       );
     }
     if (viewMode === "yearly") {
       const year = selectedPeriod.slice(0, 4);
-      return dailyCashTransactions.filter((t) => t.date.startsWith(year));
+      return transactions.filter((t) => t.date?.startsWith(year));
     }
-    return dailyCashTransactions;
+    return transactions;
   }, [dailyCashTransactions, selectedPeriod, viewMode]);
 
   const categoryTotals = useMemo(() => {
@@ -124,13 +128,12 @@ export default function ExpenseReportPage() {
     []
   );
 
-  const years = useMemo(
-    () =>
-      Array.from(
-        new Set(dailyCashTransactions.map((t) => t.date.slice(0, 4)))
-      ).sort((a, b) => b - a),
-    [dailyCashTransactions]
-  );
+  const years = useMemo(() => {
+    const transactions = Array.isArray(dailyCashTransactions) ? dailyCashTransactions : [];
+    return Array.from(
+      new Set(transactions.map((t) => t.date?.slice(0, 4)).filter(Boolean))
+    ).sort((a, b) => b - a);
+  }, [dailyCashTransactions]);
 
   const handleExportCSV = () => {
     const data = Object.entries(categoryTotals).map(([category, amount]) => ({

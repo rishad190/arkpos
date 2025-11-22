@@ -15,7 +15,14 @@
     "test:performance": "jest --testPathPatterns=performance --runInBand",
     "analyze:bundle": "node scripts/analyze-bundle.js",
     "build:analyze": "npm run build && npm run analyze:bundle",
-    "perf:report": "npm run test:performance -- --verbose"
+    "perf:report": "npm run test:performance -- --verbose",
+    "deploy:staging": "bash scripts/deploy.sh staging",
+    "deploy:production": "bash scripts/deploy.sh production",
+    "rollback:staging": "bash scripts/rollback.sh staging",
+    "rollback:production": "bash scripts/rollback.sh production",
+    "health-check:staging": "bash scripts/health-check.sh staging",
+    "health-check:production": "bash scripts/health-check.sh production",
+    "predeploy": "npm run test:ci && npm run lint && node scripts/security-check.js"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.13",

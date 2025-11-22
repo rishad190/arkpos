@@ -11,7 +11,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, DollarSign, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { CustomerTable } from "@/components/CustomerTable";
 import { AddCustomerDialog } from "@/components/AddCustomerDialog";
 import { EditCustomerDialog } from "@/components/EditCustomerDialog";
@@ -22,7 +22,8 @@ export default function CustomersPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { 
-    customers, 
+    customers,
+    transactions,
     getCustomerDue, 
     getCustomerTransactionsByMemo,
     deleteCustomer, 
@@ -38,6 +39,34 @@ export default function CustomersPage() {
     const memoGroups = getCustomerTransactionsByMemo(customerId);
     return memoGroups.length;
   };
+
+  // Calculate customer financial stats
+  const customerStats = useMemo(() => {
+    if (!customers || !transactions) {
+      return {
+        totalBill: 0,
+        totalDeposit: 0,
+        totalDue: 0,
+      };
+    }
+
+    return customers.reduce(
+      (acc, customer) => {
+        const customerTransactions =
+          transactions?.filter((t) => t.customerId === customer.id) || [];
+        return {
+          totalBill:
+            acc.totalBill +
+            customerTransactions.reduce((sum, t) => sum + (t.total || 0), 0),
+          totalDeposit:
+            acc.totalDeposit +
+            customerTransactions.reduce((sum, t) => sum + (t.deposit || 0), 0),
+          totalDue: acc.totalDue + getCustomerDue(customer.id),
+        };
+      },
+      { totalBill: 0, totalDeposit: 0, totalDue: 0 }
+    );
+  }, [customers, transactions, getCustomerDue]);
 
   const filteredCustomers = useMemo(() => {
     if (!Array.isArray(customers)) return [];
@@ -87,26 +116,86 @@ export default function CustomersPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your customer information and track their transactions
+          </p>
+        </div>
+        <Button onClick={() => setAddDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add New Customer
+        </Button>
+      </div>
+
+      {/* Financial Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-blue-50 border-none shadow-md hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-sm font-medium text-blue-600">
+                Total Bill Amount
+              </h3>
+              <DollarSign className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="text-2xl font-bold text-blue-700">
+              ৳{customerStats.totalBill.toLocaleString()}
+            </div>
+            <p className="text-xs text-blue-600 mt-2">
+              Total sales across all customers
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-green-50 border-none shadow-md hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-sm font-medium text-green-600">
+                Total Deposit
+              </h3>
+              <DollarSign className="h-4 w-4 text-green-600" />
+            </div>
+            <div className="text-2xl font-bold text-green-700">
+              ৳{customerStats.totalDeposit.toLocaleString()}
+            </div>
+            <p className="text-xs text-green-600 mt-2">
+              Total payments received
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-red-50 border-none shadow-md hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-sm font-medium text-red-600">
+                Total Due Amount
+              </h3>
+              <DollarSign className="h-4 w-4 text-red-600" />
+            </div>
+            <div className="text-2xl font-bold text-red-700">
+              ৳{customerStats.totalDue.toLocaleString()}
+            </div>
+            <p className="text-xs text-red-600 mt-2">
+              Outstanding balance to collect
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Customer List Card */}
       <Card className="border-none shadow-md">
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <CardTitle className="text-3xl font-bold tracking-tight">
-                Customers
-              </CardTitle>
-              <CardDescription className="mt-1">
-                Manage your customer information here.
+              <CardTitle>Customer List</CardTitle>
+              <CardDescription>
+                Showing {filteredCustomers.length} of {customers?.length || 0} customers
               </CardDescription>
             </div>
-            <Button onClick={() => setAddDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add New Customer
-            </Button>
-          </div>
-
-          <div className="mt-4">
-            <div className="relative max-w-sm">
+            <div className="relative w-full md:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name, phone, or address..."

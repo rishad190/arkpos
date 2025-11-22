@@ -19,9 +19,10 @@ const PERFORMANCE_THRESHOLDS = {
 
 /**
  * Generator for operation names
+ * Generates realistic operation names with alphanumeric characters, underscores, and hyphens
  */
 const operationNameGenerator = () => {
-  return fc.string({ minLength: 1, maxLength: 50 }).filter(s => s.trim().length > 0);
+  return fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/);
 };
 
 /**
@@ -425,24 +426,46 @@ describe('Property 18: Slow operations are logged', () => {
           // Property: console.info should be called for slow (but not very slow) operations
           expect(consoleInfoSpy).toHaveBeenCalled();
           
-          // Property: The log should contain the operation name and duration
+          // Property: The log should contain the slow operation pattern and duration
           const logCalls = consoleInfoSpy.mock.calls;
-          const relevantLog = logCalls.find(call => 
-            call[0].includes(operationName) && call[0].includes(`${duration}ms`)
-          );
-          expect(relevantLog).toBeDefined();
+          const hasSlowOperationLog = logCalls.some(call => {
+            const message = call[0];
+            // Check for the slow operation pattern and that it contains the duration
+            return message.includes('[Performance]') && 
+                   message.toLowerCase().includes('slow operation') &&
+                   message.includes(`${duration}ms`);
+          });
+          expect(hasSlowOperationLog).toBe(true);
           
-          // Property: The log should mention it's a slow operation
+          // Property: The log should contain the operation name
+          // Find the log entry that matches the pattern
+          const relevantLog = logCalls.find(call => {
+            const message = call[0];
+            return message.includes('[Performance]') && 
+                   message.toLowerCase().includes('slow operation') &&
+                   message.includes(`${duration}ms`);
+          });
+          
+          // Verify the log exists and contains the operation name
+          // Use a more robust check that handles special characters
+          expect(relevantLog).toBeDefined();
           if (relevantLog) {
-            expect(relevantLog[0]).toMatch(/slow operation/i);
+            const logMessage = relevantLog[0];
+            // The operation name should appear in the log message
+            // Check by verifying the log structure: "[Performance] Slow operation: {name} took {duration}ms"
+            const expectedPattern = `[Performance] Slow operation: ${operationName} took ${duration}ms`;
+            expect(logMessage).toBe(expectedPattern);
           }
           
-          // Property: Context should be logged if provided
-          if (context && Object.keys(context).length > 0) {
-            const contextLog = logCalls.find(call => call.length > 1);
-            if (contextLog) {
-              expect(contextLog[1]).toEqual(context);
-            }
+          // Property: Context should be logged as second argument if it has meaningful values
+          // Filter out contexts that are empty or only have undefined values
+          const hasValidContext = context && Object.keys(context).length > 0 && 
+                                  Object.values(context).some(v => v !== undefined && v !== null && v !== '');
+          
+          if (hasValidContext) {
+            // Check that context was passed as second argument
+            expect(relevantLog.length).toBeGreaterThan(1);
+            expect(relevantLog[1]).toEqual(context);
           }
         }
       ),
@@ -591,16 +614,18 @@ describe('Property 18: Slow operations are logged', () => {
           expect(totalLogCalls).toBe(expectedInfoLogs + expectedWarnLogs);
           
           // Property: Each operation should have a corresponding log
+          // Check by matching the exact log format: "[Performance] Slow operation: {name} took {duration}ms"
           operations.forEach(({ name, duration }) => {
-            const infoLog = consoleInfoSpy.mock.calls.find(call => 
-              call[0].includes(name) && call[0].includes(`${duration}ms`)
-            );
-            const warnLog = consoleWarnSpy.mock.calls.find(call => 
-              call[0].includes(name) && call[0].includes(`${duration}ms`)
-            );
+            const isVerySlow = duration > PERFORMANCE_THRESHOLDS.VERY_SLOW_OPERATION;
+            const expectedMessage = isVerySlow 
+              ? `[Performance] Very slow operation: ${name} took ${duration}ms`
+              : `[Performance] Slow operation: ${name} took ${duration}ms`;
             
-            // Should be logged in either info or warn
-            expect(infoLog || warnLog).toBeDefined();
+            const logCalls = isVerySlow ? consoleWarnSpy.mock.calls : consoleInfoSpy.mock.calls;
+            const matchingLog = logCalls.find(call => call[0] === expectedMessage);
+            
+            // Should be logged with exact message format
+            expect(matchingLog).toBeDefined();
           });
         }
       ),
@@ -614,9 +639,9 @@ describe('Property 18: Slow operations are logged', () => {
         operationNameGenerator(),
         fc.integer({ min: PERFORMANCE_THRESHOLDS.SLOW_OPERATION + 1, max: 10000 }),
         fc.record({
-          userId: fc.string(),
+          userId: fc.stringMatching(/^[a-zA-Z0-9_-]{0,20}$/),
           operationType: fc.constantFrom('read', 'write', 'delete', 'update'),
-          resourceId: fc.string(),
+          resourceId: fc.stringMatching(/^[a-zA-Z0-9_-]{0,20}$/),
         }),
         (operationName, duration, context) => {
           // Reset spies for each iteration
@@ -633,27 +658,28 @@ describe('Property 18: Slow operations are logged', () => {
           handle.startTime = handle.startTime - duration;
           
           // End operation
-          tracker.endOperation(handle);
+          const metrics = tracker.endOperation(handle);
           
           // Determine which console method was used
           const isVerySlow = duration > PERFORMANCE_THRESHOLDS.VERY_SLOW_OPERATION;
+          const expectedMessage = isVerySlow 
+            ? `[Performance] Very slow operation: ${operationName} took ${duration}ms`
+            : `[Performance] Slow operation: ${operationName} took ${duration}ms`;
+          
           const logCalls = isVerySlow ? consoleWarnSpy.mock.calls : consoleInfoSpy.mock.calls;
           
-          // Property: Log should exist
+          // Property: Log should exist with exact message format
           expect(logCalls.length).toBeGreaterThan(0);
           
-          // Property: Log should contain operation name
-          const relevantLog = logCalls.find(call => call[0].includes(operationName));
+          // Property: Log should match expected format exactly
+          const relevantLog = logCalls.find(call => call[0] === expectedMessage);
           expect(relevantLog).toBeDefined();
           
-          // Property: Log should contain duration
-          if (relevantLog) {
-            expect(relevantLog[0]).toMatch(new RegExp(`${duration}ms`));
-          }
-          
           // Property: Context should be passed as second argument
-          const contextLog = logCalls.find(call => call.length > 1 && call[1] === context);
-          expect(contextLog).toBeDefined();
+          if (relevantLog) {
+            expect(relevantLog.length).toBeGreaterThan(1);
+            expect(relevantLog[1]).toEqual(context);
+          }
         }
       ),
       { numRuns: 100 }

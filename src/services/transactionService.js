@@ -282,7 +282,10 @@ export class TransactionService {
       const memoGroup = memoMap.get(memoNumber);
 
       // Step 4: Categorize transaction by type and update memo group
-      if (transaction.type === 'sale' || !transaction.type) {
+      // Normalize type to lowercase for comparison
+      const transactionType = transaction.type?.toLowerCase();
+      
+      if (transactionType === 'sale' || !transaction.type) {
         // This is the original sale transaction
         // Store it separately as it contains product details and total amount
         memoGroup.saleTransaction = transaction;
@@ -290,7 +293,7 @@ export class TransactionService {
         memoGroup.saleDate = transaction.date || transaction.createdAt;
         // Initial deposit from the sale counts as first payment
         memoGroup.paidAmount = transaction.deposit || 0;
-      } else if (transaction.type === 'payment') {
+      } else if (transactionType === 'payment') {
         // This is a subsequent payment transaction
         // Add it to the payments array and accumulate the paid amount
         memoGroup.paymentTransactions.push(transaction);
@@ -345,11 +348,12 @@ export class TransactionService {
     }
 
     // Separate sale and payment transactions
+    // Normalize type to lowercase for comparison
     const saleTransaction = memoTransactions.find(
-      (t) => t.type === 'sale' || !t.type
+      (t) => t.type?.toLowerCase() === 'sale' || !t.type
     );
     const paymentTransactions = memoTransactions.filter(
-      (t) => t.type === 'payment'
+      (t) => t.type?.toLowerCase() === 'payment'
     );
 
     if (!saleTransaction) {
@@ -375,7 +379,7 @@ export class TransactionService {
       saleTransaction,
       paymentTransactions: paymentTransactions.sort((a, b) => {
         const dateA = new Date(a.date || a.createdAt || 0);
-        const dateB = new Date(b.date || b.createdAt || 0);
+        const dateB = new Date(b.createdAt || 0);
         return dateA - dateB; // Oldest first
       }),
       totalAmount,

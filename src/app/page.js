@@ -9,12 +9,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { AddCustomerDialog } from "@/components/AddCustomerDialog";
-import { EditCustomerDialog } from "@/components/EditCustomerDialog";
-import { CustomerTable } from "@/components/CustomerTable";
-import { SummaryCards } from "@/components/SummaryCards";
-import { CustomerSearch } from "@/components/CustomerSearch";
-import { Pagination } from "@/components/Pagination";
+
 import { LoadingState, TableSkeleton } from "@/components/LoadingState";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -22,12 +17,8 @@ import { SkeletonLoader } from "@/components/common/SkeletonLoader";
 import { QuickStatCard } from "@/components/QuickStatCard";
 import { RecentTransactions } from "@/components/RecentTransactions";
 import { useData } from "@/contexts/data-context";
-import { useAppToast } from "@/hooks/use-app-toast";
-import {
-  CUSTOMER_CONSTANTS,
-  ERROR_MESSAGES,
-  PAGE_TITLES,
-} from "@/lib/constants";
+
+
 import {
   Users,
   Package,
@@ -42,18 +33,7 @@ import {
   History,
   Tag,
 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
+
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -65,29 +45,15 @@ export default function Dashboard() {
     fabrics,
     suppliers,
     error,
-    addCustomer,
-    updateCustomer,
-    deleteCustomer,
     getCustomerDue,
   } = useData();
-  const { toastSuccess, toastError } = useAppToast();
 
   const [loadingState, setLoadingState] = useState({
     initial: true,
-    customers: true,
     transactions: true,
-    actions: false,
   });
-  const [isAddingCustomer, setIsAddingCustomer] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState(
-    CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL
-  );
   const [mounted, setMounted] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [activeTab, setActiveTab] = useState("customers");
-  const [selectedTags, setSelectedTags] = useState([]);
+  const [activeTab, setActiveTab] = useState("overview");
 
   // Calculate totals and statistics
   const stats = useMemo(() => {
@@ -139,80 +105,23 @@ export default function Dashboard() {
     };
   }, [customers, transactions, fabrics, suppliers, getCustomerDue]);
 
-  // Get all unique tags from customers
-  const allTags = useMemo(() => {
-    const tags = new Set();
-    customers?.forEach((customer) => {
-      customer.tags?.forEach((tag) => tags.add(tag));
-    });
-    return Array.from(tags).sort();
-  }, [customers]);
 
-  const handleAddCustomer = async (customerData) => {
-    setLoadingState((prev) => ({ ...prev, actions: true }));
-    try {
-      await addCustomer(customerData);
-      setIsAddingCustomer(false);
-      toastSuccess("Customer added successfully");
-    } catch (error) {
-      console.error(ERROR_MESSAGES.ADD_ERROR, error);
-      toastError(ERROR_MESSAGES.ADD_ERROR);
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
-    }
-  };
-
-  const handleEditCustomer = async (customerId, updatedData) => {
-    setLoadingState((prev) => ({ ...prev, actions: true }));
-    try {
-      await updateCustomer(customerId, updatedData);
-      setEditingCustomer(null);
-      toastSuccess("Customer updated successfully");
-    } catch (error) {
-      console.error(ERROR_MESSAGES.UPDATE_ERROR, error);
-      toastError(ERROR_MESSAGES.UPDATE_ERROR);
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
-    }
-  };
-
-  const handleRowClick = (customerId) => {
-    router.push(`/customers/${customerId}`);
-  };
-
-  const handleDeleteCustomer = async (customerId) => {
-    setLoadingState((prev) => ({ ...prev, actions: true }));
-    try {
-      // Filter transactions related to the customer
-      const customerTransactions = transactions.filter(
-        (t) => t.customerId === customerId
-      );
-      await deleteCustomer(customerId, customerTransactions);
-      toastSuccess("Customer deleted successfully");
-    } catch (error) {
-      console.error(ERROR_MESSAGES.DELETE_ERROR, error);
-      toastError(ERROR_MESSAGES.DELETE_ERROR);
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
-    }
-  };
 
   useEffect(() => {
     setMounted(true);
-    if (mounted && customers) {
+    if (mounted && transactions) {
       setLoadingState((prev) => ({ ...prev, initial: false }));
     }
-  }, [mounted, customers]);
+  }, [mounted, transactions]);
 
   useEffect(() => {
-    if (customers && transactions) {
+    if (transactions) {
       setLoadingState((prev) => ({
         ...prev,
-        customers: false,
         transactions: false,
       }));
     }
-  }, [customers, transactions]);
+  }, [transactions]);
 
   if (error) {
     return (
@@ -222,59 +131,30 @@ export default function Dashboard() {
     );
   }
 
-  if (loadingState.initial || !customers) {
+  if (loadingState.initial) {
     return <SkeletonLoader />;
   }
-
-  const filteredCustomers = (customers || []).filter((customer) => {
-    if (!customer) return false;
-
-    const matchesSearch =
-      customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone?.includes(searchTerm);
-
-    const currentDue = getCustomerDue(customer.id);
-    const matchesFilter =
-      selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL ||
-      (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.DUE &&
-        currentDue > 0) ||
-      (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.PAID &&
-        currentDue === 0);
-
-    const matchesTags =
-      selectedTags.length === 0 ||
-      selectedTags.every((tag) => customer.tags?.includes(tag));
-
-    return matchesSearch && matchesFilter && matchesTags;
-  });
 
   return (
     <ErrorBoundary>
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
         <PageHeader
-          title={PAGE_TITLES.CUSTOMER_MANAGEMENT}
+          title="Dashboard"
           description="Welcome back! Here's an overview of your business"
           actions={
             <>
-              <AddCustomerDialog
-                isOpen={isAddingCustomer}
-                onClose={() => setIsAddingCustomer(false)}
-                onAddCustomer={handleAddCustomer}
-              >
-                <Button
-                  className="w-full md:w-auto"
-                  disabled={loadingState.actions}
-                  aria-label="Add new customer"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Customer
-                </Button>
-              </AddCustomerDialog>
               <Button
                 variant="outline"
                 className="w-full md:w-auto"
+                onClick={() => router.push("/customers")}
+                aria-label="View customers"
+              >
+                <Users className="mr-2 h-4 w-4" />
+                View Customers
+              </Button>
+              <Button
+                className="w-full md:w-auto"
                 onClick={() => router.push("/cashmemo")}
-                disabled={loadingState.actions}
                 aria-label="Create new cash memo"
               >
                 <FileText className="mr-2 h-4 w-4" />
@@ -323,14 +203,7 @@ export default function Dashboard() {
           className="space-y-4"
         >
           <div className="flex items-center justify-between">
-            <TabsList className="grid w-full md:w-auto grid-cols-3 gap-2">
-              <TabsTrigger
-                value="customers"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                <Users className="w-4 h-4 mr-2" />
-                Customers
-              </TabsTrigger>
+            <TabsList className="grid w-full md:w-auto grid-cols-2 gap-2">
               <TabsTrigger
                 value="overview"
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
@@ -359,108 +232,6 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-
-          <TabsContent value="customers" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="bg-blue-50 border-none shadow-md hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-sm font-medium text-blue-600">
-                      Total Bill Amount
-                    </h3>
-                    <DollarSign className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-blue-700">
-                    ৳{stats.totalBill.toLocaleString()}
-                  </div>
-                  <div className="flex items-center mt-2 text-sm text-blue-600">
-                    <ArrowUpRight className="h-4 w-4 mr-1" />
-                    <span>12% from last month</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-green-50 border-none shadow-md hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-sm font-medium text-green-600">
-                      Total Deposit
-                    </h3>
-                    <DollarSign className="h-4 w-4 text-green-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-green-700">
-                    ৳{stats.totalDeposit.toLocaleString()}
-                  </div>
-                  <div className="flex items-center mt-2 text-sm text-green-600">
-                    <ArrowUpRight className="h-4 w-4 mr-1" />
-                    <span>8% from last month</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-red-50 border-none shadow-md hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-sm font-medium text-red-600">
-                      Total Due Amount
-                    </h3>
-                    <DollarSign className="h-4 w-4 text-red-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-red-700">
-                    ৳{stats.totalDue.toLocaleString()}
-                  </div>
-                  <div className="flex items-center mt-2 text-sm text-red-600">
-                    <ArrowDownRight className="h-4 w-4 mr-1" />
-                    <span>3% from last month</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            <div className="flex flex-col gap-4">
-              <CustomerSearch
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                selectedFilter={selectedFilter}
-                onFilterChange={setSelectedFilter}
-                selectedTags={selectedTags}
-                onTagsChange={setSelectedTags}
-                allTags={allTags}
-              />
-              <Button
-                onClick={() => setIsAddingCustomer(true)}
-                className="w-full md:w-auto"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Customer
-              </Button>
-            </div>
-
-            <Card className="border-none shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle>Customer List</CardTitle>
-                <CardDescription>
-                  Showing {filteredCustomers.length} customers
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  {loadingState.customers ? (
-                    <TableSkeleton />
-                  ) : (
-                    <CustomerTable
-                      customers={filteredCustomers}
-                      getCustomerDue={getCustomerDue}
-                      onRowClick={handleRowClick}
-                      onEdit={setEditingCustomer}
-                      onDelete={handleDeleteCustomer}
-                      currentPage={currentPage}
-                      customersPerPage={CUSTOMER_CONSTANTS.CUSTOMERS_PER_PAGE}
-                    />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           <TabsContent value="overview" className="space-y-4">
             {/* Financial Summary */}
@@ -584,15 +355,6 @@ export default function Dashboard() {
             </Card>
           </TabsContent>
         </Tabs>
-
-        {editingCustomer && (
-          <EditCustomerDialog
-            customer={editingCustomer}
-            isOpen={!!editingCustomer}
-            onClose={() => setEditingCustomer(null)}
-            onEditCustomer={handleEditCustomer}
-          />
-        )}
       </div>
     </ErrorBoundary>
   );
