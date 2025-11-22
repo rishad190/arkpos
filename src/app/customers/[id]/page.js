@@ -436,10 +436,10 @@ export default function CustomerDetail() {
           </Button>
         </div>
       ) : (
-        <div className="p-6 max-w-7xl mx-auto">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto">
           {/* Header Section */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-3">
+            <div className="w-full sm:w-auto">
               <div className="flex items-center gap-2 mb-1">
                 <Button
                   variant="ghost"
@@ -450,11 +450,11 @@ export default function CustomerDetail() {
                   <ArrowLeft className="h-4 w-4" />
                   <span className="sr-only">Back</span>
                 </Button>
-                <h1 className="text-2xl font-bold tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
                   Customer Details
                 </h1>
               </div>
-              <p className="text-muted-foreground">
+              <p className="text-sm text-muted-foreground ml-10">
                 View and manage customer information and transactions
               </p>
             </div>
@@ -476,7 +476,7 @@ export default function CustomerDetail() {
           )}
 
           {/* Customer Info and Financial Summary */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
             {/* Customer Info Card */}
             <Card className="lg:col-span-1 overflow-hidden border-none shadow-md">
               <CardHeader className="bg-primary text-primary-foreground pb-4">
@@ -490,50 +490,50 @@ export default function CustomerDetail() {
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center mb-6">
-                  <Avatar className="h-24 w-24 mb-4">
-                    <AvatarFallback className="text-xl">
+              <CardContent className="pt-4 sm:pt-6">
+                <div className="flex flex-col items-center mb-4 sm:mb-6">
+                  <Avatar className="h-20 w-20 sm:h-24 sm:w-24 mb-3 sm:mb-4">
+                    <AvatarFallback className="text-lg sm:text-xl">
                       {customer.name
                         .split(" ")
                         .map((n) => n[0])
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
-                  <h2 className="text-2xl font-bold text-center">
+                  <h2 className="text-xl sm:text-2xl font-bold text-center">
                     {customer.name}
                   </h2>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center gap-3">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{customer.phone}</span>
+                    <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm sm:text-base break-all">{customer.phone}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{customer.email}</span>
+                    <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm sm:text-base break-all">{customer.email}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Store className="h-4 w-4 text-muted-foreground" />
-                    <span>Store ID: {customer.storeId}</span>
+                    <Store className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm sm:text-base">Store ID: {customer.storeId}</span>
                   </div>
                 </div>
 
                 {/* Fabric Preferences Tags */}
                 {customer.tags && customer.tags.length > 0 && (
-                  <div className="mt-6 pt-4 border-t">
-                    <div className="flex items-center gap-2 mb-3">
+                  <div className="mt-4 sm:mt-6 pt-4 border-t">
+                    <div className="flex items-center gap-2 mb-2 sm:mb-3">
                       <Tag className="h-4 w-4 text-muted-foreground" />
-                      <h3 className="text-sm font-medium text-muted-foreground">
+                      <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">
                         Fabric Preferences
                       </h3>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
                       {customer.tags.map((tag) => (
                         <Badge
                           key={tag}
                           variant="secondary"
-                          className="text-sm font-normal"
+                          className="text-xs sm:text-sm font-normal"
                         >
                           {tag}
                         </Badge>
@@ -552,17 +552,17 @@ export default function CustomerDetail() {
                   Overview of customer&apos;s financial status
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <CardContent className="pt-4 sm:pt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <Card className="bg-blue-50 border-none shadow-sm">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-blue-600">
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex justify-between items-center mb-1 sm:mb-2">
+                        <span className="text-xs sm:text-sm font-medium text-blue-600">
                           Total Bill
                         </span>
-                        <DollarSign className="h-4 w-4 text-blue-600" />
+                        <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
                       </div>
-                      <div className="text-2xl font-bold text-blue-700">
+                      <div className="text-xl sm:text-2xl font-bold text-blue-700">
                         ৳
                         {customerTransactionsWithBalance
                           .reduce((sum, t) => sum + (t.total || 0), 0)
@@ -572,14 +572,14 @@ export default function CustomerDetail() {
                   </Card>
 
                   <Card className="bg-green-50 border-none shadow-sm">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-green-600">
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex justify-between items-center mb-1 sm:mb-2">
+                        <span className="text-xs sm:text-sm font-medium text-green-600">
                           Total Deposit
                         </span>
-                        <CreditCard className="h-4 w-4 text-green-600" />
+                        <CreditCard className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600" />
                       </div>
-                      <div className="text-2xl font-bold text-green-700">
+                      <div className="text-xl sm:text-2xl font-bold text-green-700">
                         ৳
                         {customerTransactionsWithBalance
                           .reduce((sum, t) => sum + (t.deposit || 0), 0)
@@ -593,23 +593,23 @@ export default function CustomerDetail() {
                       totalDue > 0 ? "bg-red-50" : "bg-green-50"
                     } border-none shadow-sm`}
                   >
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-center mb-2">
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex justify-between items-center mb-1 sm:mb-2">
                         <span
-                          className={`text-sm font-medium ${
+                          className={`text-xs sm:text-sm font-medium ${
                             totalDue > 0 ? "text-red-600" : "text-green-600"
                           }`}
                         >
                           Total Due
                         </span>
                         <FileText
-                          className={`h-4 w-4 ${
+                          className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${
                             totalDue > 0 ? "text-red-600" : "text-green-600"
                           }`}
                         />
                       </div>
                       <div
-                        className={`text-2xl font-bold ${
+                        className={`text-xl sm:text-2xl font-bold ${
                           totalDue > 0 ? "text-red-700" : "text-green-700"
                         }`}
                       >
@@ -619,12 +619,12 @@ export default function CustomerDetail() {
                   </Card>
                 </div>
 
-                <div className="mt-6 pt-4 border-t">
+                <div className="mt-4 sm:mt-6 pt-4 border-t">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium">
+                    <span className="text-xs sm:text-sm font-medium">
                       Payment Progress
                     </span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-xs sm:text-sm text-muted-foreground">
                       {paymentProgress.toFixed(1)}%
                     </span>
                   </div>
@@ -634,9 +634,9 @@ export default function CustomerDetail() {
                   </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t">
+                <div className="flex flex-col gap-3 sm:gap-4 mt-4 sm:mt-6 pt-4 border-t">
                   <select
-                    className="w-full sm:w-[180px] border rounded-md px-4 py-2"
+                    className="w-full sm:w-[180px] border rounded-md px-3 sm:px-4 py-2 text-sm"
                     value={storeFilter}
                     onChange={(e) => setStoreFilter(e.target.value)}
                   >
@@ -650,14 +650,16 @@ export default function CustomerDetail() {
                       Store 2
                     </option>
                   </select>
-                  <div className="flex gap-2 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row gap-2 w-full">
                     <Button
                       variant="outline"
                       onClick={handleExportCSV}
                       disabled={loadingState.action}
+                      className="w-full sm:w-auto text-sm"
                     >
                       <FileText className="mr-2 h-4 w-4" />
-                      Export CSV
+                      <span className="hidden sm:inline">Export CSV</span>
+                      <span className="sm:hidden">CSV</span>
                     </Button>
                     <Button
                       variant="outline"
@@ -686,9 +688,11 @@ export default function CustomerDetail() {
                         );
                       }}
                       disabled={loadingState.action}
+                      className="w-full sm:w-auto text-sm"
                     >
                       <FileText className="mr-2 h-4 w-4" />
-                      Export PDF
+                      <span className="hidden sm:inline">Export PDF</span>
+                      <span className="sm:hidden">PDF</span>
                     </Button>
                     <AddTransactionDialog
                       customerId={params.id}
@@ -702,20 +706,24 @@ export default function CustomerDetail() {
           </div>
 
           {/* View Mode Toggle */}
-          <div className="mb-6">
-            <div className="flex gap-2">
+          <div className="mb-4 sm:mb-6">
+            <div className="flex gap-2 w-full">
               <Button
                 variant={viewMode === "memos" ? "default" : "outline"}
                 onClick={() => setViewMode("memos")}
+                className="flex-1 sm:flex-none text-sm"
               >
-                <FileText className="mr-2 h-4 w-4" />
-                Memo View
+                <FileText className="mr-1 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Memo View</span>
+                <span className="sm:hidden">Memos</span>
               </Button>
               <Button
                 variant={viewMode === "transactions" ? "default" : "outline"}
                 onClick={() => setViewMode("transactions")}
+                className="flex-1 sm:flex-none text-sm"
               >
-                Transaction List
+                <span className="hidden sm:inline">Transaction List</span>
+                <span className="sm:hidden">Transactions</span>
               </Button>
             </div>
           </div>
@@ -756,41 +764,44 @@ export default function CustomerDetail() {
           {/* Transactions Table */}
           {viewMode === "transactions" && (
             <Card className="border-none shadow-md">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+              <CardContent className="p-3 sm:p-6">
+                <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
                   <div>
-                    <h2 className="text-xl font-semibold">Transactions</h2>
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <h2 className="text-lg sm:text-xl font-semibold">Transactions</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                       View and manage customer transactions
                     </p>
                   </div>
                   <TransactionFilters />
                 </div>
-              <ScrollArea className="h-[600px]">
-                <Table>
+
+                {/* Table View */}
+                <div className="relative">
+                  <div className="overflow-x-auto overflow-y-auto max-h-[400px] sm:max-h-[500px] md:max-h-[600px] -mx-3 sm:mx-0">
+                    <Table className="min-w-[800px]">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="whitespace-nowrap">Date</TableHead>
-                      <TableHead className="whitespace-nowrap">
+                      <TableHead className="whitespace-nowrap text-xs sm:text-sm">Date</TableHead>
+                      <TableHead className="whitespace-nowrap text-xs sm:text-sm">
                         Memo Number
                       </TableHead>
-                      <TableHead className="whitespace-nowrap">
+                      <TableHead className="whitespace-nowrap text-xs sm:text-sm">
                         Details
                       </TableHead>
-                      <TableHead className="text-right whitespace-nowrap">
+                      <TableHead className="text-right whitespace-nowrap text-xs sm:text-sm">
                         Total Bill
                       </TableHead>
-                      <TableHead className="text-right whitespace-nowrap">
+                      <TableHead className="text-right whitespace-nowrap text-xs sm:text-sm">
                         Deposit
                       </TableHead>
-                      <TableHead className="text-right whitespace-nowrap">
+                      <TableHead className="text-right whitespace-nowrap text-xs sm:text-sm">
                         Due Amount
                       </TableHead>
-                      <TableHead className="text-right whitespace-nowrap">
+                      <TableHead className="text-right whitespace-nowrap text-xs sm:text-sm">
                         Balance
                       </TableHead>
-                      <TableHead className="whitespace-nowrap">Store</TableHead>
-                      <TableHead className="whitespace-nowrap">
+                      <TableHead className="whitespace-nowrap text-xs sm:text-sm">Store</TableHead>
+                      <TableHead className="whitespace-nowrap text-xs sm:text-sm">
                         Actions
                       </TableHead>
                     </TableRow>
@@ -805,7 +816,7 @@ export default function CustomerDetail() {
                         
                         return (
                         <TableRow key={transaction.id} className={isPayment ? "bg-green-50/50" : ""}>
-                          <TableCell className="whitespace-nowrap">
+                          <TableCell className="whitespace-nowrap text-xs sm:text-sm">
                             {new Date(transaction.date)
                               .toLocaleDateString("en-GB", {
                                 day: "2-digit",
@@ -814,21 +825,21 @@ export default function CustomerDetail() {
                               })
                               .replace(/\//g, "-")}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">
+                          <TableCell className="whitespace-nowrap text-xs sm:text-sm">
                             {transaction.memoNumber}
                             {isPayment && (
-                              <span className="ml-2 text-xs text-green-600 font-medium">
+                              <span className="ml-1 sm:ml-2 text-xs text-green-600 font-medium">
                                 (Payment)
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">
+                          <TableCell className="whitespace-nowrap text-xs sm:text-sm">
                             {transaction.details || (isPayment ? transaction.note || 'Payment received' : '-')}
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap">
+                          <TableCell className="text-right whitespace-nowrap text-xs sm:text-sm">
                             {isPayment ? '-' : `৳${transaction.total.toLocaleString()}`}
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap">
+                          <TableCell className="text-right whitespace-nowrap text-xs sm:text-sm">
                             {isPayment ? (
                               <span className="text-green-600 font-medium">
                                 ৳{paymentAmount.toLocaleString()}
@@ -837,11 +848,11 @@ export default function CustomerDetail() {
                               `৳${transaction.deposit.toLocaleString()}`
                             )}
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap">
+                          <TableCell className="text-right whitespace-nowrap text-xs sm:text-sm">
                             {isPayment ? '-' : `৳${transaction.due.toLocaleString()}`}
                           </TableCell>
                           <TableCell
-                            className={`text-right font-medium whitespace-nowrap ${
+                            className={`text-right font-medium whitespace-nowrap text-xs sm:text-sm ${
                               transaction.cumulativeBalance > 0
                                 ? "text-red-500"
                                 : "text-green-500"
@@ -849,7 +860,7 @@ export default function CustomerDetail() {
                           >
                             ৳{transaction.cumulativeBalance.toLocaleString()}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">
+                          <TableCell className="whitespace-nowrap text-xs sm:text-sm">
                             {transaction.storeId || '-'}
                           </TableCell>
                           <TableCell>
@@ -919,21 +930,22 @@ export default function CustomerDetail() {
                       })
                     )}
                   </TableBody>
-                </Table>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Footer Section */}
-          <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="text-sm text-gray-500">
+          <div className="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+            <div className="text-xs sm:text-sm text-gray-500">
               Total Transactions: {filteredTransactions.length}
             </div>
-            <div className="bg-gray-100 p-4 rounded-lg w-full md:w-auto">
-              <span className="font-semibold">Current Balance: </span>
+            <div className="bg-gray-100 p-3 sm:p-4 rounded-lg w-full sm:w-auto">
+              <span className="text-sm sm:text-base font-semibold">Current Balance: </span>
               <span
-                className={`font-bold ${
+                className={`text-sm sm:text-base font-bold ${
                   totalDue > 0 ? "text-red-500" : "text-green-500"
                 }`}
               >

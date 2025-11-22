@@ -169,8 +169,8 @@ export function CustomerMemoList({
             </p>
           </div>
         ) : (
-          <ScrollArea className="h-[500px]">
-            <Table>
+          <div className="overflow-x-auto overflow-y-auto max-h-[400px] sm:max-h-[500px] md:max-h-[600px]">
+            <Table className="min-w-[800px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>
@@ -301,7 +301,7 @@ export function CustomerMemoList({
                 ))}
               </TableBody>
             </Table>
-          </ScrollArea>
+          </div>
         )}
         {sortedMemos.length > 0 && (
           <div className="mt-4 pt-4 border-t flex justify-between items-center">
