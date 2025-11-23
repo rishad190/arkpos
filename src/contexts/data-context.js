@@ -582,6 +582,44 @@ export function DataProvider({ children }) {
             dispatch({ type: "SET_DAILY_CASH_EXPENSE", payload: [] });
           }
         },
+      },
+      {
+        path: COLLECTION_REFS.SETTINGS,
+        setter: (data) => {
+          if (data && typeof data === "object") {
+            dispatch({ type: "UPDATE_SETTINGS", payload: data });
+          } else {
+            // Set default settings if none exist
+            dispatch({ 
+              type: "UPDATE_SETTINGS", 
+              payload: {
+                store: {
+                  storeName: "",
+                  address: "",
+                  phone: "",
+                  email: "",
+                  currency: "৳",
+                },
+                notifications: {
+                  lowStockAlert: true,
+                  duePaymentAlert: true,
+                  newOrderAlert: true,
+                  emailNotifications: false,
+                },
+                appearance: {
+                  theme: "light",
+                  compactMode: false,
+                  showImages: true,
+                },
+                security: {
+                  requirePassword: false,
+                  sessionTimeout: 30,
+                  backupEnabled: true,
+                },
+              }
+            });
+          }
+        },
       }
     ]; // Closing the collections array
 
@@ -1290,17 +1328,9 @@ export function DataProvider({ children }) {
    * @throws {Error} If validation fails
    */
   const updateSettings = useCallback(async (newSettings) => {
-    // Validate settings data
-    const validationErrors = [];
-    if (!newSettings.store?.storeName?.trim())
-      validationErrors.push("Store name is required");
-    if (!newSettings.store?.address?.trim())
-      validationErrors.push("Store address is required");
-    if (!newSettings.store?.phone?.trim())
-      validationErrors.push("Store phone is required");
-
-    if (validationErrors.length > 0) {
-      throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+    // Basic validation - only check if settings object exists
+    if (!newSettings || typeof newSettings !== 'object') {
+      throw new Error("Invalid settings data");
     }
 
     return atomicOperations.execute("updateSettings", async () => {
@@ -1313,6 +1343,7 @@ export function DataProvider({ children }) {
         payload: newSettings,
       });
 
+      logger.info("[DataContext] Settings updated successfully");
       return true;
     });
   }, []);
