@@ -51,6 +51,7 @@ describe('Property 8: Slow operations are flagged', () => {
   let performanceTracker;
 
   beforeEach(() => {
+    jest.useFakeTimers();
     performanceTracker = new PerformanceTracker();
     // Suppress console output during tests
     jest.spyOn(console, 'info').mockImplementation(() => {});
@@ -60,6 +61,7 @@ describe('Property 8: Slow operations are flagged', () => {
   afterEach(() => {
     performanceTracker.reset();
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   /**

@@ -286,6 +286,120 @@ export class SupplierService {
 
     return result;
   }
+
+  /**
+   * Add a new supplier transaction
+   * @param {SupplierTransaction} transactionData 
+   * @returns {Promise<string>}
+   */
+  async addSupplierTransaction(transactionData) {
+    const validationResult = this.validateSupplierTransactionData(transactionData);
+    if (!validationResult.isValid) {
+      throw new AppError(
+        `Validation failed: ${formatValidationErrors(validationResult)}`,
+        ERROR_TYPES.VALIDATION,
+        { transactionData, validationErrors: validationResult.errors }
+      );
+    }
+
+    return this.atomicOperations.execute("addSupplierTransaction", async () => {
+      const transactionsRef = ref(this.db, SUPPLIER_TRANSACTIONS_PATH);
+      const newTransactionRef = push(transactionsRef);
+      const transactionId = newTransactionRef.key;
+
+      await set(newTransactionRef, {
+        ...transactionData,
+        id: transactionId,
+        createdAt: new Date().toISOString(),
+      });
+
+      // Update supplier total due
+      // We need to fetch current supplier data first to be safe, or trust the caller?
+      // Better to recalculate or increment. 
+      // Simplified: Just update the supplier totalDue by adding (total - paid)
+      const supplierRef = ref(this.db, `${COLLECTION_PATH}/${transactionData.supplierId}`);
+      const supplierSnapshot = await get(supplierRef);
+      if (supplierSnapshot.exists()) {
+         const supplier = supplierSnapshot.val();
+         const newDue = (supplier.totalDue || 0) + (transactionData.totalAmount - (transactionData.paidAmount || 0));
+         await update(supplierRef, {
+           totalDue: newDue,
+           updatedAt: new Date().toISOString()
+         });
+      }
+
+      return transactionId;
+    });
+  }
+
+  /**
+   * Update a supplier transaction
+   * @param {string} transactionId
+   * @param {Partial<SupplierTransaction>} updatedData
+   * @returns {Promise<void>}
+   */
+  async updateSupplierTransaction(transactionId, updatedData) {
+     return this.atomicOperations.execute("updateSupplierTransaction", async () => {
+       const transactionRef = ref(this.db, `${SUPPLIER_TRANSACTIONS_PATH}/${transactionId}`);
+       const snapshot = await get(transactionRef);
+       if (!snapshot.exists()) throw new AppError("Transaction not found", ERROR_TYPES.NOT_FOUND);
+       
+       const oldTransaction = snapshot.val();
+       
+       await update(transactionRef, {
+         ...updatedData,
+         updatedAt: new Date().toISOString()
+       });
+
+       // Update supplier due logic is complex here because we need diff.
+       // For now, let's assume the UI handles recalibration or we re-calculate all.
+       // Re-calculating all is safest.
+       if (oldTransaction.supplierId) {
+          // Verify we have the latest transactions for this supplier?
+          // This might be expensive. Alternatively, just apply the diff.
+          const oldDue = (oldTransaction.totalAmount || 0) - (oldTransaction.paidAmount || 0);
+          const newDue = (updatedData.totalAmount !== undefined ? updatedData.totalAmount : oldTransaction.totalAmount || 0) - 
+                         (updatedData.paidAmount !== undefined ? updatedData.paidAmount : oldTransaction.paidAmount || 0);
+          const diff = newDue - oldDue;
+          
+          const supplierRef = ref(this.db, `${COLLECTION_PATH}/${oldTransaction.supplierId}`);
+          const supplierSnapshot = await get(supplierRef);
+          if (supplierSnapshot.exists()) {
+             const supplier = supplierSnapshot.val();
+             await update(supplierRef, {
+                totalDue: (supplier.totalDue || 0) + diff,
+                updatedAt: new Date().toISOString()
+             });
+          }
+       }
+     });
+  }
+
+  /**
+   * Delete a supplier transaction
+   * @param {string} transactionId
+   * @param {string} supplierId
+   * @param {number} amount
+   * @param {number} paidAmount
+   * @returns {Promise<void>}
+   */
+  async deleteSupplierTransaction(transactionId, supplierId, amount, paidAmount) {
+    return this.atomicOperations.execute("deleteSupplierTransaction", async () => {
+      await remove(ref(this.db, `${SUPPLIER_TRANSACTIONS_PATH}/${transactionId}`));
+      
+      // Update supplier due
+      const dueAmount = amount - (paidAmount || 0);
+      const supplierRef = ref(this.db, `${COLLECTION_PATH}/${supplierId}`);
+      const supplierSnapshot = await get(supplierRef);
+      if (supplierSnapshot.exists()) {
+        const supplier = supplierSnapshot.val();
+        await update(supplierRef, {
+          totalDue: (supplier.totalDue || 0) - dueAmount,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    });
+  }
 }
 
 export default SupplierService;

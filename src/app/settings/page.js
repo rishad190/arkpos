@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useData } from "@/contexts/data-context";
+import { useSettings } from "@/contexts/settings-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Store,
@@ -29,7 +29,7 @@ import {
 export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { settings, updateSettings } = useData();
+  const { settings, updateSettings } = useSettings();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 

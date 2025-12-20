@@ -1,7 +1,6 @@
-"use client";
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/contexts/data-context";
+import { useInventory } from "@/contexts/inventory-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -51,7 +50,7 @@ export default function PartnerPage() {
     partnerProducts,
     deletePartnerProduct,
     updatePartnerProduct,
-  } = useData();
+  } = useInventory();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useData } from "@/contexts/data-context";
+import { useInventory } from "@/contexts/inventory-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -62,7 +62,7 @@ function PartnerAccounts({ product }) {
     deletePartner,
     updatePartnerTransaction,
     deletePartnerTransaction,
-  } = useData();
+  } = useInventory();
 
   const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
   const [partnerModalStep, setPartnerModalStep] = useState(1);
@@ -308,7 +308,7 @@ function PartnerAccounts({ product }) {
 export default function PartnerProductDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const { partnerProducts } = useData();
+  const { partnerProducts } = useInventory();
 
   const product = partnerProducts?.find((p) => p.id === params.id);
 

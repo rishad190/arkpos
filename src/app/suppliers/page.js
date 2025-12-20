@@ -1,7 +1,6 @@
-"use client";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/contexts/data-context";
+import { useInventory } from "@/contexts/inventory-context";
 import {
   Table,
   TableBody,
@@ -46,7 +45,7 @@ export default function SuppliersPage() {
     addSupplier,
     updateSupplier,
     deleteSupplier,
-  } = useData();
+  } = useInventory();
   const [searchTerm, setSearchTerm] = useState("");
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [loadingState, setLoadingState] = useState({

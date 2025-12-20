@@ -102,13 +102,20 @@ describe('AtomicOperationService', () => {
     })
 
     test('should log info for slow operations (> 2 seconds)', async () => {
+      jest.useFakeTimers()
       const operationFn = jest.fn().mockImplementation(async () => {
         // Simulate slow operation
         await new Promise(resolve => setTimeout(resolve, 2100))
         return 'success'
       })
 
-      await service.execute('slowOperation', operationFn)
+      const pendingOp = service.execute('slowOperation', operationFn)
+      
+      // Advance time to trigger setTimeout
+      await jest.advanceTimersByTimeAsync(2100)
+      
+      await pendingOp
+      jest.useRealTimers()
 
       expect(logger.info).toHaveBeenCalledWith(
         expect.stringContaining('[Performance] Slow operation: slowOperation took')
@@ -116,13 +123,20 @@ describe('AtomicOperationService', () => {
     })
 
     test('should log warning for very slow operations (> 5 seconds)', async () => {
+      jest.useFakeTimers()
       const operationFn = jest.fn().mockImplementation(async () => {
         // Simulate very slow operation
         await new Promise(resolve => setTimeout(resolve, 5100))
         return 'success'
       })
 
-      await service.execute('verySlowOperation', operationFn)
+      const pendingOp = service.execute('verySlowOperation', operationFn)
+      
+      // Advance time
+      await jest.advanceTimersByTimeAsync(5100)
+      
+      await pendingOp
+      jest.useRealTimers()
 
       expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining('[Performance] Very slow operation: verySlowOperation took')

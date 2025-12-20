@@ -16,7 +16,11 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { SkeletonLoader } from "@/components/common/SkeletonLoader";
 import { QuickStatCard } from "@/components/QuickStatCard";
 import { RecentTransactions } from "@/components/RecentTransactions";
-import { useData } from "@/contexts/data-context";
+
+import { useCustomers } from "@/contexts/customer-context";
+import { useInventory } from "@/contexts/inventory-context";
+import { useTransactions } from "@/contexts/transaction-context";
+
 
 
 import {
@@ -39,14 +43,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Dashboard() {
   const router = useRouter();
-  const {
-    customers,
-    transactions,
-    fabrics,
-    suppliers,
-    error,
-    getCustomerDue,
-  } = useData();
+  const { customers, error: customerError } = useCustomers();
+  const { transactions, calculateCustomerTotalDue, error: transactionError } = useTransactions();
+  const { fabrics, suppliers, error: inventoryError } = useInventory();
+  
+  const error = customerError || transactionError || inventoryError;
+  const getCustomerDue = calculateCustomerTotalDue;
+
 
   const [loadingState, setLoadingState] = useState({
     initial: true,

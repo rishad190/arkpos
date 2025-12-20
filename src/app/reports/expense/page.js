@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useData } from "@/contexts/data-context";
+import { useTransactions } from "@/contexts/transaction-context";
+
 import {
   Card,
   CardContent,
@@ -40,7 +41,7 @@ import { useReactToPrint } from "react-to-print";
 import ExpenseReportPrint from "@/components/ExpenseReportPrint";
 
 export default function ExpenseReportPage() {
-  const { dailyCashTransactions, loading } = useData();
+  const { dailyCashTransactions, loading } = useTransactions();
   const [selectedPeriod, setSelectedPeriod] = useState(
     new Date().toISOString().slice(0, 7)
   );

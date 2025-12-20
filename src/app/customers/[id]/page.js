@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useData } from "@/contexts/data-context";
+import { useCustomers } from "@/contexts/customer-context";
+import { useTransactions } from "@/contexts/transaction-context";
 import { CustomerMemoList } from "@/components/CustomerMemoList";
 import { MemoDetailsDialog } from "@/components/MemoDetailsDialog";
 import { AddPaymentDialog } from "@/components/AddPaymentDialog";
@@ -71,17 +72,17 @@ export default function CustomerDetail() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { customers } = useCustomers();
   const {
-    customers,
     transactions,
     addTransaction,
     deleteTransaction,
     updateTransaction,
-    getCustomerDue,
+    calculateCustomerTotalDue: getCustomerDue,
     getCustomerTransactionsByMemo,
     getMemoDetails,
     addPaymentToMemo,
-  } = useData();
+  } = useTransactions();
 
   const [loadingState, setLoadingState] = useState({
     initial: true,

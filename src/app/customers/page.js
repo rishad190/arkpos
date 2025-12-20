@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/contexts/data-context";
+import { useCustomers } from "@/contexts/customer-context";
+import { useTransactions } from "@/contexts/transaction-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,12 +24,15 @@ export default function CustomersPage() {
   const { toast } = useToast();
   const { 
     customers,
-    transactions,
-    getCustomerDue, 
-    getCustomerTransactionsByMemo,
     deleteCustomer, 
     updateCustomer 
-  } = useData();
+  } = useCustomers();
+  
+  const { 
+    transactions,
+    calculateCustomerTotalDue: getCustomerDue, 
+    getCustomerTransactionsByMemo
+  } = useTransactions();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);

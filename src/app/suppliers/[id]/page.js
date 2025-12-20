@@ -1,10 +1,8 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import logger from "@/utils/logger";
-import { useState, useEffect } from "react";
-import { ref, onValue, push, update, remove } from "firebase/database";
-import { db } from "@/lib/firebase";
-import { useData } from "@/contexts/data-context";
+import { useState, useMemo, useEffect } from "react";
+import { useInventory } from "@/contexts/inventory-context";
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
 import {
@@ -52,70 +50,54 @@ export default function SupplierDetail() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const { suppliers, updateSupplier, deleteSupplierTransaction } = useData();
+  const { 
+    suppliers, 
+    supplierTransactions,
+    updateSupplier, 
+    addSupplierTransaction,
+    updateSupplierTransaction,
+    deleteSupplierTransaction 
+  } = useInventory();
+
   const [storeFilter, setStoreFilter] = useState("all");
-  const [supplier, setSupplier] = useState(null);
-  const [transactions, setTransactions] = useState([]);
-  const [allTransactions, setAllTransactions] = useState([]);
   const [loading, setLoading] = useState({
-    supplier: true,
-    transactions: true,
     action: false,
   });
 
+  const supplier = useMemo(() => 
+    suppliers?.find(s => s.id === params.id), 
+    [suppliers, params.id]
+  );
 
+  const allTransactions = useMemo(() => 
+    supplierTransactions?.filter(t => t.supplierId === params.id)
+      .sort((a, b) => new Date(a.date) - new Date(b.date)) || [],
+    [supplierTransactions, params.id]
+  );
 
-  // Fetch supplier and transactions data
+  const transactions = useMemo(() => 
+    allTransactions.filter(t => storeFilter === "all" || t.storeId === storeFilter),
+    [allTransactions, storeFilter]
+  );
+
   useEffect(() => {
-    const supplierRef = ref(db, `suppliers/${params.id}`);
-    const transactionsRef = ref(db, "supplierTransactions");
+    if (suppliers.length > 0 && !supplier) {
+      toast({
+        title: "Error",
+        description: "Supplier not found",
+        variant: "destructive",
+      });
+      router.push("/suppliers");
+    }
+  }, [supplier, suppliers, router, toast]);
 
-    const unsubSupplier = onValue(supplierRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setSupplier({ id: params.id, ...snapshot.val() });
-      } else {
-        toast({
-          title: "Error",
-          description: "Supplier not found",
-          variant: "destructive",
-        });
-        router.push("/suppliers");
-      }
-      setLoading((prev) => ({ ...prev, supplier: false }));
-    });
-
-    const unsubTransactions = onValue(transactionsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const transactionsData = snapshot.val();
-        const supplierTransactionsAll = Object.entries(transactionsData)
-          .map(([id, data]) => ({ id, ...data }))
-          .filter((t) => t.supplierId === params.id)
-          .sort((a, b) => {
-            const dateA = new Date(a.date);
-            const dateB = new Date(b.date);
-            return dateA - dateB;
-          });
-
-        // Keep a complete list of supplier transactions (all stores)
-        setAllTransactions(supplierTransactionsAll);
-
-        // Apply store filter for the visible list
-        const supplierTransactions = supplierTransactionsAll.filter(
-          (t) => storeFilter === "all" || t.storeId === storeFilter
-        );
-        setTransactions(supplierTransactions);
-      } else {
-        setTransactions([]);
-        setAllTransactions([]);
-      }
-      setLoading((prev) => ({ ...prev, transactions: false }));
-    });
-
-    return () => {
-      unsubSupplier();
-      unsubTransactions();
-    };
-  }, [params.id, router, storeFilter, toast]);
+  if (!supplier) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      );
+  }
 
   const handleExportCSV = () => {
     const data = transactionsWithBalance.map((t) => ({
@@ -134,26 +116,13 @@ export default function SupplierDetail() {
   const handleAddTransaction = async (transaction) => {
     try {
       setLoading((prev) => ({ ...prev, action: true }));
-      const transactionsRef = ref(db, "supplierTransactions");
-      const newTransactionRef = push(transactionsRef);
-      const newTransaction = {
+      
+      const transactionData = {
         ...transaction,
-        id: newTransactionRef.key,
         supplierId: params.id,
-        createdAt: new Date().toISOString(),
       };
 
-      await update(newTransactionRef, newTransaction);
-
-      const newTotalDue =
-        (supplier.totalDue || 0) +
-        (transaction.totalAmount - (transaction.paidAmount || 0));
-
-      await updateSupplier(params.id, {
-        ...supplier,
-        totalDue: newTotalDue,
-        updatedAt: new Date().toISOString(),
-      });
+      await addSupplierTransaction(transactionData);
 
       toast({
         title: "Success",
@@ -166,7 +135,6 @@ export default function SupplierDetail() {
         description: "Failed to add transaction",
         variant: "destructive",
       });
-      throw error;
     } finally {
       setLoading((prev) => ({ ...prev, action: false }));
     }
@@ -207,20 +175,8 @@ export default function SupplierDetail() {
   const handleEditTransaction = async (transactionId, updatedData) => {
     try {
       setLoading((prev) => ({ ...prev, action: true }));
-      const oldTransaction = transactions.find((t) => t.id === transactionId);
-      const oldDue =
-        oldTransaction.totalAmount - (oldTransaction.paidAmount || 0);
-      const newDue = updatedData.totalAmount - (updatedData.paidAmount || 0);
-      const dueDifference = newDue - oldDue;
-
-      const transactionRef = ref(db, `supplierTransactions/${transactionId}`);
-      await update(transactionRef, updatedData);
-
-      await updateSupplier(params.id, {
-        ...supplier,
-        totalDue: Math.max(0, (supplier.totalDue || 0) + dueDifference),
-        updatedAt: new Date().toISOString(),
-      });
+      
+      await updateSupplierTransaction(transactionId, updatedData);
 
       toast({
         title: "Success",
@@ -233,18 +189,14 @@ export default function SupplierDetail() {
         description: "Failed to update transaction",
         variant: "destructive",
       });
-      throw error;
     } finally {
       setLoading((prev) => ({ ...prev, action: false }));
     }
   };
 
-  if (loading.supplier) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+  if (!supplier) {
+    // Should be handled by useEffect redirect, but for safety
+     return null;
   }
 
   // Update the transactionsWithBalance calculation
@@ -309,6 +261,8 @@ export default function SupplierDetail() {
       setLoading((prev) => ({ ...prev, action: false }));
     }
   };
+
+
 
   return (
     <DataErrorBoundary>

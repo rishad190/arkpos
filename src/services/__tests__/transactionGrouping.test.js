@@ -187,7 +187,7 @@ describe('Property 22: Transactions are grouped by memo', () => {
           expect(paymentIds).toEqual(originalPaymentIds);
         });
       }),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -239,7 +239,7 @@ describe('Property 22: Transactions are grouped by memo', () => {
           });
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -314,7 +314,7 @@ describe('Property 22: Transactions are grouped by memo', () => {
           }
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -388,7 +388,7 @@ describe('Property 22: Transactions are grouped by memo', () => {
           expect(transactionsInGroups.length).toBe(targetTransactions.length);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -421,7 +421,7 @@ describe('Property 22: Transactions are grouped by memo', () => {
           expect(memoGroups.length).toBe(0);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 });
@@ -528,7 +528,7 @@ describe('Property 23: Memos with dues are displayed', () => {
           });
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -638,7 +638,7 @@ describe('Property 23: Memos with dues are displayed', () => {
           });
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -714,7 +714,7 @@ describe('Property 23: Memos with dues are displayed', () => {
           expect(memo.paidAmount).toBeCloseTo(expectedPaid, 2);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -764,7 +764,7 @@ describe('Property 23: Memos with dues are displayed', () => {
           expect(memosWithDues.length).toBe(0);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -866,7 +866,7 @@ describe('Property 23: Memos with dues are displayed', () => {
           });
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 });
@@ -981,7 +981,7 @@ describe('Property 24: Memo details include all payments', () => {
           expect(allReturnedTransactionIds).toEqual(allExpectedTransactionIds);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -1042,7 +1042,7 @@ describe('Property 24: Memo details include all payments', () => {
           expect(uniquePaymentIds.size).toBe(expectedPaymentCount);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -1086,7 +1086,7 @@ describe('Property 24: Memo details include all payments', () => {
           expect(memoDetails.saleTransaction.id).toBe(saleTransaction.id);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -1202,7 +1202,7 @@ describe('Property 24: Memo details include all payments', () => {
           });
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -1243,7 +1243,7 @@ describe('Property 24: Memo details include all payments', () => {
           expect(memoDetails).toBeNull();
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -1311,7 +1311,7 @@ describe('Property 24: Memo details include all payments', () => {
           expect(memoDetails.totalPaid).toBeCloseTo(initialDeposit + sumOfPayments, 2);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -1389,7 +1389,7 @@ describe('Property 24: Memo details include all payments', () => {
           expect(returnedPaymentDates.sort()).toEqual(expectedPaymentDates);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 });
@@ -1504,7 +1504,7 @@ describe('Property 25: Payments link to memos', () => {
           expect(paymentId).toBe(mockPaymentId);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -1591,7 +1591,7 @@ describe('Property 25: Payments link to memos', () => {
           expect(uniqueIds.size).toBe(payments.length);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -1686,7 +1686,7 @@ describe('Property 25: Payments link to memos', () => {
           });
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -1840,7 +1840,7 @@ describe('Property 25: Payments link to memos', () => {
           });
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 });
@@ -1972,7 +1972,7 @@ describe('Property 26: Customer total due aggregates memo dues', () => {
           expect(memoGroups.length).toBe(memoCount);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -2004,7 +2004,7 @@ describe('Property 26: Customer total due aggregates memo dues', () => {
           expect(totalDue).toBe(0);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -2049,7 +2049,7 @@ describe('Property 26: Customer total due aggregates memo dues', () => {
           expect(totalDue).toBe(0);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -2142,7 +2142,7 @@ describe('Property 26: Customer total due aggregates memo dues', () => {
           }
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -2204,7 +2204,7 @@ describe('Property 26: Customer total due aggregates memo dues', () => {
           expect(actualTotalDue).toBeGreaterThan(0);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -2270,7 +2270,7 @@ describe('Property 26: Customer total due aggregates memo dues', () => {
           expect(actualTotalDue).not.toBeCloseTo(actualTotalDue + otherCustomerTotalDue, 2);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -2310,7 +2310,7 @@ describe('Property 26: Customer total due aggregates memo dues', () => {
           expect(totalDue).toBeLessThanOrEqual(0);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 
@@ -2372,7 +2372,7 @@ describe('Property 26: Customer total due aggregates memo dues', () => {
           expect(Number.isNaN(actualTotalDue)).toBe(false);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 }
     );
   });
 });

@@ -1,5 +1,5 @@
 "use client";
-import { useData } from "@/contexts/data-context";
+import { useTransactions } from "@/contexts/transaction-context";
 import { Wifi, WifiOff, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
  * @returns {JSX.Element}
  */
 export function ConnectionIndicator() {
-  const { connectionState, offlineQueue, pendingOperations } = useData();
+  const { connectionState, offlineQueue, pendingOperations } = useTransactions();
 
   const isConnected = connectionState === "connected";
   const isDisconnected = connectionState === "disconnected";
