@@ -11,11 +11,11 @@ import {
 } from "@/components/ui/card";
 
 import { LoadingState, TableSkeleton } from "@/components/LoadingState";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { PageHeader } from "@/components/common/PageHeader";
-import { SkeletonLoader } from "@/components/common/SkeletonLoader";
-import { QuickStatCard } from "@/components/QuickStatCard";
-import { RecentTransactions } from "@/components/RecentTransactions";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
+import { QuickStatCard } from "@/components/shared/QuickStatCard";
+import { RecentTransactions } from "@/components/transactions/RecentTransactions";
 
 import { useCustomers } from "@/contexts/customer-context";
 import { useInventory } from "@/contexts/inventory-context";
@@ -60,7 +60,7 @@ export default function Dashboard() {
 
   // Calculate totals and statistics
   const stats = useMemo(() => {
-    if (!customers || !transactions || !fabrics || !suppliers) {
+    if (!customers || !fabrics || !suppliers) {
       return {
         totalBill: 0,
         totalDeposit: 0,
@@ -75,24 +75,22 @@ export default function Dashboard() {
 
     const totals = customers.reduce(
       (acc, customer) => {
-        const customerTransactions =
-          transactions?.filter((t) => t.customerId === customer.id) || [];
+        const summary = customer.financialSummary || {
+          totalRevenue: 0,
+          totalDeposits: 0,
+          totalDue: 0,
+        };
         return {
-          totalBill:
-            acc.totalBill +
-            customerTransactions.reduce((sum, t) => sum + (t.total || 0), 0),
-          totalDeposit:
-            acc.totalDeposit +
-            customerTransactions.reduce((sum, t) => sum + (t.deposit || 0), 0),
-          totalDue: acc.totalDue + getCustomerDue(customer.id),
+          totalBill: acc.totalBill + (summary.totalRevenue || 0),
+          totalDeposit: acc.totalDeposit + (summary.totalDeposits || 0),
+          totalDue: acc.totalDue + (summary.totalDue || 0),
         };
       },
       { totalBill: 0, totalDeposit: 0, totalDue: 0 }
     );
 
-    const recentTransactions = [...transactions]
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 5);
+    // Transactions are already sorted by createdAt desc in context
+    const recentTransactions = (transactions || []).slice(0, 5);
 
     const lowStockItems = fabrics
       .filter((f) => f.totalQuantity < 10)
@@ -106,7 +104,7 @@ export default function Dashboard() {
       recentTransactions,
       lowStockItems,
     };
-  }, [customers, transactions, fabrics, suppliers, getCustomerDue]);
+  }, [customers, transactions, fabrics, suppliers]);
 
 
 

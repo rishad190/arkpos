@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { DataTable } from "@/components/common/DataTable";
+import { DataTable } from "@/components/shared/DataTable";
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
 import {

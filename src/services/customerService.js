@@ -1,5 +1,5 @@
 "use client";
-import { ref, push, set, update, remove, get } from "firebase/database";
+import { ref, push, set, update, remove, get, onValue } from "firebase/database";
 import { AppError, ERROR_TYPES } from "@/lib/errors";
 import {
   createValidResult,
@@ -32,6 +32,30 @@ export class CustomerService {
     this.db = db;
     this.logger = logger;
     this.atomicOperations = atomicOperations;
+  }
+
+  /**
+   * Subscribe to customer updates
+   * @param {Function} callback - Function called with updated customer list
+   * @returns {Function} Unsubscribe function
+   */
+  subscribeToCustomers(callback) {
+    const customersRef = ref(this.db, COLLECTION_PATH);
+    return onValue(customersRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const customerList = Object.entries(data).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        callback(customerList);
+      } else {
+        callback([]);
+      }
+    }, (error) => {
+      this.logger.error("Error subscribing to customers:", error);
+      callback([]);
+    });
   }
 
   /**

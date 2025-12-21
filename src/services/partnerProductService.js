@@ -1,4 +1,4 @@
-import { ref, push, set, get, update, remove } from "firebase/database";
+import { ref, push, set, get, update, remove, onValue } from "firebase/database";
 import { AppError, ERROR_TYPES } from "@/utils/error-handling";
 
 const COLLECTION_PATH = "partnerProducts";
@@ -8,6 +8,30 @@ class PartnerProductService {
     this.db = db;
     this.logger = logger;
     this.atomicOperations = atomicOperations;
+  }
+
+  /**
+   * Subscribe to partner product updates
+   * @param {Function} callback - Function called with updated product list
+   * @returns {Function} Unsubscribe function
+   */
+  subscribeToPartnerProducts(callback) {
+    const itemsRef = ref(this.db, COLLECTION_PATH);
+    return onValue(itemsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const productList = Object.entries(data).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        callback(productList);
+      } else {
+        callback([]);
+      }
+    }, (error) => {
+      this.logger.error("Error subscribing to partner products:", error);
+      callback([]);
+    });
   }
 
   // --- Basic CRUD ---

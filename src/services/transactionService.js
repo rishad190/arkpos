@@ -1,5 +1,5 @@
 "use client";
-import { ref, push, set, update, remove } from "firebase/database";
+import { ref, push, set, update, remove, onValue, query, orderByChild, limitToLast, startAt, endAt, equalTo } from "firebase/database";
 import { AppError, ERROR_TYPES } from "@/lib/errors";
 import {
   createValidResult,
@@ -12,6 +12,17 @@ import { requireAuth } from "@/lib/authValidation";
 import { sanitizeObject } from "@/lib/sanitization";
 
 const COLLECTION_PATH = "transactions";
+
+/**
+ * @callback Unsubscribe
+ * @returns {void}
+ */
+
+/**
+ * @callback TransactionCallback
+ * @param {Array<Transaction>} transactions
+ * @returns {void}
+ */
 
 /**
  * Transaction Service - Handles all transaction-related Firebase operations
@@ -33,6 +44,78 @@ export class TransactionService {
     this.db = db;
     this.logger = logger;
     this.atomicOperations = atomicOperations;
+  }
+
+  /**
+   * Subscribe to real-time transaction updates
+   * @param {TransactionCallback} callback - Function called with updated transactions
+   * @param {Object} [options] - Query options
+   * @param {number} [options.limit] - Max number of transactions to fetch (from newest)
+   * @param {Date} [options.startDate] - Start date for filtering
+   * @param {Date} [options.endDate] - End date for filtering
+   * @returns {Unsubscribe} Function to unsubscribe
+   */
+  subscribeToTransactions(callback, options = {}) {
+    const transactionsRef = ref(this.db, COLLECTION_PATH);
+    let q = query(transactionsRef, orderByChild("createdAt"));
+
+    if (options.startDate && options.endDate) {
+      q = query(q, startAt(options.startDate.toISOString()), endAt(options.endDate.toISOString()));
+    } else if (options.limit) {
+      q = query(q, limitToLast(options.limit));
+    }
+    
+    // Using onValue for real-time updates
+    const unsubscribe = onValue(q, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const transactionList = Object.entries(data).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        // Sort by createdAt descending (newest first)
+        transactionList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        callback(transactionList);
+      } else {
+        callback([]);
+      }
+    }, (error) => {
+      this.logger.error("Error subscribing to transactions:", error);
+      callback([]);
+    });
+
+    return unsubscribe;
+  }
+
+  /**
+   * Subscribe to transactions for a specific customer
+   * @param {string} customerId - The customer ID
+   * @param {Function} callback - Callback function
+   * @returns {Unsubscribe} Function to unsubscribe
+   */
+  subscribeToCustomerTransactions(customerId, callback) {
+    const transactionsRef = ref(this.db, COLLECTION_PATH);
+    const q = query(transactionsRef, orderByChild("customerId"), equalTo(customerId));
+
+    const unsubscribe = onValue(q, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const transactionList = Object.entries(data).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        // Sort by createdAt descending
+        transactionList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        callback(transactionList);
+      } else {
+        callback([]);
+      }
+    }, (error) => {
+      this.logger.error(`Error subscribing to transactions for customer ${customerId}:`, error);
+      callback([]);
+    });
+
+    return unsubscribe;
   }
 
   /**
@@ -60,14 +143,42 @@ export class TransactionService {
     return this.atomicOperations.execute("addTransaction", async () => {
       const transactionsRef = ref(this.db, COLLECTION_PATH);
       const newTransactionRef = push(transactionsRef);
+      const transactionId = newTransactionRef.key;
 
       const newTransaction = {
         ...transactionData,
         createdAt: new Date().toISOString(),
       };
 
-      await set(newTransactionRef, newTransaction);
-      return newTransactionRef.key;
+      // Atomic Update: Transaction + Customer Financial Summary
+      const updates = {};
+      updates[`/${COLLECTION_PATH}/${transactionId}`] = newTransaction;
+
+      // Update Customer Financial Summary
+      const customerRef = ref(this.db, `customers/${transactionData.customerId}`);
+      const customerSnapshot = await get(customerRef);
+
+      if (customerSnapshot.exists()) {
+        const customer = customerSnapshot.val();
+        const currentSummary = customer.financialSummary || {
+          totalRevenue: 0,
+          totalDeposits: 0,
+          totalDue: 0,
+        };
+
+        const newSummary = {
+          totalRevenue: (currentSummary.totalRevenue || 0) + (newTransaction.total || 0),
+          totalDeposits: (currentSummary.totalDeposits || 0) + (newTransaction.deposit || 0),
+          totalDue: (currentSummary.totalDue || 0) + (newTransaction.total || 0) - (newTransaction.deposit || 0),
+          lastTransactionDate: newTransaction.createdAt,
+        };
+
+        updates[`/customers/${transactionData.customerId}/financialSummary`] = newSummary;
+        updates[`/customers/${transactionData.customerId}/updatedAt`] = new Date().toISOString();
+      }
+
+      await update(ref(this.db), updates);
+      return transactionId;
     });
   }
 
@@ -96,10 +207,58 @@ export class TransactionService {
 
     return this.atomicOperations.execute("updateTransaction", async () => {
       const transactionRef = ref(this.db, `${COLLECTION_PATH}/${transactionId}`);
-      await update(transactionRef, {
+      const oldTransactionSnapshot = await get(transactionRef);
+      
+      if (!oldTransactionSnapshot.exists()) {
+        throw new AppError(
+          `Transaction with ID ${transactionId} not found`,
+          ERROR_TYPES.NOT_FOUND,
+          { transactionId }
+        );
+      }
+      
+      const oldTransaction = oldTransactionSnapshot.val();
+
+      const updates = {};
+      const newTransaction = {
+        ...oldTransaction,
         ...sanitizedData,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      
+      updates[`/${COLLECTION_PATH}/${transactionId}`] = newTransaction;
+
+      // Update Customer Financial Summary (if amounts changed)
+      const oldTotal = oldTransaction.total || 0;
+      const oldDeposit = oldTransaction.deposit || 0;
+      const newTotal = newTransaction.total || 0;
+      const newDeposit = newTransaction.deposit || 0;
+
+      if (oldTotal !== newTotal || oldDeposit !== newDeposit) {
+        const customerRef = ref(this.db, `customers/${newTransaction.customerId}`);
+        const customerSnapshot = await get(customerRef);
+
+        if (customerSnapshot.exists()) {
+          const customer = customerSnapshot.val();
+          const currentSummary = customer.financialSummary || {
+            totalRevenue: 0,
+            totalDeposits: 0,
+            totalDue: 0,
+          };
+
+          const newSummary = {
+            totalRevenue: (currentSummary.totalRevenue || 0) - oldTotal + newTotal,
+            totalDeposits: (currentSummary.totalDeposits || 0) - oldDeposit + newDeposit,
+            totalDue: (currentSummary.totalDue || 0) - (oldTotal - oldDeposit) + (newTotal - newDeposit),
+            lastTransactionDate: newTransaction.createdAt, // Original creation date usually persists?
+          };
+
+          updates[`/customers/${newTransaction.customerId}/financialSummary`] = newSummary;
+          updates[`/customers/${newTransaction.customerId}/updatedAt`] = new Date().toISOString();
+        }
+      }
+
+      await update(ref(this.db), updates);
     });
   }
 
@@ -113,7 +272,45 @@ export class TransactionService {
     requireAuth();
 
     return this.atomicOperations.execute("deleteTransaction", async () => {
-      await remove(ref(this.db, `${COLLECTION_PATH}/${transactionId}`));
+      const transactionRef = ref(this.db, `${COLLECTION_PATH}/${transactionId}`);
+      const transactionSnapshot = await get(transactionRef);
+      
+      if (!transactionSnapshot.exists()) {
+        // Already deleted or doesn't exist, just return
+        return;
+      }
+
+      const transaction = transactionSnapshot.val();
+      const updates = {};
+      
+      updates[`/${COLLECTION_PATH}/${transactionId}`] = null;
+
+      // Decrement Customer Financial Summary
+      if (transaction.customerId) {
+        const customerRef = ref(this.db, `customers/${transaction.customerId}`);
+        const customerSnapshot = await get(customerRef);
+
+        if (customerSnapshot.exists()) {
+          const customer = customerSnapshot.val();
+          const currentSummary = customer.financialSummary || {
+            totalRevenue: 0,
+            totalDeposits: 0,
+            totalDue: 0,
+          };
+
+          const newSummary = {
+            totalRevenue: (currentSummary.totalRevenue || 0) - (transaction.total || 0),
+            totalDeposits: (currentSummary.totalDeposits || 0) - (transaction.deposit || 0),
+            totalDue: (currentSummary.totalDue || 0) - ((transaction.total || 0) - (transaction.deposit || 0)),
+            lastTransactionDate: currentSummary.lastTransactionDate, // Keep existing date for now
+          };
+
+          updates[`/customers/${transaction.customerId}/financialSummary`] = newSummary;
+          updates[`/customers/${transaction.customerId}/updatedAt`] = new Date().toISOString();
+        }
+      }
+
+      await update(ref(this.db), updates);
     });
   }
 
@@ -436,6 +633,7 @@ export class TransactionService {
     return this.atomicOperations.execute('addPaymentToMemo', async () => {
       const transactionsRef = ref(this.db, COLLECTION_PATH);
       const newPaymentRef = push(transactionsRef);
+      const paymentId = newPaymentRef.key;
 
       const paymentTransaction = {
         customerId,
@@ -451,12 +649,40 @@ export class TransactionService {
         createdAt: new Date().toISOString(),
       };
 
-      await set(newPaymentRef, paymentTransaction);
+      const updates = {};
+      updates[`/${COLLECTION_PATH}/${paymentId}`] = paymentTransaction;
+
+      // Update Customer Financial Summary
+      const customerRef = ref(this.db, `customers/${customerId}`);
+      const customerSnapshot = await get(customerRef);
+
+      if (customerSnapshot.exists()) {
+        const customer = customerSnapshot.val();
+        const currentSummary = customer.financialSummary || {
+          totalRevenue: 0,
+          totalDeposits: 0,
+          totalDue: 0,
+        };
+
+        const newSummary = {
+          totalRevenue: (currentSummary.totalRevenue || 0), // Payment doesn't increase revenue
+          totalDeposits: (currentSummary.totalDeposits || 0) + (paymentTransaction.amount || 0),
+          // Due decreases by the payment amount
+          totalDue: (currentSummary.totalDue || 0) - (paymentTransaction.amount || 0),
+          lastTransactionDate: paymentTransaction.createdAt,
+        };
+
+        updates[`/customers/${customerId}/financialSummary`] = newSummary;
+        updates[`/customers/${customerId}/updatedAt`] = new Date().toISOString();
+      }
+
+      await update(ref(this.db), updates);
+
       this.logger.info(
         `Payment added to memo ${memoNumber}: ${paymentData.amount}`,
         'TransactionService'
       );
-      return newPaymentRef.key;
+      return paymentId;
     });
   }
 

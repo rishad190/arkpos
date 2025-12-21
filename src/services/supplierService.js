@@ -1,5 +1,5 @@
 "use client";
-import { ref, push, set, update, remove, get } from "firebase/database";
+import { ref, push, set, update, remove, get, onValue } from "firebase/database";
 import { AppError, ERROR_TYPES } from "@/lib/errors";
 import {
   createValidResult,
@@ -32,6 +32,54 @@ export class SupplierService {
     this.db = db;
     this.logger = logger;
     this.atomicOperations = atomicOperations;
+  }
+
+  /**
+   * Subscribe to supplier updates
+   * @param {Function} callback - Function called with updated supplier list
+   * @returns {Function} Unsubscribe function
+   */
+  subscribeToSuppliers(callback) {
+    const suppliersRef = ref(this.db, COLLECTION_PATH);
+    return onValue(suppliersRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const supplierList = Object.entries(data).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        callback(supplierList);
+      } else {
+        callback([]);
+      }
+    }, (error) => {
+      this.logger.error("Error subscribing to suppliers:", error);
+      callback([]);
+    });
+  }
+
+  /**
+   * Subscribe to supplier transaction updates
+   * @param {Function} callback - Function called with updated transaction list
+   * @returns {Function} Unsubscribe function
+   */
+  subscribeToSupplierTransactions(callback) {
+    const transactionsRef = ref(this.db, SUPPLIER_TRANSACTIONS_PATH);
+    return onValue(transactionsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const txnList = Object.entries(data).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        callback(txnList);
+      } else {
+        callback([]);
+      }
+    }, (error) => {
+      this.logger.error("Error subscribing to supplier transactions:", error);
+      callback([]);
+    });
   }
 
   /**

@@ -12,8 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { MobileNav } from "@/components/MobileNav";
-import { UserNav } from "@/components/UserNav";
+import { MobileNav } from "@/components/layout/MobileNav";
+import { UserNav } from "@/components/layout/UserNav";
 import {
   LayoutDashboard,
   BookOpen,
@@ -28,7 +28,8 @@ import {
   GitMerge,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { ConnectionIndicator } from "@/components/ConnectionIndicator";
+import { ConnectionIndicator } from "@/components/layout/ConnectionIndicator";
+
 
 export function Navbar() {
   const { user, logout } = useAuth();

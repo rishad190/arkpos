@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PageHeader } from "@/components/common/PageHeader";
+import { PageHeader } from "@/components/shared/PageHeader";
 import {
   formatCurrency,
   exportToCSV,
@@ -38,7 +38,7 @@ import {
   formatDate,
 } from "@/lib/utils";
 import { useReactToPrint } from "react-to-print";
-import ExpenseReportPrint from "@/components/ExpenseReportPrint";
+import ExpenseReportPrint from "@/components/reports/ExpenseReportPrint";
 
 export default function ExpenseReportPage() {
   const { dailyCashTransactions, loading } = useTransactions();

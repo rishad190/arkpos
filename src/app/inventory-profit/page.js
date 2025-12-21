@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DollarSign, ArrowUpDown } from "lucide-react";
 
-import { DataErrorBoundary } from "@/components/ErrorBoundary";
+import { DataErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { useRouter } from "next/navigation";
 
 export default function InventoryProfitPage() {

@@ -13,8 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
-import { AddCashTransactionDialog } from "../../components/AddCashTransactionDialog.jsx";
-import { EditCashTransactionDialog } from "../../components/EditCashTransactionDialog.jsx";
+import { AddCashTransactionDialog } from "@/components/transactions/AddCashTransactionDialog";
+import { EditCashTransactionDialog } from "@/components/transactions/EditCashTransactionDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,8 +56,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ErrorBoundary } from "@/components/ErrorBoundary.jsx";
-import { Pagination } from "@/components/Pagination";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary.jsx";
+import { Pagination } from "@/components/shared/Pagination";
 
 export default function CashBookPage() {
   const {

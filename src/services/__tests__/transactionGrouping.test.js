@@ -7,6 +7,17 @@
 import * as fc from 'fast-check';
 import { TransactionService } from '../transactionService';
 
+// Mock Firebase database
+jest.mock('firebase/database', () => ({
+  ref: jest.fn(),
+  push: jest.fn(),
+  set: jest.fn(),
+  update: jest.fn(),
+  remove: jest.fn(),
+  query: jest.fn(),
+  get: jest.fn(),
+}));
+
 // Mock dependencies
 const mockDb = {};
 const mockLogger = {

@@ -11,8 +11,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AddSupplierDialog } from "@/components/AddSupplierDialog";
-import { EditSupplierDialog } from "@/components/EditSupplierDialog";
+import { AddSupplierDialog } from "@/components/inventory/AddSupplierDialog";
+import { EditSupplierDialog } from "@/components/inventory/EditSupplierDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,7 +28,7 @@ import {
   ArrowDownRight,
   RefreshCw,
 } from "lucide-react";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import {
   DropdownMenu,
   DropdownMenuContent,

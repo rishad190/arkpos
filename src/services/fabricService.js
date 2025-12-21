@@ -1,5 +1,5 @@
 "use client";
-import { ref, push, set, update, remove, get } from "firebase/database";
+import { ref, push, set, update, remove, get, onValue, query, orderByChild, limitToLast } from "firebase/database";
 import { AppError, ERROR_TYPES } from "@/lib/errors";
 import {
   createValidResult,
@@ -34,6 +34,39 @@ export class FabricService {
     this.db = db;
     this.logger = logger;
     this.atomicOperations = atomicOperations;
+  }
+  /**
+   * Subscribe to fabric updates
+   * @param {Function} callback - Function called with updated fabric list
+   * @param {Object} [options] - Query options
+   * @param {number} [options.limit] - Max number of fabrics to fetch (from newest)
+   * @returns {Function} Unsubscribe function
+   */
+  subscribeToFabrics(callback, options = {}) {
+    const fabricsRef = ref(this.db, COLLECTION_PATH);
+    let q = query(fabricsRef, orderByChild("createdAt"));
+
+    if (options.limit) {
+      q = query(q, limitToLast(options.limit));
+    }
+
+    return onValue(q, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const fabricList = Object.entries(data).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        // Sort by createdAt descending (newest first)
+        fabricList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        callback(fabricList);
+      } else {
+        callback([]);
+      }
+    }, (error) => {
+      this.logger.error("Error subscribing to fabrics:", error);
+      callback([]);
+    });
   }
 
   /**

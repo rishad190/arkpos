@@ -13,9 +13,9 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Plus, Search, DollarSign, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { CustomerTable } from "@/components/CustomerTable";
-import { AddCustomerDialog } from "@/components/AddCustomerDialog";
-import { EditCustomerDialog } from "@/components/EditCustomerDialog";
+import { CustomerTable } from "@/components/customers/CustomerTable";
+import { AddCustomerDialog } from "@/components/customers/AddCustomerDialog";
+import { EditCustomerDialog } from "@/components/customers/EditCustomerDialog";
 import { useToast } from "@/hooks/use-toast";
 import logger from "@/utils/logger";
 
@@ -28,25 +28,19 @@ export default function CustomersPage() {
     updateCustomer 
   } = useCustomers();
   
-  const { 
-    transactions,
-    calculateCustomerTotalDue: getCustomerDue, 
-    getCustomerTransactionsByMemo
-  } = useTransactions();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState(null);
+  // Removed useTransactions as we rely on customer.financialSummary now
+  const getCustomerDue = (customerId) => {
+     const customer = customers?.find(c => c.id === customerId);
+     return customer?.financialSummary?.totalDue || 0;
+  };
 
-  // Get memo count for a customer
   const getCustomerMemoCount = (customerId) => {
-    const memoGroups = getCustomerTransactionsByMemo(customerId);
-    return memoGroups.length;
+     return 0; // Placeholder until we have a way to fetch count efficiently
   };
 
   // Calculate customer financial stats
   const customerStats = useMemo(() => {
-    if (!customers || !transactions) {
+    if (!customers) {
       return {
         totalBill: 0,
         totalDeposit: 0,
@@ -56,21 +50,20 @@ export default function CustomersPage() {
 
     return customers.reduce(
       (acc, customer) => {
-        const customerTransactions =
-          transactions?.filter((t) => t.customerId === customer.id) || [];
+        const summary = customer.financialSummary || {
+          totalRevenue: 0,
+          totalDeposits: 0,
+          totalDue: 0,
+        };
         return {
-          totalBill:
-            acc.totalBill +
-            customerTransactions.reduce((sum, t) => sum + (t.total || 0), 0),
-          totalDeposit:
-            acc.totalDeposit +
-            customerTransactions.reduce((sum, t) => sum + (t.deposit || 0), 0),
-          totalDue: acc.totalDue + getCustomerDue(customer.id),
+          totalBill: acc.totalBill + (summary.totalRevenue || 0),
+          totalDeposit: acc.totalDeposit + (summary.totalDeposits || 0),
+          totalDue: acc.totalDue + (summary.totalDue || 0),
         };
       },
       { totalBill: 0, totalDeposit: 0, totalDue: 0 }
     );
-  }, [customers, transactions, getCustomerDue]);
+  }, [customers]);
 
   const filteredCustomers = useMemo(() => {
     if (!Array.isArray(customers)) return [];

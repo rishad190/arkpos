@@ -1,9 +1,9 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import "./print.css"; // <-- ENSURE THIS IMPORT IS HERE
-import { ClientLayout } from "@/components/ClientLayout";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { Navbar } from "@/components/Navbar";
+import { ClientLayout } from "@/components/layout/ClientLayout";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { Navbar } from "@/components/layout/Navbar";
 
 const inter = Inter({ subsets: ["latin"] });
 

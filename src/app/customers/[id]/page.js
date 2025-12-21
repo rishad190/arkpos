@@ -3,9 +3,9 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCustomers } from "@/contexts/customer-context";
 import { useTransactions } from "@/contexts/transaction-context";
-import { CustomerMemoList } from "@/components/CustomerMemoList";
-import { MemoDetailsDialog } from "@/components/MemoDetailsDialog";
-import { AddPaymentDialog } from "@/components/AddPaymentDialog";
+import { CustomerMemoList } from "@/components/customers/CustomerMemoList";
+import { MemoDetailsDialog } from "@/components/transactions/MemoDetailsDialog";
+import { AddPaymentDialog } from "@/components/transactions/AddPaymentDialog";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,10 +31,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AddTransactionDialog } from "@/components/AddTransactionDialog";
-import { EditTransactionDialog } from "@/components/EditTransactionDialog";
-import { LoadingState, TableSkeleton } from "@/components/LoadingState";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AddTransactionDialog } from "@/components/transactions/AddTransactionDialog";
+import { EditTransactionDialog } from "@/components/transactions/EditTransactionDialog";
+import { LoadingState, TableSkeleton } from "@/components/shared/LoadingState";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import {
   ArrowLeft,
   Phone,
@@ -62,10 +62,10 @@ import { exportToCSV, exportToPDF } from "@/utils/export";
 import { TRANSACTION_CONSTANTS, ERROR_MESSAGES } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { DateRangePicker } from "@/components/DateRangePicker";
+import { DateRangePicker } from "@/components/shared/DateRangePicker";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ErrorDisplay } from "@/components/ErrorDisplay";
+import { ErrorDisplay } from "@/components/shared/ErrorDisplay";
 import { ERROR_TYPES } from "@/lib/errors";
 
 export default function CustomerDetail() {
@@ -74,15 +74,16 @@ export default function CustomerDetail() {
   const { toast } = useToast();
   const { customers } = useCustomers();
   const {
-    transactions,
+    transactions: globalTransactions, // Renamed to avoid confusion, though we won't use it for the list
     addTransaction,
     deleteTransaction,
     updateTransaction,
-    calculateCustomerTotalDue: getCustomerDue,
-    getCustomerTransactionsByMemo,
-    getMemoDetails,
     addPaymentToMemo,
+    subscribeToCustomerTransactions,
   } = useTransactions();
+
+  // Local state for full customer history
+  const [customerTransactions, setCustomerTransactions] = useState([]);
 
   const [loadingState, setLoadingState] = useState({
     initial: true,
@@ -102,25 +103,89 @@ export default function CustomerDetail() {
 
   const customer = customers?.find((c) => c.id === params.id);
 
-  // Get memo groups for this customer
+  // Subscribe to customer transactions
+  useEffect(() => {
+    if (params.id) {
+      setLoadingState(prev => ({ ...prev, transactions: true }));
+      const unsubscribe = subscribeToCustomerTransactions(params.id, (data) => {
+        setCustomerTransactions(data);
+        setLoadingState(prev => ({ ...prev, transactions: false }));
+      });
+      return () => unsubscribe();
+    }
+  }, [params.id, subscribeToCustomerTransactions]);
+
+  // Get memo groups for this customer (derived from local transactions)
+  // Note: getCustomerTransactionsByMemo in context might use global transactions.
+  // We should either update it to accept transactions or implement it locally.
+  // Checking TransactionService.. getCustomerTransactionsByMemo accepts (customerId, allTransactions).
+  // So we can use the context helper BUT pass our local customerTransactions!
   const customerMemoGroups = useMemo(() => {
     if (!params.id) return [];
-    return getCustomerTransactionsByMemo(params.id);
-  }, [params.id, getCustomerTransactionsByMemo]);
+    // We need to pass the LOCAL customerTransactions, but the context hook `getCustomerTransactionsByMemo`
+    // binds `transactions` from context already in the context provider?
+    // Let's check context. 
+    // const getCustomerTransactionsByMemo = useCallback((customerId) => {
+    //   return transactionService.getCustomerTransactionsByMemo(customerId, transactions);
+    // }, [transactionService, transactions]);
+    // It binds GLOBAL transactions. So we cannot use the context helper for full history!
+    // We must manually call the service method or reimplement logic.
+    // The cleanest way is to import TransactionService (class) or move logic to a utility.
+    // Or... update context to allow passing transactions?
+    // Let's implement memo grouping locally here since we have the raw data.
+    
+    // Quick local implementation of memo grouping:
+    const memoMap = new Map();
+    customerTransactions.forEach((t) => {
+       if (!t.memoNumber) return;
+       if (!memoMap.has(t.memoNumber)) {
+         memoMap.set(t.memoNumber, {
+           memoNumber: t.memoNumber,
+           customerId: params.id,
+           saleTransaction: null,
+           paymentTransactions: [],
+           totalAmount: 0,
+           paidAmount: 0,
+           dueAmount: 0,
+           saleDate: null,
+           status: 'unpaid'
+         });
+       }
+       const group = memoMap.get(t.memoNumber);
+       const type = t.type?.toLowerCase();
+       if (type === 'sale' || !t.type) {
+         group.saleTransaction = t;
+         group.totalAmount = t.total || 0;
+         group.saleDate = t.date || t.createdAt;
+         group.paidAmount = t.deposit || 0;
+       } else if (type === 'payment') {
+         group.paymentTransactions.push(t);
+         group.paidAmount += t.deposit || t.amount || 0;
+       }
+    });
+
+    return Array.from(memoMap.values()).map(memo => {
+      memo.dueAmount = memo.totalAmount - memo.paidAmount;
+      if (memo.dueAmount <= 0) memo.status = 'paid';
+      else if (memo.paidAmount > 0) memo.status = 'partial';
+      else memo.status = 'unpaid';
+      return memo;
+    }).sort((a,b) => new Date(b.saleDate || 0) - new Date(a.saleDate || 0));
+
+  }, [params.id, customerTransactions]);
 
   const customerTransactionsWithBalance = useMemo(() => {
-    if (!transactions) return [];
+    if (!customerTransactions) return [];
 
-    return transactions
-      .filter((t) => t.customerId === params.id)
+    return customerTransactions
       .filter(
         (t) =>
           storeFilter === TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL ||
           t.storeId === storeFilter
       )
       .sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
+        const dateA = new Date(a.date || a.createdAt);
+        const dateB = new Date(b.date || b.createdAt);
         return dateA - dateB; // Sort by date ascending (oldest to newest)
       })
       .reduce((acc, transaction) => {
@@ -147,17 +212,16 @@ export default function CustomerDetail() {
           },
         ];
       }, []);
-  }, [transactions, params.id, storeFilter]);
+  }, [customerTransactions, params.id, storeFilter]);
 
   useEffect(() => {
-    if (customer && transactions) {
+    if (customer && !loadingState.transactions) {
       setLoadingState((prev) => ({
         ...prev,
         initial: false,
-        transactions: false,
       }));
     }
-  }, [customer, transactions]);
+  }, [customer, loadingState.transactions]);
 
   const handleAddTransaction = async (transactionData) => {
     try {

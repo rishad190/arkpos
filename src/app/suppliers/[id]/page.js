@@ -33,9 +33,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AddSupplierTransactionDialog } from "@/components/AddSupplierTransactionDialog";
+import { AddSupplierTransactionDialog } from "@/components/inventory/AddSupplierTransactionDialog";
 import { formatDate } from "@/lib/utils";
-import { EditSupplierTransactionDialog } from "@/components/EditSupplierTransactionDialog";
+import { EditSupplierTransactionDialog } from "@/components/inventory/EditSupplierTransactionDialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,

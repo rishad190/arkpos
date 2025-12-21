@@ -3,27 +3,18 @@ import { Button } from "@/components/ui/button";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { FormField } from "@/components/ui/form-field";
 import { useForm } from "@/hooks/use-form";
-import { useFirebaseCrud } from "@/hooks/use-firebase-crud";
-import { COLLECTION_REFS } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
 import { X, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import { useCustomers } from "@/contexts/customer-context";
 
 /**
  * Dialog component for adding a new customer
  */
 export function AddCustomerDialog({ open, onOpenChange, onClose }) {
   const [customTag, setCustomTag] = useState("");
-
-  const customerCrud = useFirebaseCrud(COLLECTION_REFS.CUSTOMERS, {
-    successMessages: {
-      create: "Customer added successfully",
-    },
-    errorMessages: {
-      create: "Failed to add customer. Please try again.",
-    },
-  });
+  const { addCustomer } = useCustomers();
 
   // Store options for the select field
   const storeOptions = [
@@ -82,8 +73,7 @@ export function AddCustomerDialog({ open, onOpenChange, onClose }) {
     validateCustomer,
     async (data) => {
       try {
-        // Use customerCrud hook instead of direct context call
-        await customerCrud.create({
+        await addCustomer({
           ...data,
           createdAt: new Date().toISOString(),
         });

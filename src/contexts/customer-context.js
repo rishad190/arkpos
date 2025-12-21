@@ -1,9 +1,9 @@
 "use client";
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
-import { ref, onValue, query, orderByChild } from "firebase/database";
+// import { ref, onValue, query, orderByChild } from "firebase/database"; // Removed
 import { db } from "@/lib/firebase";
 import logger from "@/utils/logger";
-import { useFirebaseCrud } from "@/hooks/use-firebase-crud";
+// import { useFirebaseCrud } from "@/hooks/use-firebase-crud"; // Removed
 import { useToast } from "@/hooks/use-toast";
 import { useAtomicOperations } from "@/hooks/use-atomic-operations";
 import { CustomerService } from "@/services/customerService";
@@ -23,8 +23,50 @@ export function CustomerProvider({ children }) {
     [atomicOperations]
   );
   
-  const crud = useFirebaseCrud("customers");
-// ... (omitted lines)
+  // Subscribe to Customers
+  useEffect(() => {
+    const unsubscribe = customerService.subscribeToCustomers((data) => {
+      setCustomers(data);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [customerService]);
+
+  // CRUD Operations
+  const addCustomer = useCallback(async (data) => {
+    try {
+      return await customerService.addCustomer(data);
+    } catch (err) {
+      logger.error("Context addCustomer error:", err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [customerService, toast]);
+
+  const updateCustomer = useCallback(async (id, data) => {
+    try {
+      await customerService.updateCustomer(id, data);
+    } catch (err) {
+      logger.error("Context updateCustomer error:", err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [customerService, toast]);
+
+  const deleteCustomer = useCallback(async (id, transactions = []) => {
+    try {
+      await customerService.deleteCustomer(id, transactions);
+    } catch (err) {
+      logger.error("Context deleteCustomer error:", err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [customerService, toast]);
+
+  const getCustomer = useCallback(async (id) => {
+    return await customerService.getCustomer(id);
+  }, [customerService]);
+
   const value = {
     customers,
     loading,

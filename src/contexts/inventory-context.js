@@ -1,9 +1,9 @@
 "use client";
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
-import { ref, onValue, query, orderByChild } from "firebase/database";
+import { ref } from "firebase/database";
 import { db } from "@/lib/firebase";
 import logger from "@/utils/logger";
-import { useFirebaseCrud } from "@/hooks/use-firebase-crud";
+// import { useFirebaseCrud } from "@/hooks/use-firebase-crud"; // Removed
 import { useToast } from "@/hooks/use-toast";
 import { useAtomicOperations } from "@/hooks/use-atomic-operations";
 import { FabricService } from "@/services/fabricService";
@@ -31,91 +31,35 @@ export function InventoryProvider({ children }) {
 
   // Subscribe to Fabrics
   useEffect(() => {
-    const fabricsRef = ref(db, "fabrics");
-    const unsubFabrics = onValue(fabricsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const fabricList = Object.entries(data).map(([id, value]) => ({
-          id,
-          ...value,
-        }));
-        setFabrics(fabricList);
-      } else {
-        setFabrics([]);
-      }
-    }, (err) => {
-      logger.error("Error fetching fabrics:", err);
-      setError(err);
+    const unsubscribe = fabricService.subscribeToFabrics((data) => {
+      setFabrics(data);
     });
-
-    return () => unsubFabrics();
-  }, []);
+    return () => unsubscribe();
+  }, [fabricService]);
 
   // Subscribe to Suppliers
   useEffect(() => {
-    const suppliersRef = ref(db, "suppliers");
-    const unsubSuppliers = onValue(suppliersRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const supplierList = Object.entries(data).map(([id, value]) => ({
-          id,
-          ...value,
-        }));
-        setSuppliers(supplierList);
-      } else {
-        setSuppliers([]);
-      }
-    }, (err) => {
-      logger.error("Error fetching suppliers:", err);
-      setError(err);
+    const unsubscribe = supplierService.subscribeToSuppliers((data) => {
+      setSuppliers(data);
     });
-
-    return () => unsubSuppliers();
-  }, []);
+    return () => unsubscribe();
+  }, [supplierService]);
   
   // Subscribe to Supplier Transactions
   useEffect(() => {
-    const supplierTransactionsRef = ref(db, "supplierTransactions");
-    const unsubSupplierTransactions = onValue(supplierTransactionsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const txnList = Object.entries(data).map(([id, value]) => ({
-          id,
-          ...value,
-        }));
-        setSupplierTransactions(txnList);
-      } else {
-        setSupplierTransactions([]);
-      }
-    }, (err) => {
-      logger.error("Error fetching supplier transactions:", err);
-      // Don't set global error for this optimization, just log
+    const unsubscribe = supplierService.subscribeToSupplierTransactions((data) => {
+      setSupplierTransactions(data);
     });
-    
-    return () => unsubSupplierTransactions();
-  }, []);
+    return () => unsubscribe();
+  }, [supplierService]);
 
   // Subscribe to Partner Products
   useEffect(() => {
-    const partnerProductsRef = ref(db, "partnerProducts");
-    const unsubPartnerProducts = onValue(partnerProductsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const productList = Object.entries(data).map(([id, value]) => ({
-          id,
-          ...value,
-        }));
-        setPartnerProducts(productList);
-      } else {
-        setPartnerProducts([]);
-      }
-    }, (err) => {
-      logger.error("Error fetching partner products:", err);
-      // Don't set global error for this optimization, just log
+    const unsubscribe = partnerProductService.subscribeToPartnerProducts((data) => {
+      setPartnerProducts(data);
     });
-    
-    return () => unsubPartnerProducts();
-  }, []);
+    return () => unsubscribe();
+  }, [partnerProductService]);
 // ... (omitted lines)
   const value = {
     fabrics,

@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PageHeader } from "@/components/common/PageHeader";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/hooks/use-toast";
 import { Edit, Trash2, MoreVertical } from "lucide-react";
 import {
@@ -37,7 +37,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { EditPartnerProductDialog } from "@/components/EditPartnerProductDialog";
+import { EditPartnerProductDialog } from "@/components/inventory/EditPartnerProductDialog";
 
 // Conversion factor
 const METER_TO_YARD = 1.09361;

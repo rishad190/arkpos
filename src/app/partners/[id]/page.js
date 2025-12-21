@@ -11,7 +11,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { ArrowLeft, MoreVertical, Edit, Trash2 } from "lucide-react";
-import { PageHeader } from "@/components/common/PageHeader";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {

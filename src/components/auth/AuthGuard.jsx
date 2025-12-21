@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 export function AuthGuard({ children }) {
   const router = useRouter();

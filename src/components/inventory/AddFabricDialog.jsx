@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { FormField } from "@/components/ui/form-field";
 import { useForm } from "@/hooks/use-form";
-import { useFirebaseCrud } from "@/hooks/use-firebase-crud";
+// import { useFirebaseCrud } from "@/hooks/use-firebase-crud"; // Removed
 import { COLLECTION_REFS, FABRIC_CONSTANTS } from "@/lib/constants";
 
 /**

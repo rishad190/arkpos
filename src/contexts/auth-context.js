@@ -8,7 +8,7 @@ import {
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { initializeSessionManager } from "@/lib/sessionManager";
 
 const AuthContext = createContext({});

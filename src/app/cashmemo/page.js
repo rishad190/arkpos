@@ -6,8 +6,8 @@ import { useCustomers } from "@/contexts/customer-context";
 import { useInventory } from "@/contexts/inventory-context";
 import { useTransactions } from "@/contexts/transaction-context";
 
-import { CashMemoPrint } from "@/components/CashMemoPrint";
-import { TransactionErrorBoundary } from "@/components/ErrorBoundary";
+import { CashMemoPrint } from "@/components/transactions/CashMemoPrint";
+import { TransactionErrorBoundary } from "@/components/shared/ErrorBoundary";
 // --- REMOVED: useReactToPrint ---
 
 import {

@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
-import { Pagination } from "@/components/Pagination";
-import { EmptyState } from "@/components/common/EmptyState";
+import { Pagination } from "@/components/shared/Pagination";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 /**
  * A reusable data table component with sorting, filtering, and column visibility controls.

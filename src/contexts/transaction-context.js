@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
-import { ref, onValue, query, orderByChild, limitToLast } from "firebase/database";
+import { ref, onValue } from "firebase/database";
 import { db } from "@/lib/firebase";
 import logger from "@/utils/logger";
 import { useToast } from "@/hooks/use-toast";
@@ -26,60 +26,29 @@ export function TransactionProvider({ children }) {
 
   // Subscribe to Transactions
   useEffect(() => {
-    const transactionsRef = ref(db, "transactions");
-    const unsubTransactions = onValue(transactionsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const transactionList = Object.entries(data).map(([id, value]) => ({
-          id,
-          ...value,
-        }));
-        transactionList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        setTransactions(transactionList);
-      } else {
-        setTransactions([]);
-      }
+    // Optimization: Only fetch the last 100 transactions by default
+    const unsubscribe = transactionService.subscribeToTransactions((data) => {
+      setTransactions(data);
       setLoading(false);
-    }, (err) => {
-      logger.error("Error fetching transactions:", err);
-      setError(err);
-      setLoading(false);
-    });
-    
-    return () => unsubTransactions();
-  }, []);
+    }, { limit: 100 });
+    return () => unsubscribe();
+  }, [transactionService]);
 
   // Subscribe to Daily Cash Income
   useEffect(() => {
-    const incomeRef = ref(db, "dailyCashIncome");
-    const unsubIncome = onValue(incomeRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const list = Object.entries(data).map(([id, value]) => ({ id, ...value }));
-        list.sort((a, b) => new Date(b.date) - new Date(a.date));
-        setDailyCashIncome(list);
-      } else {
-        setDailyCashIncome([]);
-      }
+    const unsubscribe = cashTransactionService.subscribeToDailyCashIncome((data) => {
+      setDailyCashIncome(data);
     });
-    return () => unsubIncome();
-  }, []);
+    return () => unsubscribe();
+  }, [cashTransactionService]);
 
   // Subscribe to Daily Cash Expense
   useEffect(() => {
-    const expenseRef = ref(db, "dailyCashExpense");
-    const unsubExpense = onValue(expenseRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const list = Object.entries(data).map(([id, value]) => ({ id, ...value }));
-        list.sort((a, b) => new Date(b.date) - new Date(a.date));
-        setDailyCashExpense(list);
-      } else {
-        setDailyCashExpense([]);
-      }
+    const unsubscribe = cashTransactionService.subscribeToDailyCashExpense((data) => {
+      setDailyCashExpense(data);
     });
-    return () => unsubExpense();
-  }, []);
+    return () => unsubscribe();
+  }, [cashTransactionService]);
 
   // Connection State
   const [connectionState, setConnectionState] = useState("connecting");
@@ -200,6 +169,7 @@ export function TransactionProvider({ children }) {
     addPaymentToMemo,
     calculateCustomerTotalDue,
     getCustomerMemosWithDues,
+    subscribeToCustomerTransactions: transactionService.subscribeToCustomerTransactions.bind(transactionService),
   };
 
   return (
