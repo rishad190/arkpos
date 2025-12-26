@@ -27,6 +27,11 @@ export default function CustomersPage() {
     deleteCustomer, 
     updateCustomer 
   } = useCustomers();
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
   
   // Removed useTransactions as we rely on customer.financialSummary now
   const getCustomerDue = (customerId) => {

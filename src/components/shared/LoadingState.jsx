@@ -17,13 +17,18 @@ export function LoadingState({
   );
 }
 
-export function TableSkeleton({ rows = 5 }) {
+export function TableSkeleton({ rows = 5, columns = 5 }) {
   return (
-    <div className="animate-pulse">
-      <div className="h-8 bg-gray-200 rounded mb-4" />
+    <>
       {[...Array(rows)].map((_, i) => (
-        <div key={i} className="h-16 bg-gray-100 rounded mb-2" />
+        <tr key={i} className="animate-pulse">
+          {[...Array(columns)].map((_, j) => (
+            <td key={j} className="p-4">
+              <div className="h-4 bg-gray-200 rounded" />
+            </td>
+          ))}
+        </tr>
       ))}
-    </div>
+    </>
   );
 }

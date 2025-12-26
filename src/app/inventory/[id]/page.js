@@ -1,3 +1,4 @@
+"use client";
 import React, { useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useInventory } from "@/contexts/inventory-context";
@@ -92,9 +93,29 @@ export default function FabricDetailPage() {
 
       <div className="space-y-4">
         <h3 className="text-2xl font-semibold">Container Details</h3>
-        {fabric.batches && fabric.batches.length > 0 ? (
-          fabric.batches.map((batch) => {
-            const batchTotalQuantity = (batch.items || []).reduce(
+        {(() => {
+          const batches = Array.isArray(fabric.batches) 
+            ? fabric.batches 
+            : fabric.batches ? Object.values(fabric.batches) : [];
+          
+          if (batches.length === 0) {
+            return (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground">
+                    No containers or batches have been added for this fabric yet.
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          }
+          
+          return batches.map((batch) => {
+            const items = Array.isArray(batch.items) 
+              ? batch.items 
+              : batch.items ? Object.values(batch.items) : [];
+            
+            const batchTotalQuantity = items.reduce(
               (sum, item) => sum + (Number(item.quantity) || 0),
               0
             );
@@ -129,7 +150,7 @@ export default function FabricDetailPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {batch.items && batch.items.length > 0 ? (
+                  {items.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -140,7 +161,7 @@ export default function FabricDetailPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {batch.items.map((item, index) => (
+                        {items.map((item, index) => (
                           <TableRow key={index}>
                             <TableCell className="font-medium">
                               {item.colorName || "No Color"}
@@ -160,16 +181,8 @@ export default function FabricDetailPage() {
                 </CardContent>
               </Card>
             );
-          })
-        ) : (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">
-                No containers or batches have been added for this fabric yet.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+          });
+        })()}
       </div>
     </div>
   );

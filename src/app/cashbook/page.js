@@ -48,7 +48,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "../../components/ui/popover.jsx";
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,

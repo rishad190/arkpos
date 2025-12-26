@@ -1,5 +1,5 @@
 import { ref, push, set, get, update, remove, onValue } from "firebase/database";
-import { AppError, ERROR_TYPES } from "@/utils/error-handling";
+import { AppError, ERROR_TYPES } from "@/lib/errors";
 
 const COLLECTION_PATH = "partnerProducts";
 

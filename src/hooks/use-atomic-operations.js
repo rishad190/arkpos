@@ -1,5 +1,5 @@
 "use client";
-import { useReducer, useMemo, useCallback, useEffect } from "react";
+import { useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import { AtomicOperationService } from "@/services/atomicOperations";
 import { ref, onValue } from "firebase/database";
 import { db } from "@/lib/firebase";
@@ -15,6 +15,8 @@ const initialState = {
     lastOperationTime: null,
   },
 };
+
+
 
 function reducer(state, action) {
   switch (action.type) {
@@ -58,6 +60,9 @@ function reducer(state, action) {
         },
       };
     case "SET_CONNECTION_STATE":
+      if (state.connectionState === action.payload) {
+        return state;
+      }
       return {
         ...state,
         connectionState: action.payload,
@@ -67,17 +72,18 @@ function reducer(state, action) {
   }
 }
 
-import { useReducer, useMemo, useCallback, useEffect } from "react";
-import { AtomicOperationService } from "@/services/atomicOperations";
-import { ref, onValue } from "firebase/database";
-import { db } from "@/lib/firebase"; // Assuming db is available here
-
-// ... (initialState and reducer remain same)
 
 export function useAtomicOperations() {
   const [state, dispatch] = useReducer(reducer, initialState);
+  
+  // Use a ref to keep track of state for getState access without forcing re-renders of dependencies
+  const stateRef = useRef(state);
+  
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
-  const getState = useCallback(() => state, [state]);
+  const getState = useCallback(() => stateRef.current, []);
 
   const service = useMemo(() => {
     return new AtomicOperationService(dispatch, getState);

@@ -1,4 +1,4 @@
-import { CashbookLoading } from "@/components/LoadingSystem.jsx";
+import { CashbookLoading } from "@/components/shared/LoadingSystem.jsx";
 
 export default function CashbookLoadingPage() {
   return <CashbookLoading />;

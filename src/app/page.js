@@ -10,7 +10,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 
-import { LoadingState, TableSkeleton } from "@/components/LoadingState";
+import { LoadingState, TableSkeleton } from "@/components/shared/LoadingState";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";

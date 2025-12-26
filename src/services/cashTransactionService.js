@@ -1,5 +1,5 @@
 "use client";
-import { ref, push, set, update, remove, get, query, orderByChild, equalTo } from "firebase/database";
+import { ref, push, set, update, remove, get, query, orderByChild, equalTo, onValue } from "firebase/database";
 import { AppError, ERROR_TYPES } from "@/lib/errors";
 import {
   createValidResult,
@@ -30,6 +30,64 @@ export class CashTransactionService {
     this.db = db;
     this.logger = logger;
     this.atomicOperations = atomicOperations;
+  }
+
+  /**
+   * Subscribe to daily cash income
+   * @param {Function} callback - Function called with updated income list
+   * @param {Object} [options] - Query options
+   * @returns {Function} Unsubscribe function
+   */
+  subscribeToDailyCashIncome(callback) {
+    const incomeRef = ref(this.db, DAILY_CASH_INCOME_PATH);
+    const q = query(incomeRef, orderByChild("createdAt"));
+
+    return onValue(q, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const incomeList = Object.entries(data).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        // Sort by date descending
+        incomeList.sort((a, b) => new Date(b.date) - new Date(a.date));
+        callback(incomeList);
+      } else {
+        callback([]);
+      }
+    }, (error) => {
+      this.logger.error("Error subscribing to daily cash income:", error);
+      callback([]);
+    });
+  }
+
+  /**
+   * Subscribe to daily cash expense
+   * @param {Function} callback - Function called with updated expense list
+   * @param {Object} [options] - Query options
+   * @returns {Function} Unsubscribe function
+   */
+  subscribeToDailyCashExpense(callback) {
+    const expenseRef = ref(this.db, DAILY_CASH_EXPENSE_PATH);
+    const q = query(expenseRef, orderByChild("createdAt"));
+
+    return onValue(q, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const expenseList = Object.entries(data).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        // Sort by date descending
+        expenseList.sort((a, b) => new Date(b.date) - new Date(a.date));
+        callback(expenseList);
+      } else {
+        callback([]);
+      }
+    }, (error) => {
+      this.logger.error("Error subscribing to daily cash expense:", error);
+      callback([]);
+    });
   }
 
   /**

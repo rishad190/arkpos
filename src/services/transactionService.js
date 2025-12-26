@@ -1,5 +1,5 @@
 "use client";
-import { ref, push, set, update, remove, onValue, query, orderByChild, limitToLast, startAt, endAt, equalTo } from "firebase/database";
+import { ref, push, set, update, remove, get, onValue, query, orderByChild, limitToLast, startAt, endAt, equalTo } from "firebase/database";
 import { AppError, ERROR_TYPES } from "@/lib/errors";
 import {
   createValidResult,
@@ -302,8 +302,12 @@ export class TransactionService {
             totalRevenue: (currentSummary.totalRevenue || 0) - (transaction.total || 0),
             totalDeposits: (currentSummary.totalDeposits || 0) - (transaction.deposit || 0),
             totalDue: (currentSummary.totalDue || 0) - ((transaction.total || 0) - (transaction.deposit || 0)),
-            lastTransactionDate: currentSummary.lastTransactionDate, // Keep existing date for now
           };
+          
+          // Only include lastTransactionDate if it exists (Firebase doesn't allow undefined)
+          if (currentSummary.lastTransactionDate) {
+            newSummary.lastTransactionDate = currentSummary.lastTransactionDate;
+          }
 
           updates[`/customers/${transaction.customerId}/financialSummary`] = newSummary;
           updates[`/customers/${transaction.customerId}/updatedAt`] = new Date().toISOString();

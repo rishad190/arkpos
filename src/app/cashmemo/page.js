@@ -923,13 +923,19 @@ export default function CashMemoPage() {
                             )
                             .map((fabric) => {
                               // Get total quantity across all batches and colors
-                              const totalQuantity = (
-                                fabric.batches || []
-                              ).reduce((sum, batch) => {
+                              const batches = Array.isArray(fabric.batches) 
+                                ? fabric.batches 
+                                : fabric.batches ? Object.values(fabric.batches) : [];
+                              
+                              const totalQuantity = batches.reduce((sum, batch) => {
                                 if (!batch?.items) return sum;
+                                const items = Array.isArray(batch.items)
+                                  ? batch.items
+                                  : batch.items ? Object.values(batch.items) : [];
+                                  
                                 return (
                                   sum +
-                                  batch.items.reduce(
+                                  items.reduce(
                                     (batchSum, item) =>
                                       batchSum + (Number(item?.quantity) || 0),
                                     0
@@ -965,29 +971,40 @@ export default function CashMemoPage() {
                                       </span>
                                     </div>
                                     <div className="flex gap-2 mt-1">
-                                      {(fabric.batches || [])
-                                        .flatMap((batch) => batch.items || [])
-                                        .reduce((colors, item) => {
-                                          if (
-                                            !item?.colorName ||
-                                            !item?.quantity
-                                          )
-                                            return colors;
-                                          const existing = colors.find(
-                                            (c) => c.color === item.colorName
-                                          );
-                                          if (existing) {
-                                            existing.quantity += Number(
-                                              item.quantity
-                                            );
-                                          } else {
-                                            colors.push({
-                                              color: item.colorName,
-                                              quantity: Number(item.quantity),
-                                            });
-                                          }
-                                          return colors;
-                                        }, [])
+                                      {
+                                        (() => {
+                                          const batches = Array.isArray(fabric.batches) 
+                                            ? fabric.batches 
+                                            : fabric.batches ? Object.values(fabric.batches) : [];
+                                          
+                                          return batches
+                                            .flatMap((batch) => {
+                                               return Array.isArray(batch.items) 
+                                                 ? batch.items 
+                                                 : batch.items ? Object.values(batch.items) : [];
+                                            })
+                                            .reduce((colors, item) => {
+                                              if (
+                                                !item?.colorName ||
+                                                !item?.quantity
+                                              )
+                                                return colors;
+                                              const existing = colors.find(
+                                                (c) => c.color === item.colorName
+                                              );
+                                              if (existing) {
+                                                existing.quantity += Number(
+                                                  item.quantity
+                                                );
+                                              } else {
+                                                colors.push({
+                                                  color: item.colorName,
+                                                  quantity: Number(item.quantity),
+                                                });
+                                              }
+                                              return colors;
+                                            }, []);
+                                        })()
                                         .filter((c) => c.quantity > 0)
                                         .map(({ color, quantity }) => (
                                           <span

@@ -1,3 +1,4 @@
+"use client";
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useInventory } from "@/contexts/inventory-context";

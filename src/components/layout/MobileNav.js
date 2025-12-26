@@ -9,7 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "./ui/sheet.jsx";
+} from "@/components/ui/sheet";
 import { Menu as MenuIcon, Settings, LogOut } from "lucide-react";
 
 export function MobileNav({ handleLogout, router, pathname, navItems, user }) {

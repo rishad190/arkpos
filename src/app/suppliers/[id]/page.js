@@ -43,7 +43,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { exportToCSV, exportToPDF } from "@/utils/export";
-import { DataErrorBoundary } from "@/components/ErrorBoundary";
+import { DataErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SupplierDetail() {
