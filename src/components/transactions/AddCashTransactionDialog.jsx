@@ -46,14 +46,15 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         cashIn: parseFloat(formData.cashIn) || 0,
         cashOut: parseFloat(formData.cashOut) || 0,
       });
-      setOpen(false);
-      setFormData({
-        date: new Date().toISOString().split("T")[0],
+      // Keep dialog open and preserve date for adding multiple transactions
+      // Only reset transaction-specific fields
+      setFormData((prev) => ({
+        ...prev,
         description: "",
         reference: "",
         cashIn: "",
         cashOut: "",
-      });
+      }));
     } catch (error) {
       console.error("Error adding transaction:", error);
       alert("Failed to add transaction. Please try again.");

@@ -54,8 +54,8 @@ export class FabricService {
       const data = snapshot.val();
       if (data) {
         const fabricList = Object.entries(data).map(([id, value]) => ({
-          id,
           ...value,
+          id, // Put id AFTER spread to override any empty id in stored data
         }));
         // Sort by createdAt descending (newest first)
         fabricList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));

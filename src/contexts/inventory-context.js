@@ -154,7 +154,11 @@ export function InventoryProvider({ children }) {
     adjustFabricStock,
     addFabricBatch: (data) => fabricService.addFabricBatch(data),
     updateFabricBatch: (fabricId, batchId, data) => fabricService.updateFabricBatch(fabricId, batchId, data),
-    reduceInventory: (products) => fabricService.reduceInventory(products, atomicOperations.acquireLock, atomicOperations.releaseLock),
+    reduceInventory: (products) => fabricService.reduceInventory(
+      products, 
+      async (id) => true, // acquireLock: always success for now
+      async (id) => {}    // releaseLock: no-op
+    ),
     // Supplier
     addSupplier,
     updateSupplier,

@@ -96,7 +96,10 @@ export default function FabricDetailPage() {
         {(() => {
           const batches = Array.isArray(fabric.batches) 
             ? fabric.batches 
-            : fabric.batches ? Object.values(fabric.batches) : [];
+            : fabric.batches ? Object.entries(fabric.batches).map(([id, value]) => ({
+                ...value,
+                id, // Firebase key as the batch ID
+              })) : [];
           
           if (batches.length === 0) {
             return (

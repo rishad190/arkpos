@@ -260,6 +260,7 @@ export default function InventoryPage() {
                               "View button clicked - Navigating to fabric:",
                               fabric.id
                             );
+                            logger.info("Full fabric object:", fabric);
                             router.push(`/inventory/${fabric.id}`);
                           }}
                         >

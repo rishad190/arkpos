@@ -269,12 +269,6 @@ export default function CashBookPage() {
 
   const handleDeleteTransaction = useCallback(
     async (transactionId) => {
-      if (
-        !window.confirm("Are you sure you want to delete this transaction?")
-      ) {
-        return;
-      }
-
       setLoadingState((prev) => ({ ...prev, actions: true }));
       try {
         await deleteDailyCashTransaction(transactionId);
@@ -283,10 +277,11 @@ export default function CashBookPage() {
           description: "Transaction deleted successfully",
         });
       } catch (error) {
+        console.error("Delete error details:", error);
         logger.error("Error deleting transaction:", error);
         toast({
           title: "Error",
-          description: "Failed to delete transaction. Please try again.",
+          description: error?.message || "Failed to delete transaction. Please try again.",
           variant: "destructive",
         });
       } finally {
@@ -970,8 +965,8 @@ export default function CashBookPage() {
             onOpenChange={(open) => {
               if (!open) setEditingTransaction(null);
             }}
-            onEditTransaction={(updated) => {
-              handleEditTransaction(editingTransaction.id, updated);
+            onEditTransaction={(id, updated) => {
+              handleEditTransaction(id, updated);
             }}
           />
         )}

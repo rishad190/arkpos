@@ -102,8 +102,17 @@ export default function CashMemoPage() {
 
     if (!selectedFabric?.batches) return [];
 
-    return selectedFabric.batches
-      .flatMap((batch) => batch.items || [])
+    const batches = Array.isArray(selectedFabric.batches)
+      ? selectedFabric.batches
+      : selectedFabric.batches ? Object.values(selectedFabric.batches) : [];
+
+    return batches
+      .flatMap((batch) => {
+        const items = Array.isArray(batch.items)
+          ? batch.items
+          : batch.items ? Object.values(batch.items) : [];
+        return items;
+      })
       .reduce((colors, item) => {
         if (!item?.colorName || !item?.quantity) return colors;
         const existing = colors.find((c) => c.color === item.colorName);
@@ -207,14 +216,24 @@ export default function CashMemoPage() {
     }
 
     // Batches are now directly in the fabric object
-    const batches = fabric.batches || [];
+    const batches = Array.isArray(fabric.batches)
+      ? fabric.batches
+      : fabric.batches
+        ? Object.entries(fabric.batches).map(([id, batch]) => ({
+            ...batch,
+            id, // Preserve the Firebase key as batch ID
+          }))
+        : [];
 
     // --- Try-catch for calculateFifoSale ---
     try {
       // Build FIFO-compatible batch list (each batch has a top-level quantity)
-      const fifoBatches = (batches || [])
+      const fifoBatches = batches
         .map((batch) => {
-          const items = batch.items || [];
+          const items = Array.isArray(batch.items)
+            ? batch.items
+            : batch.items ? Object.values(batch.items) : [];
+          
           const qty = newProduct.color
             ? items.reduce(
                 (s, it) =>
@@ -345,8 +364,17 @@ export default function CashMemoPage() {
     }
 
     // Get available colors with quantities
-    const availableColors = (fabric.batches || [])
-      .flatMap((batch) => batch.items || [])
+    const batches = Array.isArray(fabric.batches)
+      ? fabric.batches
+      : fabric.batches ? Object.values(fabric.batches) : [];
+    
+    const availableColors = batches
+      .flatMap((batch) => {
+        const items = Array.isArray(batch.items)
+          ? batch.items
+          : batch.items ? Object.values(batch.items) : [];
+        return items;
+      })
       .reduce((colors, item) => {
         if (!item?.colorName || !item?.quantity) return colors;
         const existing = colors.find((c) => c.color === item.colorName);
@@ -470,10 +498,21 @@ export default function CashMemoPage() {
           break;
         }
 
-        const batches = fabric.batches || [];
+        const batches = Array.isArray(fabric.batches)
+          ? fabric.batches
+          : fabric.batches
+            ? Object.entries(fabric.batches).map(([id, batch]) => ({
+                ...batch,
+                id,
+              }))
+            : [];
+        
         const fifoBatches = batches
           .map((batch) => {
-            const items = batch.items || [];
+            const items = Array.isArray(batch.items)
+              ? batch.items
+              : batch.items ? Object.values(batch.items) : [];
+            
             const qty = product.color
               ? items.reduce(
                   (s, it) =>
