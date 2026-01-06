@@ -80,6 +80,7 @@ export default function CustomerDetail() {
     updateTransaction,
     addPaymentToMemo,
     subscribeToCustomerTransactions,
+    addDailyCashTransaction,
   } = useTransactions();
 
   // Local state for full customer history
@@ -157,7 +158,7 @@ export default function CustomerDetail() {
          group.saleTransaction = t;
          group.totalAmount = t.total || 0;
          group.saleDate = t.date || t.createdAt;
-         group.paidAmount = t.deposit || 0;
+         group.paidAmount += t.deposit || 0;
        } else if (type === 'payment') {
          group.paymentTransactions.push(t);
          group.paidAmount += t.deposit || t.amount || 0;
@@ -400,6 +401,18 @@ export default function CustomerDetail() {
         paymentData,
         params.id
       );
+
+      // Add to cashbook
+      if (paymentData.amount > 0) {
+        await addDailyCashTransaction({
+             date: paymentData.date || new Date().toISOString().split('T')[0],
+             description: `Payment from ${customer?.name || 'Customer'} - Memo #${selectedMemo.memoNumber}`,
+             cashIn: Number(paymentData.amount),
+             cashOut: 0,
+             category: 'Customer Payment',
+             reference: selectedMemo.memoNumber
+        });
+      }
       toast({
         title: "Success",
         description: "Payment added successfully",

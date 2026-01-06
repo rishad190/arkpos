@@ -30,7 +30,33 @@ const FabricForm = ({ fabric, onSave, onCancel }) => {
 
   useEffect(() => {
     if (fabric) {
-      setFormData(fabric);
+      // Ensure batches is always an array (convert from Firebase object if needed)
+      const batches = Array.isArray(fabric.batches)
+        ? fabric.batches
+        : fabric.batches
+          ? Object.entries(fabric.batches).map(([id, batch]) => {
+              // Also ensure batch.items is an array
+              const items = Array.isArray(batch.items)
+                ? batch.items
+                : batch.items
+                  ? Object.values(batch.items)
+                  : [];
+              
+              return {
+                ...batch,
+                id,
+                items,
+              };
+            })
+          : [];
+      
+      setFormData({
+        ...fabric,
+        batches,
+        // Ensure required fields have values (check for empty strings too)
+        category: fabric.category && fabric.category.trim() !== '' ? fabric.category : emptyFabric.category,
+        unit: fabric.unit && fabric.unit.trim() !== '' ? fabric.unit : emptyFabric.unit,
+      });
     } else {
       setFormData(emptyFabric);
     }
