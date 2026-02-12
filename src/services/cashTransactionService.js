@@ -1,5 +1,5 @@
 "use client";
-import { ref, push, set, update, remove, get, query, orderByChild, equalTo, onValue } from "firebase/database";
+import { ref, push, set, update, remove, get, query, orderByChild, equalTo, onValue, increment } from "firebase/database";
 import { AppError, ERROR_TYPES } from "@/lib/errors";
 import {
   createValidResult,
@@ -426,6 +426,163 @@ export class CashTransactionService {
         createdAt: new Date().toISOString(),
       });
       return newRef.key;
+    });
+  }
+
+  /**
+   * Add a generic account transaction (Income/Expense/Transfer)
+   * Updates transaction record and account balances atomically.
+   * @param {Object} transaction - Transaction data
+   * @returns {Promise<string>} New transaction ID
+   */
+  async addAccountTransaction(transaction) {
+    if (!transaction.amount || transaction.amount <= 0) {
+      throw new AppError(ERROR_TYPES.VALIDATION, "Amount must be positive", "amount");
+    }
+    if (!transaction.date) {
+      throw new AppError(ERROR_TYPES.VALIDATION, "Date is required", "date");
+    }
+
+    return this.atomicOperations.execute("addAccountTransaction", async () => {
+       const newRef = push(ref(this.db, TRANSACTIONS_PATH));
+       const id = newRef.key;
+       
+       const updates = {};
+       updates[`${TRANSACTIONS_PATH}/${id}`] = { 
+         ...transaction, 
+         createdAt: new Date().toISOString(),
+         id: id
+       };
+       
+       const amount = Number(transaction.amount);
+       if (transaction.type === 'income') {
+          updates[`settings/store/balance/${transaction.paymentMode}`] = increment(amount);
+       } else if (transaction.type === 'expense') {
+          updates[`settings/store/balance/${transaction.paymentMode}`] = increment(-amount);
+       } else if (transaction.type === 'transfer') {
+          if (transaction.transferType === 'deposit') {
+             // Cash -> Bank
+             updates['settings/store/balance/cash'] = increment(-amount);
+             updates['settings/store/balance/bank'] = increment(amount);
+          } else if (transaction.transferType === 'withdraw') {
+             // Bank -> Cash
+             updates['settings/store/balance/bank'] = increment(-amount);
+             updates['settings/store/balance/cash'] = increment(amount);
+          }
+       }
+       
+       await update(ref(this.db), updates);
+       return id;
+    });
+  }
+  /**
+   * Update a generic account transaction (Income/Expense/Transfer)
+   * Updates transaction record and recaluclates account balances atomically.
+   * @param {string} id - Transaction ID
+   * @param {Object} updatedTransaction - Updated transaction data
+   * @returns {Promise<void>}
+   */
+  async updateAccountTransaction(id, updatedTransaction) {
+    if (!updatedTransaction.amount || updatedTransaction.amount <= 0) {
+      throw new AppError(ERROR_TYPES.VALIDATION, "Amount must be positive", "amount");
+    }
+    if (!updatedTransaction.date) {
+      throw new AppError(ERROR_TYPES.VALIDATION, "Date is required", "date");
+    }
+
+    return this.atomicOperations.execute("updateAccountTransaction", async () => {
+       const transactionRef = ref(this.db, `${TRANSACTIONS_PATH}/${id}`);
+       const snapshot = await get(transactionRef);
+       
+       if (!snapshot.exists()) {
+         throw new AppError(ERROR_TYPES.NOT_FOUND, "Transaction not found");
+       }
+       
+       const oldTransaction = snapshot.val();
+       const updates = {};
+       
+       // 1. Revert Old Balance Impact
+       if (oldTransaction.type === 'income') {
+          updates[`settings/store/balance/${oldTransaction.paymentMode}`] = increment(-Number(oldTransaction.amount));
+       } else if (oldTransaction.type === 'expense') {
+          updates[`settings/store/balance/${oldTransaction.paymentMode}`] = increment(Number(oldTransaction.amount));
+       } else if (oldTransaction.type === 'transfer') {
+          if (oldTransaction.transferType === 'deposit') { // Cash -> Bank
+             updates['settings/store/balance/cash'] = increment(Number(oldTransaction.amount));
+             updates['settings/store/balance/bank'] = increment(-Number(oldTransaction.amount));
+          } else if (oldTransaction.transferType === 'withdraw') { // Bank -> Cash
+             updates['settings/store/balance/bank'] = increment(Number(oldTransaction.amount));
+             updates['settings/store/balance/cash'] = increment(-Number(oldTransaction.amount));
+          }
+       }
+
+       // 2. Apply New Balance Impact
+       const newAmount = Number(updatedTransaction.amount);
+       if (updatedTransaction.type === 'income') {
+          updates[`settings/store/balance/${updatedTransaction.paymentMode}`] = increment(newAmount);
+       } else if (updatedTransaction.type === 'expense') {
+          updates[`settings/store/balance/${updatedTransaction.paymentMode}`] = increment(-newAmount);
+       } else if (updatedTransaction.type === 'transfer') {
+          if (updatedTransaction.transferType === 'deposit') { // Cash -> Bank
+             updates['settings/store/balance/cash'] = increment(-newAmount);
+             updates['settings/store/balance/bank'] = increment(newAmount);
+          } else if (updatedTransaction.transferType === 'withdraw') { // Bank -> Cash
+             updates['settings/store/balance/bank'] = increment(-newAmount);
+             updates['settings/store/balance/cash'] = increment(newAmount);
+          }
+       }
+
+       // 3. Update Transaction Record
+       updates[`${TRANSACTIONS_PATH}/${id}`] = {
+         ...oldTransaction,
+         ...updatedTransaction,
+         id: id, // Ensure ID is preserved
+         updatedAt: new Date().toISOString()
+       };
+
+       await update(ref(this.db), updates);
+    });
+  }
+  /**
+   * Delete a generic account transaction (Income/Expense/Transfer)
+   * Reverts account balances and deletes the transaction record atomically.
+   * @param {string} id - Transaction ID
+   * @returns {Promise<void>}
+   */
+  async deleteAccountTransaction(id) {
+    return this.atomicOperations.execute("deleteAccountTransaction", async () => {
+       const transactionRef = ref(this.db, `${TRANSACTIONS_PATH}/${id}`);
+       const snapshot = await get(transactionRef);
+       
+       if (!snapshot.exists()) {
+         throw new AppError(ERROR_TYPES.NOT_FOUND, "Transaction not found");
+       }
+       
+       const transaction = snapshot.val();
+       const updates = {};
+       const amount = Number(transaction.amount);
+
+       // Revert Balance Impact
+       if (transaction.type === 'income') {
+          updates[`settings/store/balance/${transaction.paymentMode}`] = increment(-amount);
+       } else if (transaction.type === 'expense') {
+          updates[`settings/store/balance/${transaction.paymentMode}`] = increment(amount);
+       } else if (transaction.type === 'transfer') {
+          if (transaction.transferType === 'deposit') { // Cash -> Bank
+             // Revert: Add back to Cash, Remove from Bank
+             updates['settings/store/balance/cash'] = increment(amount);
+             updates['settings/store/balance/bank'] = increment(-amount);
+          } else if (transaction.transferType === 'withdraw') { // Bank -> Cash
+             // Revert: Remove from Cash, Add back to Bank
+             updates['settings/store/balance/bank'] = increment(amount);
+             updates['settings/store/balance/cash'] = increment(-amount);
+          }
+       }
+
+       // Delete Transaction Record
+       updates[`${TRANSACTIONS_PATH}/${id}`] = null;
+
+       await update(ref(this.db), updates);
     });
   }
 }

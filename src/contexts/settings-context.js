@@ -1,6 +1,8 @@
 "use client";
-import { createContext, useContext, useEffect, useReducer, useCallback } from "react";
+import { createContext, useContext, useEffect, useReducer, useCallback, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { ref, onValue } from "firebase/database";
+import { db } from "@/lib/firebase";
 
 // Initial settings state
 const INITIAL_SETTINGS = {
@@ -62,7 +64,23 @@ function settingsReducer(state, action) {
 
 export function SettingsProvider({ children }) {
   const [settings, dispatch] = useReducer(settingsReducer, INITIAL_SETTINGS);
+  const [storeBalance, setStoreBalance] = useState({ cash: 0, bank: 0 });
   const { toast } = useToast();
+
+  // Subscribe to store balance from Firebase
+  useEffect(() => {
+    const balanceRef = ref(db, "settings/store/balance");
+    const unsubscribe = onValue(balanceRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setStoreBalance(data);
+      } else {
+        // Initialize with zeros if path doesn't exist
+        setStoreBalance({ cash: 0, bank: 0 });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -130,6 +148,7 @@ export function SettingsProvider({ children }) {
 
   const value = {
     settings,
+    storeBalance,
     updateSettings,
     updateSection,
     resetSettings,

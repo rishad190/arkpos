@@ -135,6 +135,36 @@ export function TransactionProvider({ children }) {
     }
   }, [cashTransactionService, toast]);
 
+  const addAccountTransaction = useCallback(async (transaction) => {
+    try {
+      return await cashTransactionService.addAccountTransaction(transaction);
+    } catch (err) {
+      logger.error("Context addAccountTransaction error:", err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [cashTransactionService, toast]);
+
+  const updateAccountTransaction = useCallback(async (id, transaction) => {
+    try {
+      return await cashTransactionService.updateAccountTransaction(id, transaction);
+    } catch (err) {
+      logger.error("Context updateAccountTransaction error:", err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [cashTransactionService, toast]);
+
+  const deleteAccountTransaction = useCallback(async (id) => {
+    try {
+      return await cashTransactionService.deleteAccountTransaction(id);
+    } catch (err) {
+      logger.error("Context deleteAccountTransaction error:", err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [cashTransactionService, toast]);
+
   const addPaymentToMemo = useCallback(async (memoNumber, paymentData, customerId) => {
     try {
       return await transactionService.addPaymentToMemo(memoNumber, paymentData, customerId);
@@ -186,6 +216,9 @@ export function TransactionProvider({ children }) {
     updateDailyCashTransaction,
     deleteDailyCashTransaction,
     addCategory,
+    addAccountTransaction,
+    updateAccountTransaction,
+    deleteAccountTransaction,
     // Memo operations
     getCustomerTransactionsByMemo,
     getMemoDetails,

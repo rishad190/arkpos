@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import logger from "@/utils/logger";
 import { useTransactions } from "@/contexts/transaction-context";
-
+import { useSettings } from "@/contexts/settings-context";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatCurrency } from "@/lib/utils";
 import { AddCashTransactionDialog } from "@/components/transactions/AddCashTransactionDialog";
 import { EditCashTransactionDialog } from "@/components/transactions/EditCashTransactionDialog";
 import {
@@ -29,6 +29,7 @@ import {
   Plus,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowRightLeft,
   X,
   Filter,
   RefreshCw,
@@ -36,8 +37,10 @@ import {
   FileText,
   PencilIcon,
   TrashIcon,
+  DollarSign,
+  Building2,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -61,12 +64,17 @@ import { Pagination } from "@/components/shared/Pagination";
 
 export default function CashBookPage() {
   const {
+    transactions, // Added
     dailyCashIncome,
     dailyCashExpense,
     addDailyCashTransaction,
+    addAccountTransaction, // Added
     updateDailyCashTransaction,
+    updateAccountTransaction, 
     deleteDailyCashTransaction,
+    deleteAccountTransaction, // Added
   } = useTransactions();
+  const { storeBalance } = useSettings(); // Added
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [date, setDate] = useState(() => {
@@ -89,10 +97,89 @@ export default function CashBookPage() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [openingBalance, setOpeningBalance] = useState(0);
 
-  const dailyCashTransactions = useMemo(
-    () => [...(dailyCashIncome || []), ...(dailyCashExpense || [])],
-    [dailyCashIncome, dailyCashExpense]
-  );
+  const dailyCashTransactions = useMemo(() => {
+    // 1. Process Legacy Data (DailyCashIncome/Expense)
+    const legacy = [...(dailyCashIncome || []), ...(dailyCashExpense || [])].map((t) => ({
+      ...t,
+      id: t.id,
+      type: t.cashIn > 0 ? "income" : "expense",
+      paymentMode: "cash",
+      amount: Number(t.cashIn || t.cashOut),
+      date: t.date,
+      description: t.description,
+      category: t.category,
+      isLegacy: true,
+    }));
+
+    // 2. Process New Account Transactions
+    const modern = (transactions || []).filter(
+      (t) => {
+        // Must be unlinked from customer transactions (pure cashbook)
+        if (t.customerId) return false;
+        
+        // Exclude Bank-Only transactions (Income/Expense paid via Bank) as they do not affect "Cash in Hand"
+        // Transfer ALWAYS affects cash (either in or out)
+        if (t.type === 'transfer') return true;
+        
+        // Income/Expense: Only include if Payment Mode is 'cash' (or legacy/undefined which defaults to cash)
+        if (['income', 'expense'].includes(t.type)) {
+            return !t.paymentMode || t.paymentMode === 'cash';
+        }
+        
+        return false;
+      }
+    );
+
+    // 3. Combine and Sort
+    const combined = [...legacy, ...modern];
+    combined.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+    
+    return combined;
+  }, [dailyCashIncome, dailyCashExpense, transactions]);
+
+  // Calculate Balances Client-Side (aggregating legacy + modern)
+  const calculatedBalance = useMemo(() => {
+    let cash = 0;
+    let bank = 0;
+    let opening = 0;
+
+    // 1. Legacy Data
+    if (dailyCashIncome) {
+      dailyCashIncome.forEach((t) => (cash += Number(t.cashIn) || 0));
+    }
+    if (dailyCashExpense) {
+      dailyCashExpense.forEach((t) => (cash -= Number(t.cashOut) || 0));
+    }
+
+    // 2. Modern Data (excluding customer transactions for now if we strictly want cashbook)
+    // The previous filter was: !t.customerId && ["income", "expense", "transfer"].includes(t.type)
+    const modern = (transactions || []).filter(
+      (t) => !t.customerId && ["income", "expense", "transfer"].includes(t.type)
+    );
+
+    modern.forEach((t) => {
+      const amt = Number(t.amount) || 0;
+      if (t.type === "income") {
+        if (t.paymentMode === "bank") bank += amt;
+        else cash += amt; // Default to cash
+      } else if (t.type === "expense") {
+        if (t.paymentMode === "bank") bank -= amt;
+        else cash -= amt;
+      } else if (t.type === "transfer") {
+        if (t.transferType === "deposit") {
+          // Cash -> Bank
+          cash -= amt;
+          bank += amt;
+        } else if (t.transferType === "withdraw") {
+          // Bank -> Cash
+          bank -= amt;
+          cash += amt;
+        }
+      }
+    });
+
+    return { cash, bank };
+  }, [dailyCashIncome, dailyCashExpense, transactions]);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -163,11 +250,44 @@ export default function CashBookPage() {
         };
       }
 
-      const cashIn = Number(item.cashIn) || 0;
-      const cashOut = Number(item.cashOut) || 0;
+      const cashIn = Number(item.amount) || Number(item.cashIn) || 0;
+      // For transfers, we need to be careful.
+      // If it's a transfer, we don't double count inflow/outflow for the *Totals* unless we want to see volume.
+      // But for "Cash" daily summary, we usually want to see cash flow.
+      
+      // Let's normalize for the daily summary:
+      let flowIn = 0;
+      let flowOut = 0;
 
-      acc[date].cashIn += cashIn;
-      acc[date].cashOut += cashOut;
+      if (item.isLegacy) {
+        flowIn = Number(item.cashIn) || 0;
+        flowOut = Number(item.cashOut) || 0;
+      } else {
+        const amt = Number(item.amount) || 0;
+        // Logic for "Cash" book summary vs "Bank"
+        // If we want a combined view:
+        if (item.type === 'income') flowIn = amt;
+        else if (item.type === 'expense') flowOut = amt;
+        else if (item.type === 'transfer') {
+             // For summary, maybe just ignore or show net?
+             // If we list it in both cols, we might want to sum it.
+             // But financials should probably reflect Net Asset Change? 
+             // Income increases assets, Expense decreases. Transfer is neutral.
+             // So for 'financials' (Net Profit context), transfers are 0.
+             // But for 'Cash Flow' they are real.
+             // Current Implementation of `financials` sums `cashIn`.
+             // We'll treat flow as:
+             if (item.paymentMode === 'cash' || !item.paymentMode) {
+                // If it's a cash impact
+             }
+             // To keep it simple for the charts/monthly summary which are "Cash In" / "Cash Out":
+             flowIn = (item.type === 'income') ? amt : 0;
+             flowOut = (item.type === 'expense') ? amt : 0;
+        }
+      }
+
+      acc[date].cashIn += flowIn;
+      acc[date].cashOut += flowOut;
       acc[date].balance = acc[date].cashIn - acc[date].cashOut;
       acc[date].dailyCash.push(item);
 
@@ -178,19 +298,22 @@ export default function CashBookPage() {
       (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
     );
 
+    // Recalculate based on normalized flows if needed, but the 'calculatedBalance' above is better for Headings.
+    // We will keep 'financials' for legacy support or PDF but prefer calculatedBalance.
     const financials = {
-      totalCashIn: dailyCashTransactions.reduce(
-        (sum, t) => sum + (Number(t.cashIn) || 0),
-        0
-      ),
-      totalCashOut: dailyCashTransactions.reduce(
-        (sum, t) => sum + (Number(t.cashOut) || 0),
-        0
-      ),
-      availableCash: dailyCashTransactions.reduce(
-        (sum, t) => sum + ((Number(t.cashIn) || 0) - (Number(t.cashOut) || 0)),
-        0
-      ),
+      totalCashIn: dailyCashTransactions.reduce((sum, t) => {
+         if (t.isLegacy && t.cashIn > 0) return sum + (Number(t.cashIn)||0);
+         if (t.type === 'income') return sum + (Number(t.amount)||0);
+         if (t.type === 'transfer' && t.transferType === 'withdraw') return sum + (Number(t.amount)||0);
+         return sum;
+      }, 0),
+      totalCashOut: dailyCashTransactions.reduce((sum, t) => {
+         if (t.isLegacy && t.cashOut > 0) return sum + (Number(t.cashOut)||0);
+         if (t.type === 'expense') return sum + (Number(t.amount)||0);
+         if (t.type === 'transfer' && t.transferType === 'deposit') return sum + (Number(t.amount)||0);
+         return sum;
+      }, 0),
+      availableCash: calculatedBalance.cash // Use the accurate one
     };
 
     const monthly = dailyCashTransactions.reduce((acc, transaction) => {
@@ -199,9 +322,27 @@ export default function CashBookPage() {
       const month = transaction.date.substring(0, 7);
       if (!acc[month]) {
         acc[month] = { cashIn: 0, cashOut: 0 };
+        // We can track bank separately if needed, but this is "Cash Book" monthly summary
       }
-      acc[month].cashIn += Number(transaction.cashIn) || 0;
-      acc[month].cashOut += Number(transaction.cashOut) || 0;
+      
+      let amtIn = 0;
+      let amtOut = 0;
+      const amount = Number(transaction.amount) || 0;
+      
+      if (transaction.isLegacy) {
+         amtIn = Number(transaction.cashIn) || 0;
+         amtOut = Number(transaction.cashOut) || 0;
+      } else {
+         if (transaction.type === 'income') amtIn = amount;
+         else if (transaction.type === 'expense') amtOut = amount;
+         else if (transaction.type === 'transfer') {
+             if (transaction.transferType === 'deposit') amtOut = amount; // Cash Out
+             else if (transaction.transferType === 'withdraw') amtIn = amount; // Cash In
+         }
+      }
+
+      acc[month].cashIn += amtIn;
+      acc[month].cashOut += amtOut;
       return acc;
     }, {});
 
@@ -215,6 +356,33 @@ export default function CashBookPage() {
 
     return { dailyCash, financials, monthlyTotals };
   }, [dailyCashTransactions]);
+
+  const filteredTransactions = useMemo(() => {
+    let result = dailyCashTransactions;
+
+    if (date) {
+      result = result.filter((t) => t.date === date);
+    }
+
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      result = result.filter(
+        (t) =>
+          (t.description || "").toLowerCase().includes(lower) ||
+          (t.category || "").toLowerCase().includes(lower)
+      );
+    }
+
+    if (activeTab !== "all") {
+      result = result.filter((t) => t.type === activeTab);
+    }
+
+    return result;
+  }, [dailyCashTransactions, date, searchTerm, activeTab]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [date, searchTerm, activeTab]);
 
   const { groupedEntries, sortedDates } = useMemo(() => {
     if (!Array.isArray(dailyCashTransactions)) {
@@ -240,12 +408,33 @@ export default function CashBookPage() {
       if (!acc[entryDate]) {
         acc[entryDate] = { income: [], expense: [] };
       }
-      if (entry.cashIn > 0) {
-        acc[entryDate].income.push({ ...entry, amount: entry.cashIn });
+      
+      const amount = Number(entry.amount) || 0;
+
+      if (entry.type === 'income') {
+        acc[entryDate].income.push({ ...entry, amount });
+      } else if (entry.type === 'expense') {
+        acc[entryDate].expense.push({ ...entry, amount });
+      } else if (entry.type === 'transfer') {
+        // Correctly classify Transfer based on Cash Flow
+        if (entry.transferType === 'deposit') {
+            // Cash -> Bank (Cash Outflow / Expense)
+            acc[entryDate].expense.push({ ...entry, amount, isTransferOut: true });
+        } else if (entry.transferType === 'withdraw') {
+            // Bank -> Cash (Cash Inflow / Income)
+            acc[entryDate].income.push({ ...entry, amount, isTransferIn: true });
+        } else {
+            // Fallback if type is missing (legacy?), show in both to be safe or ignore?
+            // Let's assume it's neutral if undefined, but ideally we fix data.
+            // For now, to allow editing, we might need it somewhere.
+            // But strict cashbook flow implies one direction.
+        }
+      } else if (entry.isLegacy) {
+          // Fallback for legacy
+         if ((entry.cashIn || 0) > 0) acc[entryDate].income.push({ ...entry, amount: entry.cashIn });
+         if ((entry.cashOut || 0) > 0) acc[entryDate].expense.push({ ...entry, amount: entry.cashOut });
       }
-      if (entry.cashOut > 0) {
-        acc[entryDate].expense.push({ ...entry, amount: entry.cashOut });
-      }
+      
       return acc;
     }, {});
 
@@ -254,24 +443,22 @@ export default function CashBookPage() {
     );
 
     let runningBalance = openingBalance;
-    sorted.forEach((date) => {
-      const { income, expense } = grouped[date];
-      [...income, ...expense]
-        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-        .forEach((entry) => {
-          runningBalance += (entry.cashIn || 0) - (entry.cashOut || 0);
-          entry.balance = runningBalance;
-        });
-    });
-
+    // Calculate running balance if needed, though with filtered/pagination it's tricky.
+    // We'll stick to daily totals for the cards.
     return { groupedEntries: grouped, sortedDates: sorted };
-  }, [dailyCashTransactions, date, searchTerm, openingBalance]);
+  }, [filteredTransactions, openingBalance]);
 
   const handleDeleteTransaction = useCallback(
-    async (transactionId) => {
+    async (transaction) => {
       setLoadingState((prev) => ({ ...prev, actions: true }));
       try {
-        await deleteDailyCashTransaction(transactionId);
+        // Check if legacy or modern
+        if (transaction.isLegacy) {
+          await deleteDailyCashTransaction(transaction.id);
+        } else {
+          await deleteAccountTransaction(transaction.id);
+        }
+
         toast({
           title: "Success",
           description: "Transaction deleted successfully",
@@ -296,8 +483,8 @@ export default function CashBookPage() {
   }, []);
 
   const handleDeleteClick = useCallback(
-    (id) => {
-      handleDeleteTransaction(id);
+    (entry) => {
+      handleDeleteTransaction(entry);
     },
     [handleDeleteTransaction]
   );
@@ -306,7 +493,7 @@ export default function CashBookPage() {
     async (transaction) => {
       setLoadingState((prev) => ({ ...prev, actions: true }));
       try {
-        await addDailyCashTransaction(transaction);
+        await addAccountTransaction(transaction); // Updated to use addAccountTransaction
 
         toast({
           title: "Success",
@@ -323,15 +510,31 @@ export default function CashBookPage() {
         setLoadingState((prev) => ({ ...prev, actions: false }));
       }
     },
-    [addDailyCashTransaction, toast]
+    [addAccountTransaction, toast]
   );
+
+
+
+  // ... (existing code)
 
   const handleEditTransaction = useCallback(
     async (transactionId, updatedData) => {
       setLoadingState((prev) => ({ ...prev, actions: true }));
 
       try {
-        await updateDailyCashTransaction(transactionId, updatedData);
+        // Determine if it's a legacy transaction or a new account transaction
+        // We can check if the original transaction (which we need reference to, but don't have here easily)
+        // OR we can infer from the data structure.
+        // Ideally, we should pass the full original transaction object to handleEditTransaction or checking `editingTransaction` state.
+        
+        const isLegacy = editingTransaction?.isLegacy;
+
+        if (isLegacy) {
+            await updateDailyCashTransaction(transactionId, updatedData);
+        } else {
+            await updateAccountTransaction(transactionId, updatedData);
+        }
+
         toast({
           title: "Success",
           description: "Transaction updated successfully",
@@ -341,14 +544,14 @@ export default function CashBookPage() {
         logger.error("Error updating transaction:", error);
         toast({
           title: "Error",
-          description: "Failed to update transaction. Please try again.",
+          description: error.message || "Failed to update transaction. Please try again.",
           variant: "destructive",
         });
       } finally {
         setLoadingState((prev) => ({ ...prev, actions: false }));
       }
     },
-    [updateDailyCashTransaction, toast]
+    [updateDailyCashTransaction, updateAccountTransaction, editingTransaction, toast]
   );
 
   const handleClearFilter = useCallback(() => {
@@ -480,6 +683,8 @@ export default function CashBookPage() {
     </Card>
   );
 
+
+
   return (
     <ErrorBoundary>
       <div className="p-4 md:p-8 max-w-7xl mx-auto">
@@ -572,98 +777,26 @@ export default function CashBookPage() {
               </div>
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <Card className="overflow-hidden border-none shadow-md">
-                <CardContent className="p-0">
-                  <div className="bg-green-50 dark:bg-green-900/20 p-4 border-b border-green-100 dark:border-green-800">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-medium text-green-800 dark:text-green-300">
-                        Total Cash In
-                      </h3>
-                      <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
-                      ৳{financials.totalCashIn.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
-                      All time income
-                    </p>
-                  </div>
+            {/* Balance Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Cash Balance</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(calculatedBalance.cash)}</div>
+                  <p className="text-xs text-muted-foreground">Physical Cash on Hand</p>
                 </CardContent>
               </Card>
-
-              <Card className="overflow-hidden border-none shadow-md">
-                <CardContent className="p-0">
-                  <div className="bg-red-50 dark:bg-red-900/20 p-4 border-b border-red-100 dark:border-red-800">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
-                        Total Cash Out
-                      </h3>
-                      <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <p className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
-                      ৳{financials.totalCashOut.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
-                      All time expenses
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="overflow-hidden border-none shadow-md">
-                <CardContent className="p-0">
-                  <div
-                    className={`${
-                      financials.availableCash >= 0
-                        ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800"
-                        : "bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800"
-                    } p-4 border-b`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <h3
-                        className={`text-sm font-medium ${
-                          financials.availableCash >= 0
-                            ? "text-blue-800 dark:text-blue-300"
-                            : "text-amber-800 dark:text-amber-300"
-                        }`}
-                      >
-                        Available Balance
-                      </h3>
-                      <RefreshCw
-                        className={`h-4 w-4 ${
-                          financials.availableCash >= 0
-                            ? "text-blue-600 dark:text-blue-400"
-                            : "text-amber-600 dark:text-amber-400"
-                        }`}
-                      />
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <p
-                      className={`text-2xl md:text-3xl font-bold ${
-                        financials.availableCash >= 0
-                          ? "text-blue-600 dark:text-blue-400"
-                          : "text-amber-600 dark:text-amber-400"
-                      }`}
-                    >
-                      ৳{financials.availableCash.toLocaleString()}
-                    </p>
-                    <p
-                      className={`text-xs ${
-                        financials.availableCash >= 0
-                          ? "text-blue-600/70 dark:text-blue-400/70"
-                          : "text-amber-600/70 dark:text-amber-400/70"
-                      } mt-1`}
-                    >
-                      Current balance
-                    </p>
-                  </div>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Bank Balance</CardTitle>
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(calculatedBalance.bank)}</div>
+                  <p className="text-xs text-muted-foreground">Bank Account Funds</p>
                 </CardContent>
               </Card>
             </div>
@@ -755,205 +888,144 @@ export default function CashBookPage() {
             >
               <TabsList className="mb-4">
                 <TabsTrigger value="all">All Transactions</TabsTrigger>
-                <TabsTrigger value="in">Cash In</TabsTrigger>
-                <TabsTrigger value="out">Cash Out</TabsTrigger>
+                <TabsTrigger value="income">Income</TabsTrigger>
+                <TabsTrigger value="expense">Expense</TabsTrigger>
+                <TabsTrigger value="transfer">Transfer</TabsTrigger>
               </TabsList>
             </Tabs>
 
             {/* Transactions Table */}
-            <Card className="border-none shadow-md">
-              <CardContent>
-                <div className="space-y-4">
-                  {sortedDates.length > 0 ? (
-                    sortedDates.map((date) => {
-                      let { income, expense } = groupedEntries[date];
+            {/* Transactions Card List (Grouped by Date) */}
+            <div className="space-y-6">
+              {sortedDates.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((date) => {
+                const { income, expense } = groupedEntries[date];
+                
+                const dailyIncomeTotal = income.reduce((sum, i) => sum + (Number(i.amount)||0), 0);
+                const dailyExpenseTotal = expense.reduce((sum, e) => sum + (Number(e.amount)||0), 0);
+                const dailyBalance = dailyIncomeTotal - dailyExpenseTotal;
 
-                      if (activeTab === "in") {
-                        expense = [];
-                      } else if (activeTab === "out") {
-                        income = [];
-                      }
-
-                      if (income.length === 0 && expense.length === 0)
-                        return null;
-
-                      const dailyIncomeTotal = income.reduce(
-                        (sum, i) => sum + i.amount,
-                        0
-                      );
-                      const dailyExpenseTotal = expense.reduce(
-                        (sum, e) => sum + e.amount,
-                        0
-                      );
-
-                      return (
-                        <div
-                          key={date}
-                          className="border rounded-lg overflow-hidden shadow-sm"
-                        >
-                          <div className="bg-muted/50 px-4 py-2 border-b">
-                            <h3 className="font-semibold text-lg">
-                              {new Date(date + "T00:00:00").toLocaleDateString(
-                                "en-US",
-                                {
-                                  weekday: "long",
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                }
-                              )}
-                            </h3>
-                          </div>
-                          {/* FIXED: Always show both columns in grid layout */}
-                          <div className="grid grid-cols-1 md:grid-cols-2">
-                            {/* Income Section - Always visible */}
-                            <div className="p-4 md:border-r">
-                              <h4 className="font-medium mb-2 text-green-600">
-                                INCOME
-                              </h4>
-                              {income.length > 0 ? (
-                                <>
-                                  <div className="space-y-2 min-h-[50px]">
-                                    {income.map((entry) => (
-                                      <div
-                                        key={entry.id}
-                                        className="flex justify-between items-center text-sm group"
-                                      >
-                                        <div>
-                                          <p className="font-medium">
-                                            {entry.description}
-                                          </p>
-                                          <p className="text-xs text-muted-foreground">
-                                            {entry.category}
-                                          </p>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          <span className="font-medium">
-                                            ৳{entry.amount.toFixed(2)}
-                                          </span>
-
-                                          <div className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-6 w-6"
-                                              onClick={() =>
-                                                handleEditClick(entry)
-                                              }
-                                            >
-                                              <PencilIcon className="h-3 w-3" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-6 w-6 text-destructive"
-                                              onClick={() =>
-                                                handleDeleteClick(entry.id)
-                                              }
-                                            >
-                                              <TrashIcon className="h-3 w-3" />
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
+                return (
+                  <Card key={date} className="overflow-hidden border-none shadow-md">
+                    <CardHeader className="bg-muted/50 py-3">
+                       <div className="flex justify-between items-center">
+                        <CardTitle className="text-lg font-semibold">
+                          {formatDate(date)} <span className="text-sm font-normal text-muted-foreground ml-2">{new Date(date).toLocaleDateString('en-US', { weekday: 'long' })}</span>
+                        </CardTitle>
+                        <Badge variant="outline" className="text-base">
+                          Daily Balance: <span className={dailyBalance >= 0 ? "text-green-600 ml-1" : "text-red-600 ml-1"}>
+                            {dailyBalance >= 0 ? '+' : ''}{formatCurrency(dailyBalance)}
+                          </span>
+                        </Badge>
+                       </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x">
+                        {/* INCOME COLUMN */}
+                        <div className="p-4">
+                           <div className="flex justify-between items-center mb-3">
+                             <h4 className="font-bold text-green-600 flex items-center gap-2">
+                               <ArrowUpRight className="h-4 w-4" /> INCOME
+                             </h4>
+                             <span className="font-bold text-green-600">{formatCurrency(dailyIncomeTotal)}</span>
+                           </div>
+                           <div className="space-y-3">
+                             {income.map(t => (
+                               <div key={t.id + '-in'} className="group flex justify-between items-start text-sm p-2 rounded-md hover:bg-muted/50 transition-colors">
+                                  <div className="space-y-1">
+                                    <div className="font-medium flex items-center gap-2">
+                                      {t.description}
+                                      {t.type === 'transfer' && (
+                                         <Badge variant="outline" className="text-[10px] h-5 px-1 bg-blue-50 text-blue-700 border-blue-200">
+                                           Transfer
+                                         </Badge>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                      <Badge variant="secondary" className="text-[10px] h-5 px-1">{t.category}</Badge>
+                                      {t.paymentMode && <span>• {t.paymentMode.toUpperCase()}</span>}
+                                    </div>
                                   </div>
-                                  <div className="border-t mt-2 pt-2 flex justify-between font-bold text-green-600">
-                                    <span>Daily Total</span>
-                                    <span>৳{dailyIncomeTotal.toFixed(2)}</span>
+                                  <div className="flex flex-col items-end gap-1">
+                                     <span className="font-bold text-green-700">+{formatCurrency(t.amount)}</span>
+                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleEditClick(t)}>
+                                          <PencilIcon className="h-3 w-3" />
+                                        </Button>
+                                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleDeleteClick(t)}>
+                                          <TrashIcon className="h-3 w-3" />
+                                        </Button>
+                                     </div>
                                   </div>
-                                </>
-                              ) : (
-                                <div className="space-y-2 min-h-[50px] flex items-center justify-center text-muted-foreground text-sm">
-                                  No income transactions
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Expense Section - Always visible */}
-                            <div className="p-4">
-                              <h4 className="font-medium mb-2 text-destructive">
-                                EXPENSE
-                              </h4>
-                              {expense.length > 0 ? (
-                                <>
-                                  <div className="space-y-2 min-h-[50px]">
-                                    {expense.map((entry) => (
-                                      <div
-                                        key={entry.id}
-                                        className="flex justify-between items-center text-sm group"
-                                      >
-                                        <div>
-                                          <p className="font-medium">
-                                            {entry.description}
-                                          </p>
-                                          <p className="text-xs text-muted-foreground">
-                                            {entry.category}
-                                          </p>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          <span className="font-medium">
-                                            ৳{entry.amount.toFixed(2)}
-                                          </span>
-
-                                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-6 w-6"
-                                              onClick={() =>
-                                                handleEditClick(entry)
-                                              }
-                                            >
-                                              <PencilIcon className="h-3 w-3" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-6 w-6 text-destructive"
-                                              onClick={() =>
-                                                handleDeleteClick(entry.id)
-                                              }
-                                            >
-                                              <TrashIcon className="h-3 w-3" />
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div className="border-t mt-2 pt-2 flex justify-between font-bold text-destructive">
-                                    <span>Daily Total</span>
-                                    <span>৳{dailyExpenseTotal.toFixed(2)}</span>
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="space-y-2 min-h-[50px] flex items-center justify-center text-muted-foreground text-sm">
-                                  No expense transactions
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="bg-muted/50 px-4 py-3 border-t font-bold flex justify-between">
-                            <span>Daily Balance</span>
-                            <span>
-                              ৳
-                              {(dailyIncomeTotal - dailyExpenseTotal).toFixed(
-                                2
-                              )}
-                            </span>
-                          </div>
+                               </div>
+                             ))}
+                             {income.length === 0 && <p className="text-muted-foreground text-center text-sm py-4 italic">No income</p>}
+                           </div>
                         </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-16 text-muted-foreground">
-                      No entries found matching your filters.
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+
+                        {/* EXPENSE COLUMN */}
+                        <div className="p-4">
+                           <div className="flex justify-between items-center mb-3">
+                             <h4 className="font-bold text-red-600 flex items-center gap-2">
+                               <ArrowDownRight className="h-4 w-4" /> EXPENSE
+                             </h4>
+                             <span className="font-bold text-red-600">{formatCurrency(dailyExpenseTotal)}</span>
+                           </div>
+                           <div className="space-y-3">
+                             {expense.map(t => (
+                               <div key={t.id + '-out'} className="group flex justify-between items-start text-sm p-2 rounded-md hover:bg-muted/50 transition-colors">
+                                  <div className="space-y-1">
+                                    <div className="font-medium flex items-center gap-2">
+                                      {t.description}
+                                      {t.type === 'transfer' && (
+                                         <Badge variant="outline" className="text-[10px] h-5 px-1 bg-blue-50 text-blue-700 border-blue-200">
+                                           Transfer
+                                         </Badge>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                      <Badge variant="secondary" className="text-[10px] h-5 px-1">{t.category}</Badge>
+                                      {t.paymentMode && <span>• {t.paymentMode.toUpperCase()}</span>}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-1">
+                                     <span className="font-bold text-red-700">-{formatCurrency(t.amount)}</span>
+                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleEditClick(t)}>
+                                          <PencilIcon className="h-3 w-3" />
+                                        </Button>
+                                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleDeleteClick(t)}>
+                                          <TrashIcon className="h-3 w-3" />
+                                        </Button>
+                                     </div>
+                                  </div>
+                               </div>
+                             ))}
+                             {expense.length === 0 && <p className="text-muted-foreground text-center text-sm py-4 italic">No expense</p>}
+                           </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              
+              {sortedDates.length === 0 && (
+                 <div className="text-center py-12 text-muted-foreground">
+                   No transactions found.
+                 </div>
+              )}
+
+              {sortedDates.length > itemsPerPage && (
+                   <div className="py-4">
+                      <Pagination
+                        currentPage={currentPage}
+                        totalItems={sortedDates.length}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                      />
+                   </div>
+              )}
+            </div>
           </>
         )}
 
