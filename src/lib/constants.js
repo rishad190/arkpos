@@ -92,3 +92,22 @@ export const TRANSACTION_CONSTANTS = {
     STORE2: "STORE2",
   },
 };
+
+export const CASH_TRANSACTION_CATEGORIES = {
+  INCOME: [
+    "Sales",
+    "Customer Payment",
+    "Capital Injection",
+    "Other Income"
+  ],
+  EXPENSE: [
+    "Supplier Payment", 
+    "Utility Bills",
+    "Rent", 
+    "Salary", 
+    "Entertainment", 
+    "Transport", 
+    "Maintenance", 
+    "Other Expense"
+  ]
+};

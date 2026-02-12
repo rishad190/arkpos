@@ -15,6 +15,7 @@ export function TransactionProvider({ children }) {
   const [transactions, setTransactions] = useState([]);
   const [dailyCashIncome, setDailyCashIncome] = useState([]);
   const [dailyCashExpense, setDailyCashExpense] = useState([]);
+  const [transactionCategories, setTransactionCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -46,6 +47,14 @@ export function TransactionProvider({ children }) {
   useEffect(() => {
     const unsubscribe = cashTransactionService.subscribeToDailyCashExpense((data) => {
       setDailyCashExpense(data);
+    });
+    return () => unsubscribe();
+  }, [cashTransactionService]);
+
+  // Subscribe to Transaction Categories
+  useEffect(() => {
+    const unsubscribe = cashTransactionService.subscribeToCategories((data) => {
+      setTransactionCategories(data);
     });
     return () => unsubscribe();
   }, [cashTransactionService]);
@@ -116,6 +125,16 @@ export function TransactionProvider({ children }) {
     return await cashTransactionService.deleteCashTransaction(id);
   }, [cashTransactionService]);
 
+  const addCategory = useCallback(async (category) => {
+    try {
+      return await cashTransactionService.addCategory(category);
+    } catch (err) {
+      logger.error("Context addCategory error:", err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [cashTransactionService, toast]);
+
   const addPaymentToMemo = useCallback(async (memoNumber, paymentData, customerId) => {
     try {
       return await transactionService.addPaymentToMemo(memoNumber, paymentData, customerId);
@@ -147,7 +166,10 @@ export function TransactionProvider({ children }) {
     transactions,
     dailyCashIncome,
     dailyCashExpense,
+    dailyCashIncome,
+    dailyCashExpense,
     dailyCashTransactions,
+    transactionCategories,
     connectionState,
     loading,
     error,
@@ -163,6 +185,7 @@ export function TransactionProvider({ children }) {
     addDailyCashTransaction,
     updateDailyCashTransaction,
     deleteDailyCashTransaction,
+    addCategory,
     // Memo operations
     getCustomerTransactionsByMemo,
     getMemoDetails,

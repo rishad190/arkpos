@@ -12,6 +12,7 @@ import {
 const DAILY_CASH_INCOME_PATH = "dailyCashIncome";
 const DAILY_CASH_EXPENSE_PATH = "dailyCashExpense";
 const TRANSACTIONS_PATH = "transactions";
+const CATEGORIES_PATH = "transactionCategories";
 
 /**
  * Cash Transaction Service - Handles atomic cash transaction operations
@@ -366,6 +367,66 @@ export class CashTransactionService {
     }
 
     return result;
+  }
+
+  /**
+   * Subscribe to transaction categories
+   * @param {Function} callback - Function called with updated categories list
+   * @returns {Function} Unsubscribe function
+   */
+  subscribeToCategories(callback) {
+    const categoriesRef = ref(this.db, CATEGORIES_PATH);
+    const q = query(categoriesRef, orderByChild("name"));
+
+    return onValue(q, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const categories = Object.entries(data).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        callback(categories);
+      } else {
+        callback([]);
+      }
+    }, (error) => {
+      this.logger.error("Error subscribing to categories:", error);
+      callback([]);
+    });
+  }
+
+  /**
+   * Add a new transaction category
+   * @param {Object} category - The category object { name, type }
+   * @returns {Promise<string>} The new category ID
+   */
+  async addCategory(category) {
+    // Validate
+    if (!category.name || !category.type) {
+      throw new Error("Category name and type are required");
+    }
+
+    // Check if exists (simple check by name within type)
+    // Ideally we should query, but for now we can rely on UI or just add it.
+    // To prevent duplicates, we can query first.
+    const categoriesRef = ref(this.db, CATEGORIES_PATH);
+    const q = query(categoriesRef, orderByChild("name"), equalTo(category.name));
+    
+    const snapshot = await get(q);
+    if (snapshot.exists()) {
+      // Check type 
+      const existing = Object.values(snapshot.val()).find(c => c.type === category.type);
+      if (existing) return; // Already exists
+    }
+
+    return this.atomicOperations.execute("addCategory", async () => {
+      const newRef = push(categoriesRef);
+      await set(newRef, {
+        ...category,
+        createdAt: new Date().toISOString(),
+      });
+      return newRef.key;
+    });
   }
 }
 

@@ -20,15 +20,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { useTransactions } from "@/contexts/transaction-context";
+import { CASH_TRANSACTION_CATEGORIES } from "@/lib/constants";
+
 export function AddCashTransactionDialog({ onAddTransaction, children }) {
+  const { transactionCategories, addCategory } = useTransactions();
   const [open, setOpen] = useState(false);
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     description: "",
     reference: "",
     cashIn: "",
     cashOut: "",
+    category: "",
   });
+
+  // Merge default and custom categories
+  const incomeCategories = [
+    ...CASH_TRANSACTION_CATEGORIES.INCOME,
+    ...(transactionCategories || []).filter(c => c.type === 'INCOME').map(c => c.name)
+  ];
+  
+  const expenseCategories = [
+    ...CASH_TRANSACTION_CATEGORIES.EXPENSE,
+    ...(transactionCategories || []).filter(c => c.type === 'EXPENSE').map(c => c.name)
+  ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,10 +58,24 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
     }
 
     try {
+      const type = cashIn > 0 ? "INCOME" : "EXPENSE";
+      const categoryName = formData.category || (cashIn > 0 ? "Other Income" : "Other Expense");
+
+      // Save custom category if it's new
+      if (isCustomCategory && formData.category && 
+          !incomeCategories.includes(formData.category) && 
+          !expenseCategories.includes(formData.category)) {
+          await addCategory({
+            name: formData.category,
+            type: type
+          });
+      }
+
       await onAddTransaction({
         ...formData,
         cashIn: parseFloat(formData.cashIn) || 0,
         cashOut: parseFloat(formData.cashOut) || 0,
+        category: categoryName,
       });
       // Keep dialog open and preserve date for adding multiple transactions
       // Only reset transaction-specific fields
@@ -54,12 +85,16 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         reference: "",
         cashIn: "",
         cashOut: "",
+        category: "",
       }));
+      setIsCustomCategory(false);
     } catch (error) {
       console.error("Error adding transaction:", error);
       alert("Failed to add transaction. Please try again.");
     }
   };
+
+  const availableCategories = [...incomeCategories, ...expenseCategories];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -82,6 +117,59 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                   }
                   required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="category">Category</Label>
+                <div className="space-y-2">
+                  <Select
+                    value={isCustomCategory ? "custom" : formData.category}
+                    onValueChange={(value) => {
+                      if (value === "custom") {
+                        setIsCustomCategory(true);
+                        setFormData((prev) => ({ ...prev, category: "" }));
+                      } else {
+                        setIsCustomCategory(false);
+                        setFormData((prev) => ({ ...prev, category: value }));
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="uncategorized">Select Category</SelectItem>
+                      {/* Income Categories */}
+                      <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                        Income
+                      </div>
+                      {incomeCategories.map((cat) => (
+                        <SelectItem key={`inc-${cat}`} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                      {/* Expense Categories */}
+                      <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground mt-2">
+                        Expense
+                      </div>
+                      {expenseCategories.map((cat) => (
+                        <SelectItem key={`exp-${cat}`} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                      <div className="border-t my-1" />
+                      <SelectItem value="custom">Other / Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  {isCustomCategory && (
+                     <Input
+                      placeholder="Enter custom category"
+                      value={formData.category}
+                      onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                      required
+                     />
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
