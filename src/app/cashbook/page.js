@@ -5,6 +5,16 @@ import { useTransactions } from "@/contexts/transaction-context";
 import { useSettings } from "@/contexts/settings-context";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -87,6 +97,7 @@ export default function CashBookPage() {
   const [pdfEndDate, setPdfEndDate] = useState(date);
 
   const [editingTransaction, setEditingTransaction] = useState(null);
+  const [deletingTransaction, setDeletingTransaction] = useState(null); // Added for delete confirmation
   const [loadingState, setLoadingState] = useState({
     initial: true,
     transactions: false,
@@ -482,12 +493,16 @@ export default function CashBookPage() {
     setEditingTransaction(entry);
   }, []);
 
-  const handleDeleteClick = useCallback(
-    (entry) => {
-      handleDeleteTransaction(entry);
-    },
-    [handleDeleteTransaction]
-  );
+  const handleDeleteClick = useCallback((entry) => {
+    setDeletingTransaction(entry);
+  }, []);
+
+  const confirmDelete = async () => {
+    if (deletingTransaction) {
+      await handleDeleteTransaction(deletingTransaction);
+      setDeletingTransaction(null);
+    }
+  };
 
   const handleAddTransaction = useCallback(
     async (transaction) => {
@@ -1042,6 +1057,32 @@ export default function CashBookPage() {
             }}
           />
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!deletingTransaction} onOpenChange={(open) => !open && setDeletingTransaction(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the transaction
+                {deletingTransaction && (
+                   <span className="font-semibold block mt-2">
+                     {formatDate(deletingTransaction.date)} - {deletingTransaction.description} ({formatCurrency(deletingTransaction.amount)})
+                   </span>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </ErrorBoundary>
   );

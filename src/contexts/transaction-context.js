@@ -74,11 +74,22 @@ export function TransactionProvider({ children }) {
   }, []);
 
   // Computed Properties
+  // Computed Properties
   const dailyCashTransactions = useMemo(() => {
-    const combined = [...dailyCashIncome, ...dailyCashExpense];
-    combined.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // 1. Legacy Data
+    const legacy = [...dailyCashIncome, ...dailyCashExpense].map(t => ({ ...t, isLegacy: true }));
+
+    // 2. Modern Data (Account Transactions: Income, Expense, Transfer)
+    // Filter out customer-linked transactions if we only want "Cash Book" style (optional, but consistent with CashbookPage)
+    // However, for a generic context provider, we might want ALL, but let's stick to Cashbook definition for now to fix Reports.
+    const modern = (transactions || []).filter(t => 
+        ['income', 'expense', 'transfer'].includes(t.type) && !t.customerId
+    );
+
+    const combined = [...legacy, ...modern];
+    combined.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
     return combined;
-  }, [dailyCashIncome, dailyCashExpense]);
+  }, [dailyCashIncome, dailyCashExpense, transactions]);
 
 
   // Operation Wrappers

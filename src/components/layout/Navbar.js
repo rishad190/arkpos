@@ -26,6 +26,7 @@ import {
   User,
   BarChart3,
   GitMerge,
+  DollarSign,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { ConnectionIndicator } from "@/components/layout/ConnectionIndicator";
@@ -67,6 +68,7 @@ export function Navbar() {
     { href: "/suppliers", label: "Suppliers", icon: Users },
     { href: "/inventory-profit", label: "Inventory Profit", icon: BarChart3 },
     { href: "/partners", label: "Partners", icon: GitMerge },
+    { href: "/loans", label: "Loans", icon: DollarSign },
     { href: "/reports/expense", label: "Expense Report", icon: BarChart3 },
   ];
 

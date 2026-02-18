@@ -237,3 +237,30 @@ export const calculateWeightedAverage = (items) => {
 
   return totalQuantity > 0 ? totalValue / totalQuantity : 0;
 };
+
+/**
+ * Convert number to words
+ * @param {number} n - Number to convert
+ * @returns {string} Number in words
+ */
+export const numberToWords = (n) => {
+  if (n < 0) return "Minus " + numberToWords(-n);
+  if (n === 0) return "Zero";
+
+  const single = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+  const double = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  
+  const convert = (num) => {
+    if (num === 0) return "";
+    else if (num < 10) return single[num];
+    else if (num < 20) return double[num - 10];
+    else if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 !== 0 ? " " + single[num % 10] : "");
+    else if (num < 1000) return single[Math.floor(num / 100)] + " Hundred" + (num % 100 !== 0 ? " " + convert(num % 100) : "");
+    else if (num < 100000) return convert(Math.floor(num / 1000)) + " Thousand" + (num % 1000 !== 0 ? " " + convert(num % 1000) : "");
+    else if (num < 10000000) return convert(Math.floor(num / 100000)) + " Lakh" + (num % 100000 !== 0 ? " " + convert(num % 100000) : "");
+    else return convert(Math.floor(num / 10000000)) + " Crore" + (num % 10000000 !== 0 ? " " + convert(num % 10000000) : "");
+  };
+
+  return convert(Math.floor(n));
+};

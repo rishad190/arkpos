@@ -24,6 +24,7 @@ import {
 
 import { useTransactions } from "@/contexts/transaction-context";
 import { CASH_TRANSACTION_CATEGORIES } from "@/lib/constants";
+import { numberToWords } from "@/lib/utils";
 
 export function AddCashTransactionDialog({ onAddTransaction, children }) {
   const { transactionCategories, addCategory } = useTransactions();
@@ -113,9 +114,8 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         description: "",
         reference: "",
         amount: "",
-        category: "",
       }));
-      setIsCustomCategory(false);
+      // Keep category and isCustomCategory state for faster entry
     } catch (error) {
       console.error("Error adding transaction:", error);
       alert("Failed to add transaction. Please try again.");
@@ -205,6 +205,11 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                       onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
                       required
                     />
+                    {formData.amount && Number(formData.amount) > 0 && (
+                      <p className="text-sm text-muted-foreground capitalize">
+                        {numberToWords(Number(formData.amount))} Taka Only
+                      </p>
+                    )}
                  </div>
 
                  {activeTab === 'transfer' ? (

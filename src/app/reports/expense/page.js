@@ -49,15 +49,31 @@ export default function ExpenseReportPage() {
 
   const printRef = useRef();
 
-  // Extract unique categories from transactions
+  // Extract unique categories from transactions (Modern + Legacy)
   const expenseCategories = useMemo(() => {
     const transactions = Array.isArray(dailyCashTransactions) ? dailyCashTransactions : [];
     const categories = new Set();
     
-    transactions.forEach((transaction) => {
-      if (transaction.transactionType === "cash" && transaction.cashOut > 0) {
-        const category = transaction.category || "Uncategorized";
-        categories.add(category);
+    transactions.forEach((t) => {
+      let isExpense = false;
+      let category = "";
+
+      if (t.isLegacy) {
+         if ((t.cashOut || 0) > 0) {
+            isExpense = true;
+            category = t.category; // Legacy category
+         }
+      } else {
+         // Modern Schema
+         // Expense OR Transfer (Deposit to bank is expense from cash)
+         if (t.type === 'expense') isExpense = true;
+         else if (t.type === 'transfer' && t.transferType === 'deposit') isExpense = true;
+         
+         if (isExpense) category = t.category;
+      }
+
+      if (isExpense) {
+        categories.add(category || "Uncategorized");
       }
     });
     
@@ -68,14 +84,21 @@ export default function ExpenseReportPage() {
     // Ensure dailyCashTransactions is an array
     const transactions = Array.isArray(dailyCashTransactions) ? dailyCashTransactions : [];
     
+    console.log("ExpenseReport: All Transactions:", transactions.length, transactions[0]);
+    console.log("ExpenseReport: Selected Period:", selectedPeriod, "View Mode:", viewMode);
+
     if (viewMode === "monthly") {
-      return transactions.filter((t) =>
-        t.date?.startsWith(selectedPeriod)
+      const filtered = transactions.filter((t) =>
+        (t.date || t.createdAt)?.startsWith(selectedPeriod)
       );
+      console.log("ExpenseReport: Monthly Filtered:", filtered.length);
+      return filtered;
     }
     if (viewMode === "yearly") {
       const year = selectedPeriod.slice(0, 4);
-      return transactions.filter((t) => t.date?.startsWith(year));
+      const filtered = transactions.filter((t) => (t.date || t.createdAt)?.startsWith(year));
+      console.log("ExpenseReport: Yearly Filtered:", filtered.length);
+      return filtered;
     }
     return transactions;
   }, [dailyCashTransactions, selectedPeriod, viewMode]);
@@ -89,10 +112,32 @@ export default function ExpenseReportPage() {
     });
 
     // Calculate totals from transactions
-    filteredTransactions.forEach((transaction) => {
-      if (transaction.transactionType === "cash" && transaction.cashOut > 0) {
-        const category = transaction.category || "Uncategorized";
-        totals[category] = (totals[category] || 0) + transaction.cashOut;
+    filteredTransactions.forEach((t) => {
+      let amount = 0;
+      let category = "";
+      let isExpense = false;
+
+      if (t.isLegacy) {
+         amount = Number(t.cashOut) || 0;
+         if (amount > 0) {
+            isExpense = true;
+            category = t.category;
+         }
+      } else {
+         const tAmount = Number(t.amount) || 0;
+         if (t.type === 'expense') {
+             isExpense = true;
+             amount = tAmount;
+         } else if (t.type === 'transfer' && t.transferType === 'deposit') {
+             isExpense = true;
+             amount = tAmount;
+         }
+         if (isExpense) category = t.category;
+      }
+
+      if (isExpense && amount > 0) {
+        const catName = category || "Uncategorized";
+        totals[catName] = (totals[catName] || 0) + amount;
       }
     });
 
@@ -101,12 +146,33 @@ export default function ExpenseReportPage() {
 
   const bankTotals = useMemo(() => {
     return filteredTransactions.reduce(
-      (acc, transaction) => {
-        if (transaction.transactionType === "bank_deposit") {
-          acc.deposits += transaction.cashIn || 0;
-        } else if (transaction.transactionType === "bank_withdrawal") {
-          acc.withdrawals += transaction.cashOut || 0;
+      (acc, t) => {
+        let deposit = 0;
+        let withdrawal = 0;
+
+        if (t.isLegacy) {
+           // Legacy didn't have strict bank types in dailyCash, usually separate.
+           // Assuming dailyCashTransactions only has cash items mostly, unless we merged bank too.
+           // If this list contains everything:
+           if (t.paymentMode === 'bank') {
+              if (t.cashIn > 0) deposit = Number(t.cashIn);
+              if (t.cashOut > 0) withdrawal = Number(t.cashOut);
+           }
+        } else {
+           const amt = Number(t.amount) || 0;
+           // Bank Deposit = Income to Bank
+           if (t.type === 'income' && t.paymentMode === 'bank') deposit = amt;
+           // Cash -> Bank Transfer is a Deposit for Bank
+           if (t.type === 'transfer' && t.transferType === 'deposit') deposit = amt;
+
+           // Bank Withdrawal = Expense from Bank
+           if (t.type === 'expense' && t.paymentMode === 'bank') withdrawal = amt;
+           // Bank -> Cash Transfer is a Withdrawal from Bank
+           if (t.type === 'transfer' && t.transferType === 'withdraw') withdrawal = amt;
         }
+
+        acc.deposits += deposit;
+        acc.withdrawals += withdrawal;
         return acc;
       },
       { deposits: 0, withdrawals: 0 }
