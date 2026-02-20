@@ -23,11 +23,14 @@ import {
 } from "@/components/ui/select";
 
 import { useTransactions } from "@/contexts/transaction-context";
+import { useCustomers } from "@/contexts/customer-context";
 import { CASH_TRANSACTION_CATEGORIES } from "@/lib/constants";
 import { numberToWords } from "@/lib/utils";
+import { TrashIcon } from "lucide-react";
 
 export function AddCashTransactionDialog({ onAddTransaction, children }) {
-  const { transactionCategories, addCategory } = useTransactions();
+  const { transactionCategories, addCategory, deleteCategory, addTransaction } = useTransactions();
+  const { customers } = useCustomers();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("income");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
@@ -39,23 +42,31 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
     amount: "",
     paymentMode: "cash", // 'cash' or 'bank'
     category: "",
+    customerId: "none", // For customer payment
     transferType: "deposit", // 'deposit' (Cash->Bank) or 'withdraw' (Bank->Cash)
   });
 
-  // Merge default and custom categories
-  const incomeCategories = [
+  // Extract custom category objects for current tab to allow deletion
+  const customIncomeCategories = (transactionCategories || []).filter(c => c.type === 'INCOME' && c.name !== 'Customer Payment');
+  const customExpenseCategories = (transactionCategories || []).filter(c => c.type === 'EXPENSE');
+
+  // Merge default and custom categories names
+  const incomeCategoryNames = [
     ...CASH_TRANSACTION_CATEGORIES.INCOME,
-    ...(transactionCategories || []).filter(c => c.type === 'INCOME').map(c => c.name)
+    "Customer Payment",
+    ...customIncomeCategories.map(c => c.name)
   ];
+  const uniqueIncomeCategories = [...new Set(incomeCategoryNames)];
   
-  const expenseCategories = [
+  const expenseCategoryNames = [
     ...CASH_TRANSACTION_CATEGORIES.EXPENSE,
-    ...(transactionCategories || []).filter(c => c.type === 'EXPENSE').map(c => c.name)
+    ...customExpenseCategories.map(c => c.name)
   ];
+  const uniqueExpenseCategories = [...new Set(expenseCategoryNames)];
 
   // Reset category when switching tabs
   useEffect(() => {
-    setFormData(prev => ({ ...prev, category: "", description: "" }));
+    setFormData(prev => ({ ...prev, category: "", description: "", customerId: "none" }));
     setIsCustomCategory(false);
   }, [activeTab]);
 
@@ -74,39 +85,67 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
     }
 
     try {
-      const transaction = {
-        type: activeTab,
-        date: formData.date,
-        amount: amount,
-        description: formData.description,
-        reference: formData.reference,
-      };
-
-      if (activeTab === 'transfer') {
-        transaction.transferType = formData.transferType;
-        if (!transaction.description) {
-           transaction.description = formData.transferType === 'deposit' 
-             ? 'Bank Deposit (Cash -> Bank)' 
-             : 'Bank Withdrawal (Bank -> Cash)';
-        }
-        transaction.category = "Transfer";
-      } else {
-        transaction.paymentMode = formData.paymentMode;
-        transaction.category = formData.category || (activeTab === 'income' ? 'Other Income' : 'Other Expense');
-
-        // Save custom category if it's new
-        if (isCustomCategory && formData.category) {
-            const currentCategories = activeTab === 'income' ? incomeCategories : expenseCategories;
-            if (!currentCategories.includes(formData.category)) {
-                await addCategory({
-                    name: formData.category,
-                    type: activeTab.toUpperCase()
-                });
-            }
-        }
+      const isCustomerPayment = activeTab === 'income' && formData.category === 'Customer Payment';
+      
+      if (isCustomerPayment && (!formData.customerId || formData.customerId === "none")) {
+        alert("Please select a customer for the payment.");
+        return;
       }
 
-      await onAddTransaction(transaction);
+      if (isCustomerPayment) {
+        // Handle Customer Payment specific routing
+        // This goes through the main transaction service to update customer balances
+        const customer = customers.find(c => c.id === formData.customerId);
+        
+        const transaction = {
+          customerId: formData.customerId,
+          date: formData.date,
+          memoNumber: formData.reference || `PAY-${Date.now()}`,
+          total: 0, // It's a payment, so no new charge
+          deposit: amount,
+          type: "payment",
+          cashbookType: "income",
+          paymentMode: formData.paymentMode,
+          description: formData.description || `Payment from ${customer?.name || 'Customer'}`,
+        };
+        
+        await addTransaction(transaction); // From useTransactions context
+      } else {
+        // Standard Cashbook routing
+        const transaction = {
+          type: activeTab,
+          date: formData.date,
+          amount: amount,
+          description: formData.description,
+          reference: formData.reference,
+        };
+
+        if (activeTab === 'transfer') {
+          transaction.transferType = formData.transferType;
+          if (!transaction.description) {
+            transaction.description = formData.transferType === 'deposit' 
+              ? 'Bank Deposit (Cash -> Bank)' 
+              : 'Bank Withdrawal (Bank -> Cash)';
+          }
+          transaction.category = "Transfer";
+        } else {
+          transaction.paymentMode = formData.paymentMode;
+          transaction.category = formData.category || (activeTab === 'income' ? 'Other Income' : 'Other Expense');
+
+          // Save custom category if it's new
+          if (isCustomCategory && formData.category) {
+              const currentCategories = activeTab === 'income' ? uniqueIncomeCategories : expenseCategories;
+              if (!currentCategories.includes(formData.category)) {
+                  await addCategory({
+                      name: formData.category,
+                      type: activeTab.toUpperCase()
+                  });
+              }
+          }
+        }
+
+        await onAddTransaction(transaction); // Uses AddAccountTransaction
+      }
 
       // Reset form (keep date)
       setFormData((prev) => ({
@@ -114,55 +153,130 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         description: "",
         reference: "",
         amount: "",
+        customerId: "none",
       }));
-      // Keep category and isCustomCategory state for faster entry
+      // Keep category and isCustomCategory state for faster entry unless it was a customer payment
+      if (isCustomerPayment) {
+          setFormData(prev => ({ ...prev, category: "" }));
+      }
     } catch (error) {
       console.error("Error adding transaction:", error);
       alert("Failed to add transaction. Please try again.");
     }
   };
 
-  const renderCategorySelect = (categories) => (
-    <div className="space-y-2">
-      <Label htmlFor="category">Category</Label>
+  const renderCategorySelect = () => {
+    const isIncome = activeTab === 'income';
+    const defaultCategoriesRaw = isIncome ? [...CASH_TRANSACTION_CATEGORIES.INCOME, "Customer Payment"] : CASH_TRANSACTION_CATEGORIES.EXPENSE;
+    const defaultCategories = [...new Set(defaultCategoriesRaw)];
+    const customCategories = isIncome ? customIncomeCategories : customExpenseCategories;
+
+    const handleDeleteCategory = async (e, categoryId) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (confirm("Are you sure you want to delete this custom category?")) {
+        try {
+          await deleteCategory(categoryId);
+          if (formData.category === customCategories.find(c => c.id === categoryId)?.name) {
+             setFormData(prev => ({ ...prev, category: "" }));
+          }
+        } catch (error) {
+           console.error("Failed to delete category", error);
+        }
+      }
+    };
+
+    return (
       <div className="space-y-2">
-        <Select
-          value={isCustomCategory ? "custom" : formData.category}
-          onValueChange={(value) => {
-            if (value === "custom") {
-              setIsCustomCategory(true);
-              setFormData((prev) => ({ ...prev, category: "" }));
-            } else {
-              setIsCustomCategory(false);
-              setFormData((prev) => ({ ...prev, category: value }));
-            }
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-            <div className="border-t my-1" />
-            <SelectItem value="custom">Other / Custom</SelectItem>
-          </SelectContent>
-        </Select>
-        
-        {isCustomCategory && (
-           <Input
-            placeholder="Enter custom category"
-            value={formData.category}
-            onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-            required
-           />
-        )}
+        <Label htmlFor="category">Category</Label>
+        <div className="space-y-2">
+          <Select
+            value={isCustomCategory ? "custom" : formData.category}
+            onValueChange={(value) => {
+              if (value === "custom") {
+                setIsCustomCategory(true);
+                setFormData((prev) => ({ ...prev, category: "", customerId: "none" }));
+              } else {
+                setIsCustomCategory(false);
+                setFormData((prev) => ({ ...prev, category: value, customerId: "none" }));
+              }
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {/* Default Categories */}
+              {defaultCategories.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat}
+                </SelectItem>
+              ))}
+              
+              {/* Custom Categories with Delete Button */}
+              {customCategories.length > 0 && (
+                <>
+                  <div className="border-t my-1" />
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">Custom</div>
+                  {customCategories.map((cat) => (
+                    <div key={cat.id} className="flex flex-row items-center justify-between w-full pr-2">
+                       <SelectItem value={cat.name} className="flex-1 pr-6">
+                         {cat.name}
+                       </SelectItem>
+                       <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 rounded-full text-muted-foreground hover:text-destructive shrink-0 -ml-10 z-10 hover:bg-destructive/10 cursor-pointer"
+                          onClick={(e) => handleDeleteCategory(e, cat.id)}
+                       >
+                         <TrashIcon className="h-3 w-3" />
+                       </Button>
+                    </div>
+                  ))}
+                </>
+              )}
+              
+              <div className="border-t my-1" />
+              <SelectItem value="custom">Other / Custom Type...</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          {isCustomCategory && (
+             <Input
+              placeholder="Enter custom category"
+              value={formData.category}
+              onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+              required
+             />
+          )}
+
+          {/* Customer Selection for Customer Payment */}
+          {formData.category === 'Customer Payment' && (
+             <div className="pt-2">
+               <Label htmlFor="customer">Select Customer</Label>
+               <Select
+                 value={formData.customerId}
+                 onValueChange={(value) => setFormData(prev => ({ ...prev, customerId: value }))}
+               >
+                 <SelectTrigger className="mt-2">
+                   <SelectValue placeholder="Choose a customer" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="none" disabled>Select Customer</SelectItem>
+                   {customers.map((c) => (
+                     <SelectItem key={c.id} value={c.id}>
+                       {c.name}
+                     </SelectItem>
+                   ))}
+                 </SelectContent>
+               </Select>
+             </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -252,7 +366,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                           </RadioGroup>
                        </div>
                        
-                       {renderCategorySelect(activeTab === 'income' ? incomeCategories : expenseCategories)}
+                       {renderCategorySelect()}
                     </>
                  )}
 

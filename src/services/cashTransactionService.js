@@ -430,6 +430,22 @@ export class CashTransactionService {
   }
 
   /**
+   * Delete a custom transaction category
+   * @param {string} categoryId - The category ID to delete
+   * @returns {Promise<void>}
+   */
+  async deleteCategory(categoryId) {
+    if (!categoryId) {
+      throw new Error("Category ID is required");
+    }
+
+    return this.atomicOperations.execute("deleteCategory", async () => {
+      const categoryRef = ref(this.db, `${CATEGORIES_PATH}/${categoryId}`);
+      await remove(categoryRef);
+    });
+  }
+
+  /**
    * Add a generic account transaction (Income/Expense/Transfer)
    * Updates transaction record and account balances atomically.
    * @param {Object} transaction - Transaction data

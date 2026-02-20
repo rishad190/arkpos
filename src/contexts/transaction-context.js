@@ -81,9 +81,10 @@ export function TransactionProvider({ children }) {
 
     // 2. Modern Data (Account Transactions: Income, Expense, Transfer)
     // Filter out customer-linked transactions if we only want "Cash Book" style (optional, but consistent with CashbookPage)
-    // However, for a generic context provider, we might want ALL, but let's stick to Cashbook definition for now to fix Reports.
+    // However, allow transactions explicitly marked for the cashbook via `cashbookType` (like Customer Payments added from Cashbook)
     const modern = (transactions || []).filter(t => 
-        ['income', 'expense', 'transfer'].includes(t.type) && !t.customerId
+        (['income', 'expense', 'transfer'].includes(t.type) && !t.customerId) ||
+        (['income', 'expense'].includes(t.cashbookType) && t.customerId) // Customer payments injected to cashbook
     );
 
     const combined = [...legacy, ...modern];
@@ -141,6 +142,16 @@ export function TransactionProvider({ children }) {
       return await cashTransactionService.addCategory(category);
     } catch (err) {
       logger.error("Context addCategory error:", err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [cashTransactionService, toast]);
+
+  const deleteCategory = useCallback(async (categoryId) => {
+    try {
+      return await cashTransactionService.deleteCategory(categoryId);
+    } catch (err) {
+      logger.error("Context deleteCategory error:", err);
       toast({ title: "Error", description: err.message, variant: "destructive" });
       throw err;
     }

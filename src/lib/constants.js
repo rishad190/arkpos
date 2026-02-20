@@ -97,17 +97,17 @@ export const CASH_TRANSACTION_CATEGORIES = {
   INCOME: [
     "Sales",
     "Customer Payment",
-    "Capital Injection",
-    "Other Income"
+    "Other Income",
+    "Income from Rent",
+    "Partner Payment"
   ],
   EXPENSE: [
     "Supplier Payment", 
-    "Utility Bills",
-    "Rent", 
-    "Salary", 
-    "Entertainment", 
-    "Transport", 
-    "Maintenance", 
+    "Own Expense",
+    "Partner Payment",
+    "Shop Expense",
+    "Product Expense",
+    "Short Taka",
     "Other Expense"
   ]
 };

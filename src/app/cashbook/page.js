@@ -125,21 +125,35 @@ export default function CashBookPage() {
     // 2. Process New Account Transactions
     const modern = (transactions || []).filter(
       (t) => {
-        // Must be unlinked from customer transactions (pure cashbook)
-        if (t.customerId) return false;
-        
         // Exclude Bank-Only transactions (Income/Expense paid via Bank) as they do not affect "Cash in Hand"
         // Transfer ALWAYS affects cash (either in or out)
         if (t.type === 'transfer') return true;
         
-        // Income/Expense: Only include if Payment Mode is 'cash' (or legacy/undefined which defaults to cash)
-        if (['income', 'expense'].includes(t.type)) {
+        // Allowed if standard cashbook explicitly
+        const isStandardCashbook = ['income', 'expense'].includes(t.type) && !t.customerId;
+        // Allowed if customer payment explicitly tagged for cashbook
+        const isCustomerCashbook = ['income', 'expense'].includes(t.cashbookType) && t.customerId;
+
+        if (isStandardCashbook || isCustomerCashbook) {
+            // Income/Expense: Only include if Payment Mode is 'cash' (or legacy/undefined which defaults to cash)
             return !t.paymentMode || t.paymentMode === 'cash';
         }
         
         return false;
       }
-    );
+    ).map(t => {
+       // Normalize the transaction for the cashbook view
+       if (t.cashbookType) {
+           return {
+               ...t,
+               type: t.cashbookType, // Map 'payment' or 'purchase' to 'income'/'expense'
+               amount: t.deposit || t.amount || 0, // Customer payment uses 'deposit'
+               description: t.description || `Customer Transaction (${t.customerId})`,
+               category: "Customer Payment"
+           };
+       }
+       return t;
+    });
 
     // 3. Combine and Sort
     const combined = [...legacy, ...modern];
@@ -162,21 +176,28 @@ export default function CashBookPage() {
       dailyCashExpense.forEach((t) => (cash -= Number(t.cashOut) || 0));
     }
 
-    // 2. Modern Data (excluding customer transactions for now if we strictly want cashbook)
-    // The previous filter was: !t.customerId && ["income", "expense", "transfer"].includes(t.type)
+    // 2. Modern Data
     const modern = (transactions || []).filter(
-      (t) => !t.customerId && ["income", "expense", "transfer"].includes(t.type)
+      (t) => {
+        const isStandardCashbook = ['income', 'expense', 'transfer'].includes(t.type) && !t.customerId;
+        const isCustomerCashbook = ['income', 'expense'].includes(t.cashbookType) && t.customerId;
+        return isStandardCashbook || isCustomerCashbook;
+      }
     );
 
     modern.forEach((t) => {
-      const amt = Number(t.amount) || 0;
-      if (t.type === "income") {
-        if (t.paymentMode === "bank") bank += amt;
+      // Determine effective type and amount
+      const effectiveType = t.cashbookType || t.type;
+      const amt = Number(t.deposit || t.amount) || 0; // Customer payments use deposit
+      const mode = t.paymentMode || 'cash';
+
+      if (effectiveType === "income") {
+        if (mode === "bank") bank += amt;
         else cash += amt; // Default to cash
-      } else if (t.type === "expense") {
-        if (t.paymentMode === "bank") bank -= amt;
+      } else if (effectiveType === "expense") {
+        if (mode === "bank") bank -= amt;
         else cash -= amt;
-      } else if (t.type === "transfer") {
+      } else if (effectiveType === "transfer") {
         if (t.transferType === "deposit") {
           // Cash -> Bank
           cash -= amt;
