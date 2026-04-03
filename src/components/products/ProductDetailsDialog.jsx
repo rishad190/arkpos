@@ -27,34 +27,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useLoans } from "@/contexts/loan-context";
+import { useProducts } from "@/contexts/product-context";
 
-export function LoanDetailsDialog({ loan, open, onOpenChange }) {
-  const { addLoanTransaction, updateLoanTransaction, deleteLoanTransaction } = useLoans(); 
+export function ProductDetailsDialog({ product, open, onOpenChange }) {
+  const { addProductTransaction, updateProductTransaction, deleteProductTransaction } = useProducts(); 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    type: 'PRINCIPAL', // PRINCIPAL or PROFIT
-    action: 'TAKE_MORE', // TAKE_MORE or REPAY. This is purely for UI, mapped to positive/negative amount
+    type: 'INVESTMENT', 
     amount: "",
     date: new Date().toISOString().split("T")[0],
     note: ""
   });
 
-  if (!loan) return null;
+  if (!product) return null;
 
   // Process transactions for display
-  const transactionsList = loan.transactions 
-    ? Object.entries(loan.transactions).map(([id, t]) => ({ id, ...t })).sort((a, b) => new Date(b.date) - new Date(a.date))
+  const transactionsList = product.transactions 
+    ? Object.entries(product.transactions).map(([id, t]) => ({ id, ...t })).sort((a, b) => new Date(b.date) - new Date(a.date))
     : [];
 
   const cancelForm = () => {
     setShowAddForm(false);
     setEditId(null);
     setFormData({
-      type: 'PRINCIPAL',
-      action: 'TAKE_MORE',
+      type: 'INVESTMENT',
       amount: "",
       date: new Date().toISOString().split("T")[0],
       note: ""
@@ -66,7 +64,6 @@ export function LoanDetailsDialog({ loan, open, onOpenChange }) {
     setShowAddForm(true);
     setFormData({
       type: t.type,
-      action: t.type === 'PRINCIPAL' ? (t.amount > 0 ? 'TAKE_MORE' : 'REPAY') : 'TAKE_MORE',
       amount: Math.abs(t.amount).toString(),
       date: t.date || new Date().toISOString().split("T")[0],
       note: t.note || ""
@@ -76,8 +73,8 @@ export function LoanDetailsDialog({ loan, open, onOpenChange }) {
   const handleDelete = async (tId) => {
      if (confirm("Are you sure you want to delete this transaction?")) {
          try {
-             if (deleteLoanTransaction) {
-                 await deleteLoanTransaction(loan.id, tId);
+             if (deleteProductTransaction) {
+                 await deleteProductTransaction(product.id, tId);
              } else {
                  alert("Delete not fully linked yet");
              }
@@ -94,19 +91,11 @@ export function LoanDetailsDialog({ loan, open, onOpenChange }) {
     
     setLoading(true);
     try {
-      let finalAmount = Number(formData.amount);
-      // Logic:
-      // If Principal Repayment -> negative amount
-      // If Profit -> always positive tracked
-      if (formData.type === 'PRINCIPAL' && formData.action === 'REPAY') {
-        finalAmount = -Math.abs(finalAmount);
-      } else {
-        finalAmount = Math.abs(finalAmount);
-      }
+      let finalAmount = Math.abs(Number(formData.amount)); // Keep strictly positive, logic handled via type
 
       if (editId) {
-          if (updateLoanTransaction) {
-              await updateLoanTransaction(loan.id, editId, {
+          if (updateProductTransaction) {
+              await updateProductTransaction(product.id, editId, {
                   type: formData.type,
                   amount: finalAmount,
                   date: formData.date,
@@ -114,8 +103,8 @@ export function LoanDetailsDialog({ loan, open, onOpenChange }) {
               });
           }
       } else {
-          if (addLoanTransaction) {
-            await addLoanTransaction(loan.id, {
+          if (addProductTransaction) {
+            await addProductTransaction(product.id, {
                 type: formData.type,
                 amount: finalAmount,
                 date: formData.date,
@@ -145,13 +134,13 @@ export function LoanDetailsDialog({ loan, open, onOpenChange }) {
           <div className="flex justify-between items-start">
             <div>
                 <DialogTitle className="text-xl flex items-center gap-2">
-                {loan.name} 
-                <Badge variant={loan.type === 'GIVEN' ? "default" : "destructive"} className={loan.type === 'GIVEN' ? "bg-green-600" : ""}>
-                    {loan.type}
+                {product.name} 
+                <Badge variant={product.netROI >= 0 ? "default" : "destructive"} className={product.netROI >= 0 ? "bg-green-600" : ""}>
+                    {product.netROI >= 0 ? "PROFITABLE" : "LOSS"}
                 </Badge>
                 </DialogTitle>
                 <div className="text-sm text-muted-foreground mt-1 capitalize">
-                    Source: {loan.sourceType?.toLowerCase() || 'Person'} | Started: {formatDate(loan.startDate)}
+                    Started: {formatDate(product.startDate)} ({product.daysElapsed} days ago)
                 </div>
             </div>
             {!showAddForm && (
@@ -169,23 +158,11 @@ export function LoanDetailsDialog({ loan, open, onOpenChange }) {
                             <Select value={formData.type} onValueChange={(v) => setFormData({...formData, type: v})}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="PRINCIPAL">Principal</SelectItem>
-                                    <SelectItem value="PROFIT">Profit</SelectItem>
+                                    <SelectItem value="INVESTMENT">Investment/Expense</SelectItem>
+                                    <SelectItem value="RETURN">Return/Income</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
-                        {formData.type === 'PRINCIPAL' && (
-                            <div className="space-y-2 flex-1 min-w-[120px]">
-                                <Label>Action</Label>
-                                <Select value={formData.action} onValueChange={(v) => setFormData({...formData, action: v})}>
-                                    <SelectTrigger><SelectValue/></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="TAKE_MORE">Gain/Give More</SelectItem>
-                                        <SelectItem value="REPAY">Repay/Get Paid Back</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
                         <div className="space-y-2 flex-1 min-w-[100px]">
                             <Label>Amount</Label>
                             <Input type="number" min="0.01" step="0.01" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
@@ -207,22 +184,20 @@ export function LoanDetailsDialog({ loan, open, onOpenChange }) {
             </Card>
         )}
 
-        <div className="grid grid-cols-4 gap-4 py-4">
+        <div className="grid grid-cols-3 gap-4 py-4">
           <div className="p-4 bg-muted rounded-lg text-center">
-            <div className="text-xs text-muted-foreground uppercase mb-1">Total {loan.type === 'GIVEN' ? "Given" : "Taken"}</div>
-            <div className="font-bold text-lg">{formatCurrency(loan.totalTaken)}</div>
+            <div className="text-xs text-muted-foreground uppercase mb-1">Total Invested</div>
+            <div className="font-bold text-lg text-destructive">{formatCurrency(product.totalInvested)}</div>
           </div>
           <div className="p-4 bg-muted rounded-lg text-center">
-            <div className="text-xs text-muted-foreground uppercase mb-1">Total Repaid</div>
-            <div className="font-bold text-lg">{formatCurrency(loan.totalRepaid)}</div>
-          </div>
-          <div className="p-4 bg-muted rounded-lg text-center">
-            <div className="text-xs text-orange-600/80 uppercase mb-1">Profit Paid</div>
-            <div className="font-bold text-lg text-orange-600">{formatCurrency(loan.totalProfit)}</div>
+            <div className="text-xs text-muted-foreground uppercase mb-1">Total Returns</div>
+            <div className="font-bold text-lg text-green-600">{formatCurrency(product.totalReturned)}</div>
           </div>
           <div className="p-4 border-2 border-primary/20 bg-primary/5 rounded-lg text-center">
-            <div className="text-xs text-primary/80 font-bold uppercase mb-1">Remaining Balance</div>
-            <div className="font-bold text-xl text-primary">{formatCurrency(loan.balance)}</div>
+            <div className="text-xs text-primary/80 font-bold uppercase mb-1">Net ROI</div>
+            <div className={`font-bold text-xl ${product.netROI < 0 ? 'text-destructive' : 'text-primary'}`}>
+                {product.netROI > 0 ? '+' : ''}{formatCurrency(product.netROI)}
+            </div>
           </div>
         </div>
 
@@ -242,12 +217,12 @@ export function LoanDetailsDialog({ loan, open, onOpenChange }) {
                     <TableBody>
                         {/* Render Initial Load */}
                         <TableRow className="bg-muted/20">
-                            <TableCell>{formatDate(loan.startDate)}</TableCell>
+                            <TableCell>{formatDate(product.startDate)}</TableCell>
                             <TableCell>
                                 <span className="font-medium text-xs rounded bg-gray-200 px-2 py-0.5">INITIAL BALANCE</span>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">Account Created</TableCell>
-                            <TableCell className="text-right text-gray-700">+{formatCurrency(Number(loan.principal) || 0)}</TableCell>
+                            <TableCell className="text-right text-destructive">-{formatCurrency(Number(product.initialInvestment) || 0)}</TableCell>
                             <TableCell></TableCell>
                         </TableRow>
                         {transactionsList.length === 0 && (
@@ -256,22 +231,19 @@ export function LoanDetailsDialog({ loan, open, onOpenChange }) {
                             </TableRow>
                         )}
                         {transactionsList.map(t => {
-                            const isProfit = t.type === 'PROFIT';
-                            const isRepay = t.type === 'PRINCIPAL' && t.amount < 0;
-                            const isExtraTake = t.type === 'PRINCIPAL' && t.amount > 0;
+                            const isInvestment = t.type === 'INVESTMENT';
+                            const isReturn = t.type === 'RETURN';
                             
                             return (
                             <TableRow key={t.id}>
                                 <TableCell>{formatDate(t.date || t.createdAt)}</TableCell>
                                 <TableCell>
-                                    {isProfit && <Badge variant="outline" className="text-orange-600 border-orange-200 bg-orange-50">PROFIT</Badge>}
-                                    {isRepay && <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">REPAYMENT</Badge>}
-                                    {isExtraTake && <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">ADDED PRINCIPAL</Badge>}
-                                    {!isProfit && !isRepay && !isExtraTake && <Badge variant="outline">OTHER</Badge>}
+                                    {isInvestment && <Badge variant="outline" className="text-destructive border-destructive/30 bg-destructive/5">INVESTMENT</Badge>}
+                                    {isReturn && <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">RETURN</Badge>}
                                 </TableCell>
                                 <TableCell className="text-sm">{t.note || '-'}</TableCell>
-                                <TableCell className={`text-right font-medium ${isRepay ? 'text-green-600' : 'text-foreground'}`}>
-                                    {isRepay || isProfit ? '' : '+'}{formatCurrency(Math.abs(t.amount || 0))}
+                                <TableCell className={`text-right font-medium ${isReturn ? 'text-green-600' : 'text-destructive'}`}>
+                                    {isReturn ? '+' : '-'}{formatCurrency(Math.abs(t.amount || 0))}
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex justify-end gap-1">

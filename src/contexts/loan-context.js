@@ -94,6 +94,28 @@ export function LoanProvider({ children }) {
     }
   }, [loanService, toast]);
 
+  const updateLoanTransaction = useCallback(async (loanId, transactionId, data) => {
+    try {
+      await loanService.updateLoanTransaction(loanId, transactionId, data);
+      toast({ title: "Success", description: "Transaction updated successfully" });
+    } catch (err) {
+      logger.error("Context updateLoanTransaction error:", err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [loanService, toast]);
+
+  const deleteLoanTransaction = useCallback(async (loanId, transactionId) => {
+    try {
+      await loanService.deleteLoanTransaction(loanId, transactionId);
+      toast({ title: "Success", description: "Transaction deleted successfully" });
+    } catch (err) {
+      logger.error("Context deleteLoanTransaction error:", err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [loanService, toast]);
+
   const value = {
     loans,
     totals,
@@ -101,7 +123,9 @@ export function LoanProvider({ children }) {
     addLoan,
     updateLoan,
     deleteLoan,
-    addLoanTransaction
+    addLoanTransaction,
+    updateLoanTransaction,
+    deleteLoanTransaction
   };
 
   return (

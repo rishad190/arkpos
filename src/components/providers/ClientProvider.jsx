@@ -6,6 +6,7 @@ import { CustomerProvider } from "@/contexts/customer-context";
 import { InventoryProvider } from "@/contexts/inventory-context";
 import { TransactionProvider } from "@/contexts/transaction-context";
 import { LoanProvider } from "@/contexts/loan-context";
+import { ProductProvider } from "@/contexts/product-context";
 
 export function ClientProvider({ children }) {
   return (
@@ -15,7 +16,9 @@ export function ClientProvider({ children }) {
           <InventoryProvider>
             <TransactionProvider>
               <LoanProvider>
-                {children}
+                <ProductProvider>
+                  {children}
+                </ProductProvider>
               </LoanProvider>
             </TransactionProvider>
           </InventoryProvider>

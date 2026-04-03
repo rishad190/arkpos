@@ -3,7 +3,13 @@ import { useState } from "react";
 import { useLoans } from "@/contexts/loan-context";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Calendar, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { Plus, Trash2, Calendar, TrendingUp, TrendingDown, DollarSign, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { AddLoanDialog } from "@/components/loans/AddLoanDialog";
 import {
@@ -180,35 +186,46 @@ export default function LoansPage() {
                         {formatCurrency(loan.balance)}
                     </TableCell>
                     <TableCell>
-                      <AlertDialog open={deletingId === loan.id} onOpenChange={(open) => !open && setDeletingId(null)}>
-                        <AlertDialogTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setDeletingId(loan.id);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 p-0" onClick={e => e.stopPropagation()}>
+                            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent onClick={e => e.stopPropagation()}>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Loan?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete this loan record. This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <AlertDialog open={deletingId === loan.id} onOpenChange={(open) => !open && setDeletingId(null)}>
+                                <AlertDialogTrigger asChild>
+                                  <div 
+                                    className="flex w-full cursor-pointer items-center text-sm text-destructive hover:text-destructive focus:text-destructive"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setDeletingId(loan.id);
+                                    }}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </div>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent onClick={e => e.stopPropagation()}>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Loan?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will permanently delete this loan record. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={(e) => { e.stopPropagation(); handleDelete(); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))

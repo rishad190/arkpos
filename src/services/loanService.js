@@ -135,6 +135,42 @@ export class LoanService {
   }
 
   /**
+   * Update a specific loan transaction
+   * @param {string} loanId 
+   * @param {string} transactionId 
+   * @param {Object} updates 
+   */
+  async updateLoanTransaction(loanId, transactionId, updates) {
+    try {
+      const loanTxRef = ref(this.db, `${LOANS_PATH}/${loanId}/transactions/${transactionId}`);
+      await update(loanTxRef, {
+        ...updates,
+        updatedAt: serverTimestamp()
+      });
+      this.logger.info(`Loan transaction updated: ${transactionId} for loan ${loanId}`);
+    } catch (error) {
+      this.logger.error("Error updating loan transaction:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a specific loan transaction
+   * @param {string} loanId 
+   * @param {string} transactionId 
+   */
+  async deleteLoanTransaction(loanId, transactionId) {
+    try {
+      const loanTxRef = ref(this.db, `${LOANS_PATH}/${loanId}/transactions/${transactionId}`);
+      await remove(loanTxRef);
+      this.logger.info(`Loan transaction deleted: ${transactionId} from loan ${loanId}`);
+    } catch (error) {
+      this.logger.error("Error deleting loan transaction:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Calculate manual ledger totals from sub-transactions
    * @param {Object} loan 
    * @returns {Object} enriched loan

@@ -25,6 +25,7 @@ import {
 import { useTransactions } from "@/contexts/transaction-context";
 import { useCustomers } from "@/contexts/customer-context";
 import { useLoans } from "@/contexts/loan-context";
+import { useProducts } from "@/contexts/product-context";
 import { CASH_TRANSACTION_CATEGORIES } from "@/lib/constants";
 import { numberToWords } from "@/lib/utils";
 import { TrashIcon } from "lucide-react";
@@ -33,6 +34,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
   const { transactionCategories, addCategory, deleteCategory, addTransaction } = useTransactions();
   const { customers } = useCustomers();
   const { loans, addLoanTransaction } = useLoans();
+  const { products, addProductTransaction } = useProducts();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("income");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
@@ -47,6 +49,9 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
     customerId: "none", // For customer payment
     loanId: "none",
     loanAction: "PRINCIPAL",
+    productId: "none",
+    productAction: "PRODUCT_COST",
+    productPartnerName: "",
     transferType: "deposit", // 'deposit' (Cash->Bank) or 'withdraw' (Bank->Cash)
   });
 
@@ -70,7 +75,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
 
   // Reset category when switching tabs
   useEffect(() => {
-    setFormData(prev => ({ ...prev, category: "", description: "", customerId: "none" }));
+    setFormData(prev => ({ ...prev, category: "", description: "", customerId: "none", productPartnerName: "" }));
     setIsCustomCategory(false);
   }, [activeTab]);
 
@@ -91,6 +96,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
     try {
       const isCustomerPayment = activeTab === 'income' && formData.category === 'Customer Payment';
       const isLoanTransaction = formData.category === 'Loan Activity';
+      const isProductTransaction = formData.category === 'Product Activity';
       
       if (isCustomerPayment && (!formData.customerId || formData.customerId === "none")) {
         alert("Please select a customer for the payment.");
@@ -99,6 +105,11 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
 
       if (isLoanTransaction && (!formData.loanId || formData.loanId === "none")) {
         alert("Please select a loan account.");
+        return;
+      }
+
+      if (isProductTransaction && (!formData.productId || formData.productId === "none")) {
+        alert("Please select a product.");
         return;
       }
 
@@ -158,6 +169,31 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
           category: formData.category,
           paymentMode: formData.paymentMode,
           loanId: formData.loanId,
+        };
+        await onAddTransaction(transaction);
+      } else if (isProductTransaction) {
+        // Handle Product Activity routing
+        const product = products.find(p => p.id === formData.productId);
+
+        if (addProductTransaction) {
+           await addProductTransaction(formData.productId, {
+               type: formData.productAction,
+               amount: amount,
+               date: formData.date,
+               partnerName: formData.productPartnerName,
+               note: formData.description
+           });
+        }
+
+        const transaction = {
+          type: activeTab,
+          date: formData.date,
+          amount: amount,
+          description: formData.description || `Product Activity - ${product?.name}`,
+          reference: formData.reference,
+          category: formData.category,
+          paymentMode: formData.paymentMode,
+          productId: formData.productId,
         };
         await onAddTransaction(transaction);
       } else {
@@ -362,6 +398,97 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                        </SelectContent>
                    </Select>
                </div>
+             </div>
+          )}
+
+          {/* Product Selection for Product Activity */}
+          {formData.category === 'Product Activity' && (
+             <div className="pt-2 space-y-4">
+               <div>
+                  <Label htmlFor="product">Select Product / Project</Label>
+                  <Select
+                    value={formData.productId}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, productId: value }))}
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Choose a product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none" disabled>Select Product</SelectItem>
+                      {products.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+               </div>
+               
+               <div>
+                   <Label>Nature of Cashflow</Label>
+                   <Select
+                     value={formData.productAction}
+                     onValueChange={(value) => setFormData(prev => ({ ...prev, productAction: value, productPartnerName: "" }))}
+                   >
+                       <SelectTrigger className="mt-2">
+                           <SelectValue placeholder="Select type" />
+                       </SelectTrigger>
+                       <SelectContent>
+                           {activeTab === 'expense' ? (
+                             <>
+                               <SelectItem value="PRODUCT_COST">Product Cost</SelectItem>
+                               <SelectItem value="OTHER_EXPENSE">Other Expense</SelectItem>
+                               <SelectItem value="PARTNER_PAYOUT">Partner Payout</SelectItem>
+                             </>
+                           ) : (
+                             <>
+                               <SelectItem value="PARTNER_INVESTMENT">Partner Investment</SelectItem>
+                               <SelectItem value="PRODUCT_SALE">Product Sale</SelectItem>
+                             </>
+                           )}
+                       </SelectContent>
+                   </Select>
+               </div>
+               
+               {formData.productAction === 'PARTNER_INVESTMENT' && (
+                 <div>
+                   <Label>Partner Name</Label>
+                   <Input 
+                     className="mt-2"
+                     list="global-partner-names-list"
+                     placeholder="Name of Partner..."
+                     value={formData.productPartnerName || ''}
+                     onChange={(e) => setFormData(prev => ({ ...prev, productPartnerName: e.target.value }))}
+                     required
+                   />
+                   <datalist id="global-partner-names-list">
+                     {Object.keys(products.find(p => p.id === formData.productId)?.partners || {}).map(name => (
+                         <option key={name} value={name} />
+                     ))}
+                   </datalist>
+                 </div>
+               )}
+
+               {formData.productAction === 'PARTNER_PAYOUT' && (
+                 <div>
+                   <Label>Select Partner</Label>
+                   <Select 
+                     value={formData.productPartnerName || ''}
+                     onValueChange={(v) => setFormData(prev => ({ ...prev, productPartnerName: v }))}
+                     required
+                   >
+                     <SelectTrigger className="mt-2"><SelectValue placeholder="Choose partner..." /></SelectTrigger>
+                     <SelectContent>
+                         {Object.keys(products.find(p => p.id === formData.productId)?.partners || {}).length === 0 && (
+                            <SelectItem value="none" disabled>No active partners</SelectItem>
+                         )}
+                         {Object.keys(products.find(p => p.id === formData.productId)?.partners || {}).map(name => (
+                             <SelectItem key={name} value={name}>{name}</SelectItem>
+                         ))}
+                     </SelectContent>
+                   </Select>
+                 </div>
+               )}
              </div>
           )}
         </div>

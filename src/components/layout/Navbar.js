@@ -69,6 +69,7 @@ export function Navbar() {
     { href: "/inventory-profit", label: "Inventory Profit", icon: BarChart3 },
     { href: "/partners", label: "Partners", icon: GitMerge },
     { href: "/loans", label: "Loans", icon: DollarSign },
+    { href: "/products", label: "Products", icon: Package },
     { href: "/reports/expense", label: "Expense Report", icon: BarChart3 },
   ];
 
