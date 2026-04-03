@@ -24,6 +24,7 @@ import {
 
 import { useTransactions } from "@/contexts/transaction-context";
 import { useCustomers } from "@/contexts/customer-context";
+import { useLoans } from "@/contexts/loan-context";
 import { CASH_TRANSACTION_CATEGORIES } from "@/lib/constants";
 import { numberToWords } from "@/lib/utils";
 import { TrashIcon } from "lucide-react";
@@ -31,6 +32,7 @@ import { TrashIcon } from "lucide-react";
 export function AddCashTransactionDialog({ onAddTransaction, children }) {
   const { transactionCategories, addCategory, deleteCategory, addTransaction } = useTransactions();
   const { customers } = useCustomers();
+  const { loans, addLoanTransaction } = useLoans();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("income");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
@@ -43,6 +45,8 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
     paymentMode: "cash", // 'cash' or 'bank'
     category: "",
     customerId: "none", // For customer payment
+    loanId: "none",
+    loanAction: "PRINCIPAL",
     transferType: "deposit", // 'deposit' (Cash->Bank) or 'withdraw' (Bank->Cash)
   });
 
@@ -86,9 +90,15 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
 
     try {
       const isCustomerPayment = activeTab === 'income' && formData.category === 'Customer Payment';
+      const isLoanTransaction = formData.category === 'Loan Activity';
       
       if (isCustomerPayment && (!formData.customerId || formData.customerId === "none")) {
         alert("Please select a customer for the payment.");
+        return;
+      }
+
+      if (isLoanTransaction && (!formData.loanId || formData.loanId === "none")) {
+        alert("Please select a loan account.");
         return;
       }
 
@@ -110,6 +120,46 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         };
         
         await addTransaction(transaction); // From useTransactions context
+      } else if (isLoanTransaction) {
+        // Handle Loan Activity routing
+        const loan = loans.find(l => l.id === formData.loanId);
+        let loanAmount = amount;
+        
+        if (formData.loanAction === 'PRINCIPAL') {
+            if (loan.type === 'GIVEN') {
+                // Given loan: Expense(giving money) = positive addition, Income(receiving money) = negative addition (repayment)
+                loanAmount = activeTab === 'income' ? -amount : amount;
+            } else {
+                // Taken loan: Income(receiving money) = positive addition, Expense(giving money) = negative addition (repayment)
+                loanAmount = activeTab === 'income' ? amount : -amount;
+            }
+        } else {
+            // Profit is always recorded as a positive absolute value being tracked
+            loanAmount = Math.abs(amount);
+        }
+
+        // 1. Add to Loan Ledger
+        if (addLoanTransaction) {
+           await addLoanTransaction(formData.loanId, {
+               type: formData.loanAction,
+               amount: loanAmount,
+               date: formData.date,
+               note: formData.description
+           });
+        }
+
+        // 2. Standard Cashbook routing
+        const transaction = {
+          type: activeTab,
+          date: formData.date,
+          amount: amount,
+          description: formData.description || `Loan Activity - ${loan.name}`,
+          reference: formData.reference,
+          category: formData.category,
+          paymentMode: formData.paymentMode,
+          loanId: formData.loanId,
+        };
+        await onAddTransaction(transaction);
       } else {
         // Standard Cashbook routing
         const transaction = {
@@ -134,7 +184,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
 
           // Save custom category if it's new
           if (isCustomCategory && formData.category) {
-              const currentCategories = activeTab === 'income' ? uniqueIncomeCategories : expenseCategories;
+              const currentCategories = activeTab === 'income' ? uniqueIncomeCategories : uniqueExpenseCategories;
               if (!currentCategories.includes(formData.category)) {
                   await addCategory({
                       name: formData.category,
@@ -271,6 +321,47 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                    ))}
                  </SelectContent>
                </Select>
+             </div>
+          )}
+
+          {/* Loan Selection for Loan Activity */}
+          {formData.category === 'Loan Activity' && (
+             <div className="pt-2 space-y-4">
+               <div>
+                  <Label htmlFor="loan">Select Loan Account</Label>
+                  <Select
+                    value={formData.loanId}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, loanId: value }))}
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Choose a loan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none" disabled>Select Loan</SelectItem>
+                      {loans.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          {l.name} ({l.type === 'GIVEN' ? 'Asset' : 'Liability'})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+               </div>
+               
+               <div>
+                   <Label>Nature of Payment</Label>
+                   <Select
+                     value={formData.loanAction}
+                     onValueChange={(value) => setFormData(prev => ({ ...prev, loanAction: value }))}
+                   >
+                       <SelectTrigger className="mt-2">
+                           <SelectValue placeholder="Select type" />
+                       </SelectTrigger>
+                       <SelectContent>
+                           <SelectItem value="PRINCIPAL">Principal Amount</SelectItem>
+                           <SelectItem value="PROFIT">Profit Amount</SelectItem>
+                       </SelectContent>
+                   </Select>
+               </div>
              </div>
           )}
         </div>

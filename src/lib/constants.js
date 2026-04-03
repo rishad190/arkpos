@@ -97,12 +97,14 @@ export const CASH_TRANSACTION_CATEGORIES = {
   INCOME: [
     "Sales",
     "Customer Payment",
+    "Loan Activity",
     "Other Income",
     "Income from Rent",
     "Partner Payment"
   ],
   EXPENSE: [
     "Supplier Payment", 
+    "Loan Activity",
     "Own Expense",
     "Partner Payment",
     "Shop Expense",

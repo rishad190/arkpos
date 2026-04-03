@@ -56,30 +56,43 @@ export function LoanProvider({ children }) {
 
   const totals = useMemo(() => {
     return loans.reduce((acc, loan) => {
-      const amount = loan.principal || 0; // Use Principal for base, or totalDue for current value?
-      // Usually "Assets" = Principal + Interest Receivable
-      // "Liabilities" = Principal + Interest Payable
-      const currentValue = loan.totalDue || amount;
-
+      // The manual ledger gives us totalTaken, totalRepaid, totalProfit, balance
+      // totalTaken = sum of all principals taken/given
+      
       if (loan.type === 'GIVEN') {
-        acc.givenPrincipal += amount;
-        acc.givenTotal += currentValue;
-        acc.givenInterest += (loan.calculatedInterest || 0);
+        acc.givenTotal += loan.totalTaken || 0;
+        acc.givenRepaid += loan.totalRepaid || 0;
+        acc.givenProfit += loan.totalProfit || 0;
+        acc.givenBalance += loan.balance || 0;
       } else { // TAKEN
-        acc.takenPrincipal += amount;
-        acc.takenTotal += currentValue;
-        acc.takenInterest += (loan.calculatedInterest || 0);
+        acc.takenTotal += loan.totalTaken || 0;
+        acc.takenRepaid += loan.totalRepaid || 0;
+        acc.takenProfit += loan.totalProfit || 0;
+        acc.takenBalance += loan.balance || 0;
       }
       return acc;
     }, {
-      givenPrincipal: 0,
-      givenInterest: 0,
       givenTotal: 0,
-      takenPrincipal: 0,
-      takenInterest: 0,
-      takenTotal: 0
+      givenRepaid: 0,
+      givenProfit: 0,
+      givenBalance: 0,
+      takenTotal: 0,
+      takenRepaid: 0,
+      takenProfit: 0,
+      takenBalance: 0
     });
   }, [loans]);
+
+  const addLoanTransaction = useCallback(async (loanId, data) => {
+    try {
+      await loanService.addLoanTransaction(loanId, data);
+      toast({ title: "Success", description: "Transaction logged successfully" });
+    } catch (err) {
+      logger.error("Context addLoanTransaction error:", err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [loanService, toast]);
 
   const value = {
     loans,
@@ -87,7 +100,8 @@ export function LoanProvider({ children }) {
     loading,
     addLoan,
     updateLoan,
-    deleteLoan
+    deleteLoan,
+    addLoanTransaction
   };
 
   return (

@@ -115,53 +115,61 @@ export class LoanService {
   }
 
   /**
-   * Calculate accrued interest and total due
+   * Add a transaction to an existing loan
+   * @param {string} loanId 
+   * @param {Object} transactionData - { type: "PRINCIPAL" | "PROFIT", amount: Number (positive for taking more/giving more, negative for repayment), date: String, note: String, isCashbookLinked: Boolean, cashbookRefId: String }
+   */
+  async addLoanTransaction(loanId, transactionData) {
+    try {
+      const loanTxRef = push(ref(this.db, `${LOANS_PATH}/${loanId}/transactions`));
+      await update(loanTxRef, {
+        ...transactionData,
+        createdAt: serverTimestamp()
+      });
+      this.logger.info(`Loan transaction added to ${loanId}`);
+      return loanTxRef.key;
+    } catch (error) {
+      this.logger.error("Error adding loan transaction:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate manual ledger totals from sub-transactions
    * @param {Object} loan 
    * @returns {Object} enriched loan
    */
   enrichLoanData(loan) {
-    if (!loan.startDate || !loan.principal || !loan.rate) return loan;
+    let totalTaken = Number(loan.principal) || 0;
+    let totalRepaid = 0;
+    let totalProfit = 0;
 
-    const start = new Date(loan.startDate);
-    // If endDate is defined, use it as the calculation limit (Fixed Term / Closed Loan)
-    // Otherwise, use current date (Running Loan)
-    const end = loan.endDate ? new Date(loan.endDate) : new Date();
-    
-    // Ensure we don't calculate negative time if start > end
-    if (start > end) return { ...loan, calculatedInterest: 0, totalDue: Number(loan.principal), daysElapsed: 0 };
-
-    // Difference in milliseconds
-    const diffTime = Math.abs(end - start);
-    // Difference in days
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-    
-    // Calculate Interest
-    // Formula: Principal * Rate * Time
-    // Rate is entered as Percentage (e.g., 5 for 5%)
-    
-    let interest = 0;
-    const principal = Number(loan.principal);
-    const rate = Number(loan.rate);
-
-    if (loan.rateType === 'MONTHLY') {
-      // Rate is per month.
-      // Time = Months
-      // Using precise day calculation: Days / 30 offers a rough month count
-      // Or (Principal * Rate/100) * (Days / 30)
-      const months = diffDays / 30;
-      interest = principal * (rate / 100) * months;
-    } else {
-      // Rate is per year
-      // Time = Years
-      const years = diffDays / 365;
-      interest = principal * (rate / 100) * years;
+    if (loan.transactions) {
+       // Convert transactions object to array and calculate
+       Object.values(loan.transactions).forEach(t => {
+           const amt = Number(t.amount) || 0;
+           if (t.type === 'PRINCIPAL') {
+               // Positive amount means loan size increased (took more / gave more)
+               // Negative amount means loan was repaid (paid back / received back)
+               if (amt > 0) {
+                 totalTaken += amt;
+               } else {
+                 totalRepaid += Math.abs(amt);
+               }
+           } else if (t.type === 'PROFIT') {
+               // Profit paid/received
+               totalProfit += Math.abs(amt);
+           }
+       });
     }
 
     return {
       ...loan,
-      calculatedInterest: interest,
-      totalDue: principal + interest,
-      daysElapsed: diffDays
+      totalTaken,
+      totalRepaid,
+      totalProfit,
+      balance: totalTaken - totalRepaid,
+      daysElapsed: Math.ceil(Math.abs(new Date() - new Date(loan.startDate)) / (1000 * 60 * 60 * 24))
     };
   }
 }

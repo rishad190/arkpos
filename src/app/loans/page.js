@@ -35,9 +35,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { LoanDetailsDialog } from "@/components/loans/LoanDetailsDialog";
+
 export default function LoansPage() {
   const { loans, loading, totals, deleteLoan } = useLoans();
   const [deletingId, setDeletingId] = useState(null);
+  const [selectedLoan, setSelectedLoan] = useState(null);
 
   const handleDelete = async () => {
     if (deletingId) {
@@ -52,20 +55,18 @@ export default function LoansPage() {
 
   // Calculate Net Position
   // Assets (Given) - Liabilities (Taken)
-  // If Positive: You are owed money. If Negative: You owe money.
-  const netPrincipal = totals.givenPrincipal - totals.takenPrincipal;
-  const netTotal = totals.givenTotal - totals.takenTotal;
+  const netBalance = totals.givenBalance - totals.takenBalance;
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
       <PageHeader
         title="Loan Management"
-        description="Track loans given and taken with automatic interest calculation."
+        description="Track loans given and taken, logging exactly what you receive and pay."
         actions={
           <AddLoanDialog>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Add Loan
+              Add Loan Account
             </Button>
           </AddLoanDialog>
         }
@@ -76,13 +77,16 @@ export default function LoansPage() {
         {/* Loans Given (Assets) */}
         <Card className="bg-green-50/50 border-green-200">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-green-700">Total Loans Given</CardTitle>
-            <CardDescription>Principal + Interest</CardDescription>
+            <CardTitle className="text-sm font-medium text-green-700">Money Given (Assets)</CardTitle>
+            <CardDescription>Remaining Balance</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-700">{formatCurrency(totals.givenTotal)}</div>
+            <div className="text-2xl font-bold text-green-700">{formatCurrency(totals.givenBalance)}</div>
             <p className="text-xs text-green-600 mt-1">
-              Principal: {formatCurrency(totals.givenPrincipal)} | Interest: {formatCurrency(totals.givenInterest)}
+              Total Out: {formatCurrency(totals.givenTotal)} | Repaid: {formatCurrency(totals.givenRepaid)}
+            </p>
+            <p className="text-xs text-emerald-600 mt-0.5">
+              Profit Received: {formatCurrency(totals.givenProfit)}
             </p>
           </CardContent>
         </Card>
@@ -90,13 +94,16 @@ export default function LoansPage() {
         {/* Loans Taken (Liabilities) */}
         <Card className="bg-red-50/50 border-red-200">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-red-700">Total Loans Taken</CardTitle>
-            <CardDescription>Principal + Interest</CardDescription>
+            <CardTitle className="text-sm font-medium text-red-700">Money Taken (Liabilities)</CardTitle>
+            <CardDescription>Remaining Balance</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-700">{formatCurrency(totals.takenTotal)}</div>
+            <div className="text-2xl font-bold text-red-700">{formatCurrency(totals.takenBalance)}</div>
             <p className="text-xs text-red-600 mt-1">
-              Principal: {formatCurrency(totals.takenPrincipal)} | Interest: {formatCurrency(totals.takenInterest)}
+              Total In: {formatCurrency(totals.takenTotal)} | Repaid: {formatCurrency(totals.takenRepaid)}
+            </p>
+            <p className="text-xs text-orange-600 mt-0.5">
+              Profit Paid: {formatCurrency(totals.takenProfit)}
             </p>
           </CardContent>
         </Card>
@@ -105,15 +112,12 @@ export default function LoansPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Net Position</CardTitle>
-            <CardDescription>Receivable - Payable</CardDescription>
+            <CardDescription>Given Balance - Taken Balance</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${netTotal >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {netTotal >= 0 ? "+" : ""}{formatCurrency(netTotal)}
+            <div className={`text-2xl font-bold ${netBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+              {netBalance >= 0 ? "+" : ""}{formatCurrency(netBalance)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Net Principal: {formatCurrency(netPrincipal)}
-            </p>
           </CardContent>
         </Card>
       </div>
@@ -127,34 +131,35 @@ export default function LoansPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
+                <TableHead>Start Date</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Source</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead className="text-right">Principal</TableHead>
-                <TableHead className="text-center">Rate</TableHead>
-                <TableHead className="text-right">Interest (Accrued)</TableHead>
-                <TableHead className="text-right">Total Due</TableHead>
+                <TableHead className="text-right">Total Taken</TableHead>
+                <TableHead className="text-right">Repaid</TableHead>
+                <TableHead className="text-right">Profit Paid</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loans.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    No loans found. Click "Add Loan" to create one.
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    No loans found. Click "Add Loan Account" to create one.
                   </TableCell>
                 </TableRow>
               ) : (
                 loans.map((loan) => (
-                  <TableRow key={loan.id}>
+                  <TableRow 
+                     key={loan.id} 
+                     className="cursor-pointer hover:bg-muted/50"
+                     onClick={() => setSelectedLoan(loan)}
+                  >
                     <TableCell>
                         <div className="flex flex-col">
                             <span className="font-medium">{formatDate(loan.startDate)}</span>
-                            {loan.endDate ? (
-                               <span className="text-xs text-muted-foreground">to {formatDate(loan.endDate)}</span>
-                            ) : (
-                               <span className="text-xs text-muted-foreground">{loan.daysElapsed} days ago</span>
-                            )}
+                             <span className="text-xs text-muted-foreground">{loan.daysElapsed} days</span>
                         </div>
                     </TableCell>
                     <TableCell>
@@ -162,16 +167,17 @@ export default function LoansPage() {
                         {loan.type}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-medium">{loan.name}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(loan.principal)}</TableCell>
-                    <TableCell className="text-center hidden md:table-cell">
-                      {loan.rate}% <span className="text-xs text-muted-foreground">/{loan.rateType === 'MONTHLY' ? 'mo' : 'yr'}</span>
+                    <TableCell className="capitalize text-muted-foreground text-sm">
+                      {loan.sourceType?.toLowerCase() || 'Person'}
                     </TableCell>
-                    <TableCell className="text-right text-orange-600 font-medium">
-                        +{formatCurrency(loan.calculatedInterest)}
+                    <TableCell className="font-medium">{loan.name}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(loan.totalTaken)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{formatCurrency(loan.totalRepaid)}</TableCell>
+                    <TableCell className="text-right text-orange-600">
+                        {formatCurrency(loan.totalProfit)}
                     </TableCell>
                     <TableCell className="text-right font-bold">
-                        {formatCurrency(loan.totalDue)}
+                        {formatCurrency(loan.balance)}
                     </TableCell>
                     <TableCell>
                       <AlertDialog open={deletingId === loan.id} onOpenChange={(open) => !open && setDeletingId(null)}>
@@ -180,12 +186,15 @@ export default function LoansPage() {
                             variant="ghost" 
                             size="icon" 
                             className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => setDeletingId(loan.id)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingId(loan.id);
+                            }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent>
+                        <AlertDialogContent onClick={e => e.stopPropagation()}>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete Loan?</AlertDialogTitle>
                             <AlertDialogDescription>
@@ -208,6 +217,12 @@ export default function LoansPage() {
           </Table>
         </CardContent>
       </Card>
+      
+      <LoanDetailsDialog 
+        loan={selectedLoan} 
+        open={!!selectedLoan} 
+        onOpenChange={(open) => !open && setSelectedLoan(null)} 
+      />
     </div>
   );
 }

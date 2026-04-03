@@ -27,10 +27,9 @@ export function AddLoanDialog({ children }) {
 
   const [formData, setFormData] = useState({
     type: "GIVEN", // 'GIVEN' or 'TAKEN'
+    sourceType: "PERSON", // 'PERSON' or 'BANK'
     name: "",
     principal: "",
-    rate: "",
-    rateType: "MONTHLY", // 'MONTHLY' or 'YEARLY'
     startDate: new Date().toISOString().split("T")[0],
     notes: ""
   });
@@ -40,7 +39,7 @@ export function AddLoanDialog({ children }) {
     setLoading(true);
 
     try {
-      if (!formData.name || !formData.principal || !formData.rate) {
+      if (!formData.name || !formData.principal) {
         alert("Please fill in all required fields");
         setLoading(false);
         return;
@@ -48,18 +47,16 @@ export function AddLoanDialog({ children }) {
 
       await addLoan({
         ...formData,
-        principal: Number(formData.principal),
-        rate: Number(formData.rate)
+        principal: Number(formData.principal)
       });
 
       setOpen(false);
       // Reset form
       setFormData({
         type: "GIVEN",
+        sourceType: "PERSON",
         name: "",
         principal: "",
-        rate: "",
-        rateType: "MONTHLY",
         startDate: new Date().toISOString().split("T")[0],
         notes: ""
       });
@@ -99,6 +96,25 @@ export function AddLoanDialog({ children }) {
             </RadioGroup>
           </div>
 
+          {/* Source Type (Person / Bank) */}
+          <div className="space-y-2">
+            <Label>Source Type</Label>
+            <RadioGroup 
+              value={formData.sourceType} 
+              onValueChange={(val) => setFormData({...formData, sourceType: val})}
+              className="flex gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="PERSON" id="person" />
+                <Label htmlFor="person">Person</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="BANK" id="bank" />
+                <Label htmlFor="bank">Bank</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
           {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="name">
@@ -126,40 +142,6 @@ export function AddLoanDialog({ children }) {
               onChange={(e) => setFormData({ ...formData, principal: e.target.value })}
               required
             />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {/* Interest Rate */}
-            <div className="space-y-2">
-              <Label htmlFor="rate">Interest Rate (%)</Label>
-              <Input
-                id="rate"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="5"
-                value={formData.rate}
-                onChange={(e) => setFormData({ ...formData, rate: e.target.value })}
-                required
-              />
-            </div>
-
-            {/* Rate Type */}
-            <div className="space-y-2">
-              <Label>Rate Frequency</Label>
-              <Select 
-                value={formData.rateType} 
-                onValueChange={(val) => setFormData({...formData, rateType: val})}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MONTHLY">Monthly</SelectItem>
-                  <SelectItem value="YEARLY">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
