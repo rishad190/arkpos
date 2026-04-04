@@ -18,6 +18,9 @@ export function AddProductDialog({ children }) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
+    quantity: "",
+    color: "",
+    details: "",
     initialCost: "", 
     partners: [{ name: "", amount: "" }],
     startDate: new Date().toISOString().split("T")[0],
@@ -54,6 +57,9 @@ export function AddProductDialog({ children }) {
 
       const newProductId = await addProduct({
         name: formData.name,
+        quantity: formData.quantity,
+        color: formData.color,
+        details: formData.details,
         initialInvestment: Number(formData.initialCost || 0), // Maps to totalCost in backend
         startDate: formData.startDate,
         notes: formData.notes
@@ -75,6 +81,9 @@ export function AddProductDialog({ children }) {
       // Reset form
       setFormData({
         name: "",
+        quantity: "",
+        color: "",
+        details: "",
         initialCost: "",
         partners: [{ name: "", amount: "" }],
         startDate: new Date().toISOString().split("T")[0],
@@ -91,7 +100,7 @@ export function AddProductDialog({ children }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Product/Project</DialogTitle>
         </DialogHeader>
@@ -107,6 +116,36 @@ export function AddProductDialog({ children }) {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
               />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quantity">Qty (Opt)</Label>
+                  <Input
+                    id="quantity"
+                    placeholder="e.g. 500"
+                    value={formData.quantity}
+                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="color">Color (Opt)</Label>
+                  <Input
+                    id="color"
+                    placeholder="e.g. Red"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="details">Details</Label>
+                  <Input
+                    id="details"
+                    placeholder="e.g. Silk"
+                    value={formData.details}
+                    onChange={(e) => setFormData({ ...formData, details: e.target.value })}
+                  />
+                </div>
             </div>
 
             <div className="space-y-4">

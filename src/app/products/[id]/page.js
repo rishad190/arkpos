@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProducts } from "@/contexts/product-context";
+import { useCustomers } from "@/contexts/customer-context";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { products, loading, deleteProductTransaction, updateProductTransaction, addProductTransaction } = useProducts();
+  const { customers } = useCustomers();
   const [product, setProduct] = useState(null);
 
   const [showAddForm, setShowAddForm] = useState(false);
@@ -40,7 +42,10 @@ export default function ProductDetailPage() {
     amount: "",
     date: new Date().toISOString().split("T")[0],
     note: "",
-    partnerName: ""
+    partnerName: "",
+    soldQuantity: "",
+    soldColor: "",
+    soldToCustomer: ""
   });
 
   useEffect(() => {
@@ -75,7 +80,10 @@ export default function ProductDetailPage() {
       amount: "",
       date: new Date().toISOString().split("T")[0],
       note: "",
-      partnerName: ""
+      partnerName: "",
+      soldQuantity: "",
+      soldColor: "",
+      soldToCustomer: ""
     });
   };
 
@@ -87,7 +95,10 @@ export default function ProductDetailPage() {
       amount: Math.abs(t.amount).toString(),
       date: t.date || new Date().toISOString().split("T")[0],
       note: t.note || "",
-      partnerName: t.partnerName || ""
+      partnerName: t.partnerName || "",
+      soldQuantity: t.soldQuantity || "",
+      soldColor: t.soldColor || "",
+      soldToCustomer: t.soldToCustomer || ""
     });
   };
 
@@ -114,25 +125,26 @@ export default function ProductDetailPage() {
     try {
       let finalAmount = Math.abs(Number(formData.amount));
 
+      const payload = {
+          type: formData.type,
+          amount: finalAmount,
+          date: formData.date,
+          note: formData.note,
+          partnerName: formData.partnerName,
+          ...(formData.type === 'PRODUCT_SALE' && {
+             soldQuantity: formData.soldQuantity || "",
+             soldColor: formData.soldColor || "",
+             soldToCustomer: formData.soldToCustomer || ""
+          })
+      };
+
       if (editId) {
           if (updateProductTransaction) {
-              await updateProductTransaction(product.id, editId, {
-                  type: formData.type,
-                  amount: finalAmount,
-                  date: formData.date,
-                  note: formData.note,
-                  partnerName: formData.partnerName
-              });
+              await updateProductTransaction(product.id, editId, payload);
           }
       } else {
           if (addProductTransaction) {
-            await addProductTransaction(product.id, {
-                type: formData.type,
-                amount: finalAmount,
-                date: formData.date,
-                note: formData.note,
-                partnerName: formData.partnerName
-            });
+            await addProductTransaction(product.id, payload);
           } else {
             alert("Transaction saving not fully linked yet!");
           }
@@ -154,15 +166,29 @@ export default function ProductDetailPage() {
                 <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="flex-1">
-                <h1 className="text-2xl font-bold flex items-center gap-3">
+                <h1 className="text-2xl font-bold flex flex-wrap items-center gap-3">
                     {product.name}
                     <Badge variant={product.netProfit >= 0 ? "default" : "destructive"} className={product.netProfit >= 0 ? "bg-green-600" : ""}>
                         {product.netProfit >= 0 ? "PROFITABLE" : "LOSS"}
                     </Badge>
+                    {product.quantity && (
+                        <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
+                            Qty: {product.quantity}
+                        </Badge>
+                    )}
+                    {product.color && (
+                        <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
+                            Color: {product.color}
+                        </Badge>
+                    )}
                 </h1>
-                <p className="text-muted-foreground mt-1">
-                     Started: {formatDate(product.startDate)} ({product.daysElapsed} days ago)
-                </p>
+                <div className="text-muted-foreground mt-1 text-sm flex items-center flex-wrap gap-2">
+                     <span>Started: {formatDate(product.startDate)} ({product.daysElapsed} days ago)</span>
+                     {(product.details || product.notes) && <span className="text-muted-foreground/50">•</span>}
+                     {product.details && <span className="font-medium text-foreground/80">{product.details}</span>}
+                     {product.details && product.notes && <span className="text-muted-foreground/50">-</span>}
+                     {product.notes && <span className="italic">{product.notes}</span>}
+                </div>
             </div>
             {!showAddForm && (
                 <Button onClick={() => setShowAddForm(true)}>Log Activity</Button>
@@ -218,6 +244,35 @@ export default function ProductDetailPage() {
                               </Select>
                           </div>
                         )}
+                        {formData.type === 'PRODUCT_SALE' && (
+                          <>
+                            <div className="space-y-2 flex-1 min-w-[100px]">
+                                <Label>Sold Qty (Opt)</Label>
+                                <Input type="text" placeholder="e.g. 50" value={formData.soldQuantity} onChange={e => setFormData({...formData, soldQuantity: e.target.value})} />
+                            </div>
+                            <div className="space-y-2 flex-1 min-w-[100px]">
+                                <Label>Color (Opt)</Label>
+                                <Input type="text" placeholder="e.g. Red" value={formData.soldColor} onChange={e => setFormData({...formData, soldColor: e.target.value})} />
+                            </div>
+                            <div className="space-y-2 flex-1 min-w-[120px]">
+                                <Label>Sold To</Label>
+                                <Select 
+                                  value={formData.soldToCustomer || "none"} 
+                                  onValueChange={(v) => setFormData({...formData, soldToCustomer: v === "none" ? "" : v})}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select customer..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No Customer</SelectItem>
+                                        {customers?.map(c => (
+                                            <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                          </>
+                        )}
                         <div className="space-y-2 flex-1 min-w-[100px]">
                             <Label>Amount</Label>
                             <Input type="number" min="0.01" step="0.01" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
@@ -237,6 +292,34 @@ export default function ProductDetailPage() {
                     </form>
                 </CardContent>
             </Card>
+        )}
+
+        {product.quantity && (
+            <div>
+                <h2 className="text-lg font-semibold mb-3">Inventory Tracking</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <Card className="bg-muted/50 border-none shadow-sm">
+                        <CardContent className="p-4 text-center">
+                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Starting Qty</div>
+                            <div className="text-2xl font-bold text-foreground">{product.quantity}</div>
+                        </CardContent>
+                    </Card>
+                    <Card className="bg-muted/50 border-none shadow-sm">
+                        <CardContent className="p-4 text-center">
+                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Total Sold</div>
+                            <div className="text-2xl font-bold text-green-600">{product.totalSoldQuantity || 0}</div>
+                        </CardContent>
+                    </Card>
+                    <Card className="bg-primary/5 border border-primary/20 shadow-sm">
+                        <CardContent className="p-4 text-center">
+                            <div className="text-xs font-medium text-primary/80 uppercase tracking-wider mb-1">Remaining Qty</div>
+                            <div className="text-3xl font-black text-primary">
+                                {product.remainingQuantity !== null ? product.remainingQuantity : (product.quantity || 0)}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -342,7 +425,16 @@ export default function ProductDetailPage() {
                                     {t.type === 'INVESTMENT' && <Badge variant="outline" className="text-destructive border-destructive/30 bg-destructive/5 uppercase text-[10px] font-bold tracking-wider">Legacy Cost</Badge>}
                                     {t.type === 'RETURN' && <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 uppercase text-[10px] font-bold tracking-wider">Legacy Sale</Badge>}
                                 </TableCell>
-                                <TableCell className="text-sm">{t.note || '-'}</TableCell>
+                                <TableCell className="text-sm">
+                                    <div>{t.note || '-'}</div>
+                                    {t.type === 'PRODUCT_SALE' && (t.soldQuantity || t.soldColor || t.soldToCustomer) && (
+                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                            {t.soldQuantity && <Badge variant="secondary" className="text-[10px] bg-muted/50">Qty: {t.soldQuantity}</Badge>}
+                                            {t.soldColor && <Badge variant="secondary" className="text-[10px] bg-muted/50">Color: {t.soldColor}</Badge>}
+                                            {t.soldToCustomer && <Badge variant="outline" className="text-[10px] border-primary/20 text-primary">To: {t.soldToCustomer}</Badge>}
+                                        </div>
+                                    )}
+                                </TableCell>
                                 <TableCell className={`text-right font-medium ${isOutflow ? 'text-destructive' : 'text-green-600'}`}>
                                     {isOutflow ? '-' : '+'}{formatCurrency(Math.abs(t.amount || 0))}
                                 </TableCell>

@@ -52,6 +52,9 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
     productId: "none",
     productAction: "PRODUCT_COST",
     productPartnerName: "",
+    productSoldQuantity: "",
+    productSoldColor: "",
+    productSoldToCustomer: "",
     transferType: "deposit", // 'deposit' (Cash->Bank) or 'withdraw' (Bank->Cash)
   });
 
@@ -181,15 +184,52 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                amount: amount,
                date: formData.date,
                partnerName: formData.productPartnerName,
-               note: formData.description
+               note: formData.description,
+               ...(formData.productAction === 'PRODUCT_SALE' && {
+                  soldQuantity: formData.productSoldQuantity || "",
+                  soldColor: formData.productSoldColor || "",
+                  soldToCustomer: formData.productSoldToCustomer || ""
+               })
            });
+        }
+
+        // Connect PRODUCT_SALE to specific Customer's ledger if provided
+        if (formData.productAction === 'PRODUCT_SALE' && formData.productSoldToCustomer) {
+            const matchedCustomer = customers?.find(c => c.name.toLowerCase() === formData.productSoldToCustomer.trim().toLowerCase());
+            if (matchedCustomer && addTransaction) {
+                const customerLedgerTx = {
+                    customerId: matchedCustomer.id,
+                    date: formData.date,
+                    memoNumber: formData.reference || `PSALE-${Date.now()}`,
+                    total: amount,       // Goods sold value
+                    deposit: amount,     // Cash received right now (since it's a cashbook entry)
+                    due: 0,
+                    type: "sale",
+                    details: formData.description || `Cash Product Sale: ${product?.name}`,
+                };
+                await addTransaction(customerLedgerTx);
+            }
+        }
+
+        let generatedDesc = `Product Activity: ${product?.name}`;
+        if (formData.productAction === 'PRODUCT_SALE') {
+            generatedDesc = `Product Sale: ${product?.name}`;
+            const extraTags = [];
+            if (formData.productSoldToCustomer) extraTags.push(`To: ${formData.productSoldToCustomer}`);
+            if (formData.productSoldQuantity) extraTags.push(`Qty: ${formData.productSoldQuantity}`);
+            
+            if (extraTags.length > 0) {
+                generatedDesc += ` (${extraTags.join(', ')})`;
+            }
+        } else if (formData.productAction === 'PARTNER_INVESTMENT' || formData.productAction === 'PARTNER_PAYOUT') {
+            generatedDesc = `Product ${formData.productAction === 'PARTNER_PAYOUT' ? 'Payout' : 'Investment'}: ${product?.name} (${formData.productPartnerName})`;
         }
 
         const transaction = {
           type: activeTab,
           date: formData.date,
           amount: amount,
-          description: formData.description || `Product Activity - ${product?.name}`,
+          description: formData.description || generatedDesc,
           reference: formData.reference,
           category: formData.category,
           paymentMode: formData.paymentMode,
@@ -240,6 +280,9 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         reference: "",
         amount: "",
         customerId: "none",
+        productSoldQuantity: "",
+        productSoldColor: "",
+        productSoldToCustomer: "",
       }));
       // Keep category and isCustomCategory state for faster entry unless it was a customer payment
       if (isCustomerPayment) {
@@ -489,6 +532,48 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                    </Select>
                  </div>
                )}
+
+               {formData.productAction === 'PRODUCT_SALE' && (
+                 <div className="space-y-4">
+                     <div className="grid grid-cols-2 gap-4">
+                       <div>
+                         <Label>Sold Qty (Opt)</Label>
+                         <Input 
+                           className="mt-2"
+                           placeholder="e.g. 50"
+                           value={formData.productSoldQuantity || ''}
+                           onChange={(e) => setFormData(prev => ({ ...prev, productSoldQuantity: e.target.value }))}
+                         />
+                       </div>
+                       <div>
+                         <Label>Color (Opt)</Label>
+                         <Input 
+                           className="mt-2"
+                           placeholder="e.g. Red"
+                           value={formData.productSoldColor || ''}
+                           onChange={(e) => setFormData(prev => ({ ...prev, productSoldColor: e.target.value }))}
+                         />
+                       </div>
+                     </div>
+                     <div>
+                       <Label>Sold To (Customer Name)</Label>
+                       <Select 
+                         value={formData.productSoldToCustomer || "none"} 
+                         onValueChange={(v) => setFormData(prev => ({ ...prev, productSoldToCustomer: v === "none" ? "" : v }))}
+                       >
+                         <SelectTrigger className="mt-2">
+                             <SelectValue placeholder="Select an existing customer..." />
+                         </SelectTrigger>
+                         <SelectContent>
+                             <SelectItem value="none">No Customer (General Sale)</SelectItem>
+                             {customers?.map(c => (
+                                 <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                             ))}
+                         </SelectContent>
+                       </Select>
+                     </div>
+                 </div>
+               )}
              </div>
           )}
         </div>
@@ -499,7 +584,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Transaction</DialogTitle>
         </DialogHeader>

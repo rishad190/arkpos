@@ -193,7 +193,12 @@ export default function ProductsPage() {
                     </TableCell>
                     <TableCell className="font-medium">
                         {product.name}
-                        {product.notes && <div className="text-xs text-muted-foreground max-w-[200px] truncate">{product.notes}</div>}
+                        <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
+                            {product.quantity && <span className="font-semibold text-primary/80 bg-primary/5 px-1 rounded">Qty: {product.quantity}</span>}
+                            {product.color && <span className="font-semibold text-primary/80 bg-primary/5 px-1 rounded">Color: {product.color}</span>}
+                            {product.details && <span className="text-muted-foreground">{product.details}</span>}
+                            {product.notes && <span className="max-w-[150px] truncate italic">{product.notes}</span>}
+                        </div>
                     </TableCell>
                     <TableCell className="text-right font-medium text-destructive">
                         {formatCurrency(product.totalCost)}

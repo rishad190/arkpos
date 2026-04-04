@@ -178,6 +178,7 @@ export class ProductService {
     let totalCost = 0;
     let totalSales = 0;
     let totalPartnerInvestment = 0;
+    let totalSoldQuantity = 0;
     let partners = {}; // { [partnerName]: { invested: 0, payout: 0, balance: 0 } }
 
     const initInvestment = Number(product.initialInvestment) || 0;
@@ -193,6 +194,9 @@ export class ProductService {
                totalCost += amt;
            } else if (type === 'PRODUCT_SALE' || type === 'RETURN') {
                totalSales += amt;
+               if (t.soldQuantity) {
+                   totalSoldQuantity += Number(t.soldQuantity) || 0;
+               }
            } else if (type === 'PARTNER_INVESTMENT') {
                totalPartnerInvestment += amt;
                if (!partners[partnerName]) partners[partnerName] = { invested: 0, payout: 0, balance: 0 };
@@ -207,12 +211,17 @@ export class ProductService {
     }
 
     const netProfit = totalSales - totalCost;
+    
+    const initialQty = Number(product.quantity) || 0;
+    const remainingQuantity = product.quantity ? Math.max(0, initialQty - totalSoldQuantity) : null;
 
     return {
       ...product,
       totalCost,
       totalSales,
       totalPartnerInvestment,
+      totalSoldQuantity,
+      remainingQuantity,
       netProfit,
       partners,
       daysElapsed: product.startDate ? Math.ceil(Math.abs(new Date() - new Date(product.startDate)) / (1000 * 60 * 60 * 24)) : 0
