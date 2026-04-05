@@ -160,8 +160,8 @@ export default function ProductDetailPage() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <Button variant="outline" size="icon" onClick={() => router.push("/products")}>
                 <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -191,14 +191,14 @@ export default function ProductDetailPage() {
                 </div>
             </div>
             {!showAddForm && (
-                <Button onClick={() => setShowAddForm(true)}>Log Activity</Button>
+                <Button onClick={() => setShowAddForm(true)} className="w-full sm:w-auto">Log Activity</Button>
             )}
         </div>
 
         {showAddForm && (
             <Card className="bg-muted/30 border-dashed">
-                <CardContent className="pt-6">
-                    <form onSubmit={handleAddTransaction} className="flex gap-4 items-end flex-wrap">
+                <CardContent className="pt-6 overflow-x-auto">
+                    <form onSubmit={handleAddTransaction} className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-end flex-wrap min-w-full">
                         <div className="space-y-2 flex-1 min-w-[120px]">
                             <Label>Category</Label>
                             <Select value={formData.type} onValueChange={(v) => setFormData({...formData, type: v, partnerName: ""})}>
@@ -285,7 +285,7 @@ export default function ProductDetailPage() {
                             <Label>Note (Opt)</Label>
                             <Input type="text" placeholder="Details..." value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} />
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 w-full sm:w-auto justify-end mt-2">
                             <Button type="button" variant="ghost" onClick={cancelForm}>Cancel</Button>
                             <Button type="submit" disabled={saving}>{saving ? "Saving" : (editId ? "Update" : "Save")}</Button>
                         </div>
@@ -383,9 +383,9 @@ export default function ProductDetailPage() {
             </div>
         )}
 
-        <Card>
-            <CardContent className="p-0">
-                <Table>
+        <Card className="overflow-hidden">
+            <CardContent className="p-0 overflow-x-auto whitespace-nowrap">
+                <Table className="min-w-[600px]">
                     <TableHeader className="bg-muted/50 rounded-t-lg">
                         <TableRow>
                             <TableHead className="pl-6">Date</TableHead>
