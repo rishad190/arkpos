@@ -58,7 +58,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 flex flex-col h-[calc(100vh-64px)] overflow-hidden">
+    <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-6 flex flex-col lg:h-[calc(100vh-64px)] lg:overflow-hidden">
       <div className="flex-none">
         <PageHeader
           title="Product Ledger"
@@ -142,7 +142,7 @@ export default function ProductsPage() {
           </div>
         </CardHeader>
         <CardContent className="flex-1 overflow-auto p-0">
-          <Table>
+          <Table className="min-w-[800px]">
             <TableHeader className="bg-white sticky top-0 z-10 shadow-sm">
               <TableRow>
                 <TableHead>Start Date</TableHead>
