@@ -507,7 +507,7 @@ export default function CashBookPage() {
         setLoadingState((prev) => ({ ...prev, actions: false }));
       }
     },
-    [deleteDailyCashTransaction, toast]
+    [deleteDailyCashTransaction, deleteAccountTransaction, toast]
   );
 
   const handleEditClick = useCallback((entry) => {
