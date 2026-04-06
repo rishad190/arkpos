@@ -46,10 +46,8 @@ export function AddCustomerDialog({ open, onOpenChange, onClose }) {
     const errors = {};
     if (!data.name?.trim()) errors.name = "Name is required";
 
-    // Enhanced phone validation
-    if (!data.phone?.trim()) {
-      errors.phone = "Phone is required";
-    } else {
+    // Optional phone validation — only validate format if provided
+    if (data.phone?.trim()) {
       const phoneRegex = /^[0-9]{11}$/;
       if (!phoneRegex.test(data.phone)) {
         errors.phone = "Phone number must be exactly 11 digits";
@@ -149,11 +147,8 @@ export function AddCustomerDialog({ open, onOpenChange, onClose }) {
         value={formData.phone}
         onChange={handleChange}
         error={errors.phone}
-        required
-        placeholder="Enter 11-digit phone number"
+        placeholder="Enter phone number (optional)"
         type="tel"
-        maxLength={11}
-        pattern="[0-9]{11}"
       />
 
       <FormField

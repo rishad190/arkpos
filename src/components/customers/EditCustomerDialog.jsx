@@ -20,7 +20,6 @@ export function EditCustomerDialog({
   const validateCustomer = (data) => {
     const errors = {};
     if (!data.name?.trim()) errors.name = "Name is required";
-    if (!data.phone?.trim()) errors.phone = "Phone is required";
     return errors;
   };
 
@@ -88,8 +87,7 @@ export function EditCustomerDialog({
         value={formData.phone}
         onChange={handleChange}
         error={errors.phone}
-        required
-        placeholder="Enter phone number"
+        placeholder="Enter phone number (optional)"
       />
 
       <FormField
