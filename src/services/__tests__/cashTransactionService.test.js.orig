@@ -1,0 +1,261 @@
+import { CashTransactionService } from '../cashTransactionService';
+import { AppError } from '@/lib/errors';
+import { ref, push, get, update, increment } from 'firebase/database';
+
+// Mock Firebase Realtime Database
+jest.mock('firebase/database', () => ({
+  ref: jest.fn(),
+  push: jest.fn(),
+  get: jest.fn(),
+  update: jest.fn(),
+  increment: jest.fn((val) => val), // Simple mock for increment
+  set: jest.fn(),
+  remove: jest.fn(),
+  query: jest.fn(),
+  orderByChild: jest.fn(),
+  equalTo: jest.fn(),
+  onValue: jest.fn()
+}));
+
+// Mock Logger
+const mockLogger = {
+  info: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+};
+
+// Mock Atomic Operations
+const mockAtomicOperations = {
+  execute: jest.fn((name, callback) => callback())
+};
+
+describe('CashTransactionService', () => {
+  let service;
+  let mockDb;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockDb = {};
+    service = new CashTransactionService(mockDb, mockLogger, mockAtomicOperations);
+
+    // Default push implementation to return a mock ref with a key
+    push.mockImplementation((refPath) => ({
+      key: 'mock-push-id-123',
+      ref: refPath
+    }));
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('initializes correctly', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('addAccountTransaction - Data Sanitization', () => {
+    it('strips commas from string amount and parses as number', async () => {
+      const transaction = {
+        amount: '13,00,000',
+        date: '2023-10-27',
+        type: 'income',
+        paymentMode: 'cash'
+      };
+
+      await service.addAccountTransaction(transaction);
+
+      // Verify that update was called with the parsed number
+      expect(update).toHaveBeenCalled();
+      const updatesArg = update.mock.calls[0][1];
+
+      const transactionId = 'mock-push-id-123';
+      const addedTransaction = updatesArg[`transactions/${transactionId}`];
+
+      expect(addedTransaction.amount).toBe(1300000);
+      expect(increment).toHaveBeenCalledWith(1300000);
+    });
+
+    it('throws AppError if amount is missing or <= 0', async () => {
+      const transactionMissing = { date: '2023-10-27', type: 'income' };
+      await expect(service.addAccountTransaction(transactionMissing))
+        .rejects.toThrow(AppError);
+
+      const transactionNegative = { amount: -100, date: '2023-10-27', type: 'income' };
+      await expect(service.addAccountTransaction(transactionNegative))
+        .rejects.toThrow(AppError);
+
+      const transactionZero = { amount: 0, date: '2023-10-27', type: 'income' };
+      await expect(service.addAccountTransaction(transactionZero))
+        .rejects.toThrow(AppError);
+    });
+
+    it('throws AppError if date is missing', async () => {
+      const transaction = { amount: 100, type: 'income' };
+      await expect(service.addAccountTransaction(transaction))
+        .rejects.toThrow(AppError);
+    });
+
+    it('throws AppError if amount is an invalid string', async () => {
+      const transaction = { amount: 'invalid', date: '2023-10-27', type: 'income' };
+      await expect(service.addAccountTransaction(transaction))
+        .rejects.toThrow(AppError);
+    });
+  });
+
+  describe('addAccountTransaction - Cashbook to Customer Data Translation', () => {
+    it('creates customer transaction correctly for income type', async () => {
+      const transaction = {
+        amount: 500,
+        date: '2023-10-27',
+        type: 'income',
+        paymentMode: 'cash',
+        customerId: 'customer-123',
+        description: 'Payment from customer'
+      };
+
+      // Mock push to return predictable keys
+      push.mockImplementationOnce(() => ({ key: 'mock-push-id-main', ref: 'ref' }));
+      push.mockImplementationOnce(() => ({ key: 'mock-push-id-customer', ref: 'ref' }));
+
+      // Mock Date.now to return predictable memoNumber
+      const mockDateNow = jest.spyOn(Date, 'now').mockReturnValue(1698400000000);
+
+      await service.addAccountTransaction(transaction);
+
+      expect(update).toHaveBeenCalled();
+      const updatesArg = update.mock.calls[0][1];
+
+      // Verify the generated customer transaction
+      const customerTransaction = updatesArg['transactions/mock-push-id-customer'];
+      expect(customerTransaction).toBeDefined();
+      expect(customerTransaction.memoNumber).toBe('CB-1698400000000');
+      expect(customerTransaction.type).toBe('payment');
+      expect(customerTransaction.deposit).toBe(500);
+      expect(customerTransaction.total).toBe(0);
+
+      // Verify the link
+      expect(updatesArg['transactions/mock-push-id-main'].customerTransactionId).toBe('mock-push-id-customer');
+
+      mockDateNow.mockRestore();
+    });
+
+    it('creates customer transaction correctly for expense type', async () => {
+      const transaction = {
+        amount: 300,
+        date: '2023-10-27',
+        type: 'expense',
+        paymentMode: 'cash',
+        customerId: 'customer-456',
+        description: 'Sale to customer'
+      };
+
+      push.mockImplementationOnce(() => ({ key: 'mock-push-id-main', ref: 'ref' }));
+      push.mockImplementationOnce(() => ({ key: 'mock-push-id-customer', ref: 'ref' }));
+      const mockDateNow = jest.spyOn(Date, 'now').mockReturnValue(1698400000001);
+
+      await service.addAccountTransaction(transaction);
+
+      expect(update).toHaveBeenCalled();
+      const updatesArg = update.mock.calls[0][1];
+
+      // Verify the generated customer transaction
+      const customerTransaction = updatesArg['transactions/mock-push-id-customer'];
+      expect(customerTransaction).toBeDefined();
+      expect(customerTransaction.memoNumber).toBe('CB-1698400000001');
+      expect(customerTransaction.type).toBe('sale');
+      expect(customerTransaction.total).toBe(300);
+      expect(customerTransaction.deposit).toBe(0);
+
+      mockDateNow.mockRestore();
+    });
+  });
+
+  describe('addAccountTransaction & deleteAccountTransaction - Customer Financial Summary Updates', () => {
+    it('updates financialSummary for income', async () => {
+      const transaction = {
+        amount: 500,
+        date: '2023-10-27',
+        type: 'income',
+        paymentMode: 'cash',
+        customerId: 'customer-123'
+      };
+
+      await service.addAccountTransaction(transaction);
+
+      expect(update).toHaveBeenCalled();
+      const updatesArg = update.mock.calls[0][1];
+
+      expect(updatesArg['customers/customer-123/financialSummary/totalDeposit']).toBeDefined();
+      expect(updatesArg['customers/customer-123/financialSummary/totalBalance']).toBeDefined();
+      expect(increment).toHaveBeenCalledWith(500); // from totalDeposit
+      expect(increment).toHaveBeenCalledWith(-500); // from totalBalance
+    });
+
+    it('updates financialSummary for expense', async () => {
+      const transaction = {
+        amount: 300,
+        date: '2023-10-27',
+        type: 'expense',
+        paymentMode: 'cash',
+        customerId: 'customer-456'
+      };
+
+      await service.addAccountTransaction(transaction);
+
+      expect(update).toHaveBeenCalled();
+      const updatesArg = update.mock.calls[0][1];
+
+      expect(updatesArg['customers/customer-456/financialSummary/totalAmount']).toBeDefined();
+      expect(updatesArg['customers/customer-456/financialSummary/totalBalance']).toBeDefined();
+      expect(increment).toHaveBeenCalledWith(300); // from totalAmount
+      expect(increment).toHaveBeenCalledWith(300); // from totalBalance
+    });
+  });
+
+  describe('deleteAccountTransaction - Customer Financial Summary Reverts', () => {
+    it('reverts financialSummary when deleting an income transaction with a linked customer transaction', async () => {
+      // Mock get to return an existing transaction that has a linked customerTransactionId
+      const mockMainTransaction = {
+        amount: 500,
+        type: 'income',
+        paymentMode: 'cash',
+        customerId: 'customer-123',
+        customerTransactionId: 'customer-tx-id'
+      };
+      const mockCustomerTransaction = {
+        type: 'payment',
+        deposit: 500,
+        total: 0,
+        customerId: 'customer-123'
+      };
+
+      get.mockImplementation((refObj) => {
+        const path = typeof refObj === 'string' ? refObj : refObj.ref || refObj.toString();
+        if (path.includes('transactions/main-tx-id')) {
+          return { exists: () => true, val: () => mockMainTransaction };
+        }
+        if (path.includes('transactions/customer-tx-id')) {
+          return { exists: () => true, val: () => mockCustomerTransaction };
+        }
+        return { exists: () => false };
+      });
+
+      await service.deleteAccountTransaction('main-tx-id');
+
+      expect(update).toHaveBeenCalled();
+      const updatesArg = update.mock.calls[update.mock.calls.length - 1][1];
+
+      // Since we modified deleteAccountTransaction, we need to check the updates payload
+      // Verify it reverts financial summary
+      expect(updatesArg['customers/customer-123/financialSummary/totalDeposit']).toBeDefined();
+      expect(updatesArg['customers/customer-123/financialSummary/totalBalance']).toBeDefined();
+      // It should revert the deposit (decrement) and balance (increment)
+      expect(increment).toHaveBeenCalledWith(-500);
+      expect(increment).toHaveBeenCalledWith(500);
+
+      // And it should delete both the main and customer transaction
+      expect(updatesArg['transactions/main-tx-id']).toBeNull();
+      expect(updatesArg['transactions/customer-tx-id']).toBeNull();
+    });
+  });
+});
