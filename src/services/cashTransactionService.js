@@ -452,12 +452,21 @@ export class CashTransactionService {
    * @returns {Promise<string>} New transaction ID
    */
   async addAccountTransaction(transaction) {
-    if (!transaction.amount || transaction.amount <= 0) {
+    // Sanitize amount (remove commas and parse)
+    let sanitizedAmount = transaction.amount;
+    if (typeof sanitizedAmount === 'string') {
+      sanitizedAmount = sanitizedAmount.replace(/,/g, '');
+    }
+    const parsedAmount = Number(sanitizedAmount);
+
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
       throw new AppError(ERROR_TYPES.VALIDATION, "Amount must be positive", "amount");
     }
     if (!transaction.date) {
       throw new AppError(ERROR_TYPES.VALIDATION, "Date is required", "date");
     }
+
+    transaction = { ...transaction, amount: parsedAmount };
 
     return this.atomicOperations.execute("addAccountTransaction", async () => {
        const newRef = push(ref(this.db, TRANSACTIONS_PATH));
@@ -471,6 +480,41 @@ export class CashTransactionService {
        };
        
        const amount = Number(transaction.amount);
+
+       // Handle customer data translation
+       if (transaction.customerId) {
+         const memoNumber = `CB-${Date.now()}`;
+         const customerTransactionId = push(ref(this.db, TRANSACTIONS_PATH)).key;
+
+         const customerTransaction = {
+           id: customerTransactionId,
+           customerId: transaction.customerId,
+           date: transaction.date,
+           memoNumber: memoNumber,
+           description: transaction.description || '',
+           createdAt: new Date().toISOString(),
+           updatedAt: new Date().toISOString()
+         };
+
+         if (transaction.type === 'income') {
+           customerTransaction.type = 'payment';
+           customerTransaction.deposit = amount;
+           customerTransaction.total = 0;
+           updates[`customers/${transaction.customerId}/financialSummary/totalDeposit`] = increment(amount);
+           updates[`customers/${transaction.customerId}/financialSummary/totalBalance`] = increment(-amount);
+         } else if (transaction.type === 'expense') {
+           customerTransaction.type = 'sale';
+           customerTransaction.total = amount;
+           customerTransaction.deposit = 0;
+           updates[`customers/${transaction.customerId}/financialSummary/totalAmount`] = increment(amount);
+           updates[`customers/${transaction.customerId}/financialSummary/totalBalance`] = increment(amount);
+         }
+
+         updates[`${TRANSACTIONS_PATH}/${customerTransactionId}`] = customerTransaction;
+         // Link back to the generic account transaction
+         updates[`${TRANSACTIONS_PATH}/${id}`].customerTransactionId = customerTransactionId;
+       }
+
        if (transaction.type === 'income') {
           updates[`settings/store/balance/${transaction.paymentMode}`] = increment(amount);
        } else if (transaction.type === 'expense') {
@@ -593,6 +637,27 @@ export class CashTransactionService {
              updates['settings/store/balance/bank'] = increment(amount);
              updates['settings/store/balance/cash'] = increment(-amount);
           }
+       }
+
+       // Revert Customer Impact
+       if (transaction.customerTransactionId) {
+         const customerTransactionRef = ref(this.db, `${TRANSACTIONS_PATH}/${transaction.customerTransactionId}`);
+         const customerSnapshot = await get(customerTransactionRef);
+
+         if (customerSnapshot.exists()) {
+           const customerTransaction = customerSnapshot.val();
+
+           if (customerTransaction.type === 'payment') {
+             updates[`customers/${customerTransaction.customerId}/financialSummary/totalDeposit`] = increment(-customerTransaction.deposit);
+             updates[`customers/${customerTransaction.customerId}/financialSummary/totalBalance`] = increment(customerTransaction.deposit);
+           } else if (customerTransaction.type === 'sale') {
+             updates[`customers/${customerTransaction.customerId}/financialSummary/totalAmount`] = increment(-customerTransaction.total);
+             updates[`customers/${customerTransaction.customerId}/financialSummary/totalBalance`] = increment(-customerTransaction.total);
+           }
+
+           // Delete the customer transaction as well
+           updates[`${TRANSACTIONS_PATH}/${transaction.customerTransactionId}`] = null;
+         }
        }
 
        // Delete Transaction Record
