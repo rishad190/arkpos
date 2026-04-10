@@ -195,7 +195,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
 
         // Connect PRODUCT_SALE to specific Customer's ledger if provided
         if (formData.productAction === 'PRODUCT_SALE' && formData.productSoldToCustomer) {
-            const matchedCustomer = customers?.find(c => c.name.toLowerCase() === formData.productSoldToCustomer.trim().toLowerCase());
+            const matchedCustomer = customers?.find(c => c.name?.trim().toLowerCase() === formData.productSoldToCustomer?.trim().toLowerCase());
             if (matchedCustomer && addTransaction) {
                 const customerLedgerTx = {
                     customerId: matchedCustomer.id,
@@ -234,6 +234,11 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
           category: formData.category,
           paymentMode: formData.paymentMode,
           productId: formData.productId,
+          productName: product?.name,
+          productAction: formData.productAction,
+          productSoldQuantity: formData.productSoldQuantity || "",
+          productSoldColor: formData.productSoldColor || "",
+          productSoldToCustomer: formData.productSoldToCustomer || "",
         };
         await onAddTransaction(transaction);
       } else {
