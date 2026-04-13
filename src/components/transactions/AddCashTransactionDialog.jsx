@@ -28,7 +28,9 @@ import { useLoans } from "@/contexts/loan-context";
 import { useProducts } from "@/contexts/product-context";
 import { CASH_TRANSACTION_CATEGORIES } from "@/lib/constants";
 import { numberToWords } from "@/lib/utils";
-import { TrashIcon } from "lucide-react";
+import { TrashIcon, Search } from "lucide-react";
+import { AddProductDialog } from "@/components/products/AddProductDialog";
+import { AddCustomerDialog } from "@/components/customers/AddCustomerDialog";
 
 export function AddCashTransactionDialog({ onAddTransaction, children }) {
   const { transactionCategories, addCategory, deleteCategory, addTransaction } = useTransactions();
@@ -38,6 +40,15 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("income");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
+  
+  // Modals state
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+
+  // Search states
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [productCustomerSearch, setProductCustomerSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
   
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
@@ -397,8 +408,21 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                    <SelectValue placeholder="Choose a customer" />
                  </SelectTrigger>
                  <SelectContent>
+                   <div className="flex items-center px-3 py-2 sticky top-0 bg-popover z-10 border-b">
+                     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                     <input
+                       className="flex h-8 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                       placeholder="Search customer..."
+                       value={customerSearch}
+                       onChange={(e) => setCustomerSearch(e.target.value)}
+                       onKeyDown={(e) => e.stopPropagation()}
+                     />
+                   </div>
                    <SelectItem value="none" disabled>Select Customer</SelectItem>
-                   {customers.map((c) => (
+                   <SelectItem value="ADD_NEW_CUSTOMER" className="text-primary font-medium focus:bg-primary/10 focus:text-primary">
+                     + Add New Customer
+                   </SelectItem>
+                   {customers.filter(c => c.name?.toLowerCase().includes(customerSearch.toLowerCase())).map((c) => (
                      <SelectItem key={c.id} value={c.id}>
                        {c.name}
                      </SelectItem>
@@ -456,14 +480,33 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                   <Label htmlFor="product">Select Product / Project</Label>
                   <Select
                     value={formData.productId}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, productId: value }))}
+                    onValueChange={(value) => {
+                      if (value === "ADD_NEW_PRODUCT") {
+                        setShowAddProduct(true);
+                      } else {
+                        setFormData(prev => ({ ...prev, productId: value }));
+                      }
+                    }}
                   >
                     <SelectTrigger className="mt-2">
                       <SelectValue placeholder="Choose a product" />
                     </SelectTrigger>
                     <SelectContent>
+                      <div className="flex items-center px-3 py-2 sticky top-0 bg-popover z-10 border-b">
+                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                        <input
+                          className="flex h-8 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                          placeholder="Search product..."
+                          value={productSearch}
+                          onChange={(e) => setProductSearch(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        />
+                      </div>
                       <SelectItem value="none" disabled>Select Product</SelectItem>
-                      {products.map((p) => (
+                      <SelectItem value="ADD_NEW_PRODUCT" className="text-primary font-medium focus:bg-primary/10 focus:text-primary">
+                        + Add New Product
+                      </SelectItem>
+                      {products.filter(p => p.name?.toLowerCase().includes(productSearch.toLowerCase())).map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.name}
                         </SelectItem>
@@ -562,34 +605,54 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                      </div>
                      <div>
                        <Label>Sold To (Customer Name)</Label>
-                       <Select 
-                         value={formData.productSoldToCustomer || "none"} 
-                         onValueChange={(v) => setFormData(prev => ({ ...prev, productSoldToCustomer: v === "none" ? "" : v }))}
-                       >
-                         <SelectTrigger className="mt-2">
-                             <SelectValue placeholder="Select an existing customer..." />
-                         </SelectTrigger>
-                         <SelectContent>
-                             <SelectItem value="none">No Customer (General Sale)</SelectItem>
-                             {customers?.map(c => (
-                                 <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                             ))}
-                         </SelectContent>
-                       </Select>
-                     </div>
-                 </div>
-               )}
-             </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+                      <Select 
+                        value={formData.productSoldToCustomer || "none"} 
+                        onValueChange={(v) => {
+                          if (v === "ADD_NEW_CUSTOMER") {
+                            setShowAddCustomer(true);
+                          } else {
+                            setFormData(prev => ({ ...prev, productSoldToCustomer: v === "none" ? "" : v }));
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="mt-2">
+                            <SelectValue placeholder="Select an existing customer..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <div className="flex items-center px-3 py-2 sticky top-0 bg-popover z-10 border-b">
+                               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                               <input
+                                 className="flex h-8 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                                 placeholder="Search customer..."
+                                 value={productCustomerSearch}
+                                 onChange={(e) => setProductCustomerSearch(e.target.value)}
+                                 onKeyDown={(e) => e.stopPropagation()}
+                               />
+                            </div>
+                            <SelectItem value="none">No Customer (General Sale)</SelectItem>
+                            <SelectItem value="ADD_NEW_CUSTOMER" className="text-primary font-medium focus:bg-primary/10 focus:text-primary">
+                              + Add New Customer
+                            </SelectItem>
+                            {customers?.filter(c => c.name?.toLowerCase().includes(productCustomerSearch.toLowerCase())).map(c => (
+                                <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                </div>
+              )}
+            </div>
+         )}
+       </div>
+     </div>
+   );
+ };
 
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+ return (
+   <>
+   <Dialog open={open} onOpenChange={setOpen}>
+     <DialogTrigger asChild>{children}</DialogTrigger>
+     <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Transaction</DialogTitle>
         </DialogHeader>
@@ -711,5 +774,16 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         </FormErrorBoundary>
       </DialogContent>
     </Dialog>
+
+    {/* Supplementary Modals */}
+    <AddProductDialog 
+       open={showAddProduct} 
+       onOpenChange={setShowAddProduct} 
+    />
+    <AddCustomerDialog 
+       open={showAddCustomer} 
+       onOpenChange={setShowAddCustomer} 
+    />
+    </>
   );
 }
