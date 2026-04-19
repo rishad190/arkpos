@@ -12,9 +12,13 @@ import {
 } from "@/components/ui/dialog";
 import { useProducts } from "@/contexts/product-context";
 
-export function AddProductDialog({ children }) {
+export function AddProductDialog({ children, open: externalOpen, onOpenChange: externalOnOpenChange }) {
   const { addProduct, addProductTransaction } = useProducts();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = externalOnOpenChange || setInternalOpen;
+  
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -99,7 +103,7 @@ export function AddProductDialog({ children }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="sm:max-w-[425px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Product/Project</DialogTitle>

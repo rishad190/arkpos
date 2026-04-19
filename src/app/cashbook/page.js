@@ -976,6 +976,13 @@ export default function CashBookPage() {
                                          </Badge>
                                       )}
                                     </div>
+                                    {t.productName && (
+                                      <div className="text-xs text-muted-foreground">
+                                        Item: <span className="font-semibold">{t.productName}</span>
+                                        {t.productSoldQuantity && ` | Qty: ${t.productSoldQuantity}`}
+                                        {t.productSoldToCustomer && ` | Buyer: ${t.productSoldToCustomer}`}
+                                      </div>
+                                    )}
                                     <div className="text-xs text-muted-foreground flex items-center gap-2">
                                       <Badge variant="secondary" className="text-[10px] h-5 px-1">{t.category}</Badge>
                                       {t.paymentMode && <span>• {t.paymentMode.toUpperCase()}</span>}
@@ -1018,6 +1025,13 @@ export default function CashBookPage() {
                                          </Badge>
                                       )}
                                     </div>
+                                    {t.productName && (
+                                      <div className="text-xs text-muted-foreground">
+                                        Item: <span className="font-semibold">{t.productName}</span>
+                                        {t.productSoldQuantity && ` | Qty: ${t.productSoldQuantity}`}
+                                        {t.productSoldToCustomer && ` | Buyer: ${t.productSoldToCustomer}`}
+                                      </div>
+                                    )}
                                     <div className="text-xs text-muted-foreground flex items-center gap-2">
                                       <Badge variant="secondary" className="text-[10px] h-5 px-1">{t.category}</Badge>
                                       {t.paymentMode && <span>• {t.paymentMode.toUpperCase()}</span>}
