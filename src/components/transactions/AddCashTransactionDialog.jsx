@@ -28,15 +28,19 @@ import { useLoans } from "@/contexts/loan-context";
 import { useProducts } from "@/contexts/product-context";
 import { CASH_TRANSACTION_CATEGORIES } from "@/lib/constants";
 import { numberToWords } from "@/lib/utils";
-import { TrashIcon, Search } from "lucide-react";
+import { TrashIcon, Search, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { AddProductDialog } from "@/components/products/AddProductDialog";
 import { AddCustomerDialog } from "@/components/customers/AddCustomerDialog";
+import { AddSupplierDialog } from "@/components/inventory/AddSupplierDialog";
+import { useInventory } from "@/contexts/inventory-context";
 
 export function AddCashTransactionDialog({ onAddTransaction, children }) {
   const { transactionCategories, addCategory, deleteCategory, addTransaction } = useTransactions();
   const { customers } = useCustomers();
   const { loans, addLoanTransaction } = useLoans();
   const { products, addProductTransaction } = useProducts();
+  const { suppliers, addSupplierTransaction } = useInventory();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("income");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
@@ -44,11 +48,13 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
   // Modals state
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [showAddSupplier, setShowAddSupplier] = useState(false);
 
   // Search states
   const [customerSearch, setCustomerSearch] = useState("");
   const [productCustomerSearch, setProductCustomerSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
+  const [supplierSearch, setSupplierSearch] = useState("");
   
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
@@ -62,10 +68,11 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
     loanAction: "PRINCIPAL",
     productId: "none",
     productAction: "PRODUCT_COST",
-    productPartnerName: "",
+    supplierId: "none",
+    selectedProducts: [],
     productSoldQuantity: "",
     productSoldColor: "",
-    productSoldToCustomer: "",
+    productSoldToCustomer: "none",
     transferType: "deposit", // 'deposit' (Cash->Bank) or 'withdraw' (Bank->Cash)
   });
 
@@ -89,7 +96,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
 
   // Reset category when switching tabs
   useEffect(() => {
-    setFormData(prev => ({ ...prev, category: "", description: "", customerId: "none", productPartnerName: "" }));
+    setFormData(prev => ({ ...prev, category: "", description: "", customerId: "none", supplierId: "none", selectedProducts: [] }));
     setIsCustomCategory(false);
   }, [activeTab]);
 
@@ -122,10 +129,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         return;
       }
 
-      if (isProductTransaction && (!formData.productId || formData.productId === "none")) {
-        alert("Please select a product.");
-        return;
-      }
+      // Removed old isProductTransaction validation since it's handled in the specific block below
 
       if (isCustomerPayment) {
         // Handle Customer Payment specific routing
@@ -186,72 +190,132 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         };
         await onAddTransaction(transaction);
       } else if (isProductTransaction) {
-        // Handle Product Activity routing
-        const product = products.find(p => p.id === formData.productId);
-
-        if (addProductTransaction) {
-           await addProductTransaction(formData.productId, {
-               type: formData.productAction,
-               amount: amount,
-               date: formData.date,
-               partnerName: formData.productPartnerName,
-               note: formData.description,
-               ...(formData.productAction === 'PRODUCT_SALE' && {
-                  soldQuantity: formData.productSoldQuantity || "",
-                  soldColor: formData.productSoldColor || "",
-                  soldToCustomer: formData.productSoldToCustomer || ""
-               })
-           });
+        // Validation for new flows
+        if (formData.productAction !== 'PARTNER_PAYOUT' && (!formData.productId || formData.productId === "none")) {
+          alert("Please select a product.");
+          return;
+        }
+        if (formData.productAction === 'PARTNER_PAYOUT' && formData.selectedProducts.length === 0) {
+          alert("Please select at least one product for the payout.");
+          return;
+        }
+        if ((formData.productAction === 'PARTNER_INVESTMENT' || formData.productAction === 'PARTNER_PAYOUT') && (!formData.supplierId || formData.supplierId === "none")) {
+          alert("Please select a partner/supplier.");
+          return;
         }
 
-        // Connect PRODUCT_SALE to specific Customer's ledger if provided
-        if (formData.productAction === 'PRODUCT_SALE' && formData.productSoldToCustomer) {
-            const matchedCustomer = customers?.find(c => c.name?.trim().toLowerCase() === formData.productSoldToCustomer?.trim().toLowerCase());
-            if (matchedCustomer && addTransaction) {
-                const customerLedgerTx = {
-                    customerId: matchedCustomer.id,
-                    date: formData.date,
-                    memoNumber: formData.reference || `PSALE-${Date.now()}`,
-                    total: amount,       // Goods sold value
-                    deposit: amount,     // Cash received right now (since it's a cashbook entry)
-                    due: 0,
-                    type: "sale",
-                    details: formData.description || `Cash Product Sale: ${product?.name}`,
-                };
-                await addTransaction(customerLedgerTx);
-            }
-        }
+        const product = formData.productAction !== 'PARTNER_PAYOUT' ? products.find(p => p.id === formData.productId) : null;
+        const supplier = (formData.productAction === 'PARTNER_INVESTMENT' || formData.productAction === 'PARTNER_PAYOUT') ? suppliers.find(s => s.id === formData.supplierId) : null;
 
-        let generatedDesc = `Product Activity: ${product?.name}`;
-        if (formData.productAction === 'PRODUCT_SALE') {
-            generatedDesc = `Product Sale: ${product?.name}`;
-            const extraTags = [];
-            if (formData.productSoldToCustomer) extraTags.push(`To: ${formData.productSoldToCustomer}`);
-            if (formData.productSoldQuantity) extraTags.push(`Qty: ${formData.productSoldQuantity}`);
-            
-            if (extraTags.length > 0) {
-                generatedDesc += ` (${extraTags.join(', ')})`;
-            }
-        } else if (formData.productAction === 'PARTNER_INVESTMENT' || formData.productAction === 'PARTNER_PAYOUT') {
-            generatedDesc = `Product ${formData.productAction === 'PARTNER_PAYOUT' ? 'Payout' : 'Investment'}: ${product?.name} (${formData.productPartnerName})`;
-        }
+        // Handle PARTNER_PAYOUT (Multi-Product)
+        if (formData.productAction === 'PARTNER_PAYOUT') {
+           const productNames = formData.selectedProducts.map(pid => products.find(p => p.id === pid)?.name).filter(Boolean);
+           const detailsDesc = formData.description || `Payout for products: ${productNames.join(', ')}`;
+           
+           // Based on user request, payouts are only recorded in the Supplier page, not individual product ledgers,
+           // to prevent double-counting the deduction if multiple products are selected.
+           
+           if (addSupplierTransaction && supplier) {
+               await addSupplierTransaction({
+                   supplierId: supplier.id,
+                   date: formData.date,
+                   totalAmount: 0,
+                   paidAmount: amount, // Paying them back reduces their due
+                   details: detailsDesc,
+                   invoiceNumber: formData.reference || `PAYOUT-${Date.now()}`
+               });
+           }
 
-        const transaction = {
-          type: activeTab,
-          date: formData.date,
-          amount: amount,
-          description: formData.description || generatedDesc,
-          reference: formData.reference,
-          category: formData.category,
-          paymentMode: formData.paymentMode,
-          productId: formData.productId,
-          productName: product?.name,
-          productAction: formData.productAction,
-          productSoldQuantity: formData.productSoldQuantity || "",
-          productSoldColor: formData.productSoldColor || "",
-          productSoldToCustomer: formData.productSoldToCustomer || "",
-        };
-        await onAddTransaction(transaction);
+           const transaction = {
+              type: activeTab,
+              date: formData.date,
+              amount: amount,
+              description: detailsDesc,
+              reference: formData.reference,
+              category: formData.category,
+              paymentMode: formData.paymentMode,
+              productAction: formData.productAction,
+              supplierId: formData.supplierId,
+           };
+           await onAddTransaction(transaction);
+        } else {
+           // Handle Single Product Actions (INVESTMENT, COST, SALE, OTHER)
+           if (addProductTransaction) {
+              await addProductTransaction(formData.productId, {
+                  type: formData.productAction,
+                  amount: amount,
+                  date: formData.date,
+                  partnerName: supplier?.name || "",
+                  note: formData.description,
+                  ...(formData.productAction === 'PRODUCT_SALE' && {
+                     soldQuantity: formData.productSoldQuantity || "",
+                     soldColor: formData.productSoldColor || "",
+                     soldToCustomer: formData.productSoldToCustomer || ""
+                  })
+              });
+           }
+
+           if (formData.productAction === 'PARTNER_INVESTMENT' && addSupplierTransaction && supplier) {
+               await addSupplierTransaction({
+                   supplierId: supplier.id,
+                   date: formData.date,
+                   totalAmount: amount, // Investment increases what we owe them
+                   paidAmount: 0,
+                   details: formData.description || `Product invest cost for ${product?.name}`,
+                   invoiceNumber: formData.reference || `INV-${Date.now()}`
+               });
+           }
+
+           // Connect PRODUCT_SALE to specific Customer's ledger if provided
+           if (formData.productAction === 'PRODUCT_SALE' && formData.productSoldToCustomer && formData.productSoldToCustomer !== "none") {
+               const matchedCustomer = customers?.find(c => c.name?.trim().toLowerCase() === formData.productSoldToCustomer?.trim().toLowerCase());
+               if (matchedCustomer && addTransaction) {
+                   const customerLedgerTx = {
+                       customerId: matchedCustomer.id,
+                       date: formData.date,
+                       memoNumber: formData.reference || `PSALE-${Date.now()}`,
+                       total: amount,       // Goods sold value
+                       deposit: amount,     // Cash received right now
+                       due: 0,
+                       type: "sale",
+                       details: formData.description || `Cash Product Sale: ${product?.name}`,
+                   };
+                   await addTransaction(customerLedgerTx);
+               }
+           }
+
+           let generatedDesc = `Product Activity: ${product?.name}`;
+           if (formData.productAction === 'PRODUCT_SALE') {
+               generatedDesc = `Product Sale: ${product?.name}`;
+               const extraTags = [];
+               if (formData.productSoldToCustomer && formData.productSoldToCustomer !== "none") extraTags.push(`To: ${formData.productSoldToCustomer}`);
+               if (formData.productSoldQuantity) extraTags.push(`Qty: ${formData.productSoldQuantity}`);
+               
+               if (extraTags.length > 0) {
+                   generatedDesc += ` (${extraTags.join(', ')})`;
+               }
+           } else if (formData.productAction === 'PARTNER_INVESTMENT') {
+               generatedDesc = `Product Investment: ${product?.name} (${supplier?.name})`;
+           }
+
+           const transaction = {
+             type: activeTab,
+             date: formData.date,
+             amount: amount,
+             description: formData.description || generatedDesc,
+             reference: formData.reference,
+             category: formData.category,
+             paymentMode: formData.paymentMode,
+             productId: formData.productId,
+             productName: product?.name,
+             productAction: formData.productAction,
+             supplierId: formData.supplierId,
+             productSoldQuantity: formData.productSoldQuantity || "",
+             productSoldColor: formData.productSoldColor || "",
+             productSoldToCustomer: formData.productSoldToCustomer === "none" ? "" : formData.productSoldToCustomer,
+           };
+           await onAddTransaction(transaction);
+        }
       } else {
         // Standard Cashbook routing
         const transaction = {
@@ -298,7 +362,9 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         customerId: "none",
         productSoldQuantity: "",
         productSoldColor: "",
-        productSoldToCustomer: "",
+        productSoldToCustomer: "none",
+        supplierId: "none",
+        selectedProducts: [],
       }));
       // Keep category and isCustomCategory state for faster entry unless it was a customer payment
       if (isCustomerPayment) {
@@ -477,49 +543,10 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
           {formData.category === 'Product Activity' && (
              <div className="pt-2 space-y-4">
                <div>
-                  <Label htmlFor="product">Select Product / Project</Label>
-                  <Select
-                    value={formData.productId}
-                    onValueChange={(value) => {
-                      if (value === "ADD_NEW_PRODUCT") {
-                        setShowAddProduct(true);
-                      } else {
-                        setFormData(prev => ({ ...prev, productId: value }));
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Choose a product" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <div className="flex items-center px-3 py-2 sticky top-0 bg-popover z-10 border-b">
-                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                        <input
-                          className="flex h-8 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                          placeholder="Search product..."
-                          value={productSearch}
-                          onChange={(e) => setProductSearch(e.target.value)}
-                          onKeyDown={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      <SelectItem value="none" disabled>Select Product</SelectItem>
-                      <SelectItem value="ADD_NEW_PRODUCT" className="text-primary font-medium focus:bg-primary/10 focus:text-primary">
-                        + Add New Product
-                      </SelectItem>
-                      {products.filter(p => p.name?.toLowerCase().includes(productSearch.toLowerCase())).map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-               </div>
-               
-               <div>
                    <Label>Nature of Cashflow</Label>
                    <Select
                      value={formData.productAction}
-                     onValueChange={(value) => setFormData(prev => ({ ...prev, productAction: value, productPartnerName: "" }))}
+                     onValueChange={(value) => setFormData(prev => ({ ...prev, productAction: value, supplierId: "none", selectedProducts: [], productId: "none" }))}
                    >
                        <SelectTrigger className="mt-2">
                            <SelectValue placeholder="Select type" />
@@ -540,44 +567,133 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                        </SelectContent>
                    </Select>
                </div>
-               
-               {formData.productAction === 'PARTNER_INVESTMENT' && (
+
+               {/* Partner Selection for Investment & Payout */}
+               {(formData.productAction === 'PARTNER_INVESTMENT' || formData.productAction === 'PARTNER_PAYOUT') && (
                  <div>
-                   <Label>Partner Name</Label>
-                   <Input 
-                     className="mt-2"
-                     list="global-partner-names-list"
-                     placeholder="Name of Partner..."
-                     value={formData.productPartnerName || ''}
-                     onChange={(e) => setFormData(prev => ({ ...prev, productPartnerName: e.target.value }))}
-                     required
-                   />
-                   <datalist id="global-partner-names-list">
-                     {Object.keys(products.find(p => p.id === formData.productId)?.partners || {}).map(name => (
-                         <option key={name} value={name} />
-                     ))}
-                   </datalist>
+                   <Label>Select Partner/Supplier</Label>
+                   <Select 
+                     value={formData.supplierId || "none"}
+                     onValueChange={(v) => {
+                       if (v === "ADD_NEW_SUPPLIER") {
+                         setShowAddSupplier(true);
+                       } else {
+                         setFormData(prev => ({ ...prev, supplierId: v === "none" ? "" : v }));
+                       }
+                     }}
+                   >
+                     <SelectTrigger className="mt-2"><SelectValue placeholder="Choose partner/supplier..." /></SelectTrigger>
+                     <SelectContent>
+                       <div className="flex items-center px-3 py-2 sticky top-0 bg-popover z-10 border-b">
+                         <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                         <input
+                           className="flex h-8 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                           placeholder="Search partner/supplier..."
+                           value={supplierSearch}
+                           onChange={(e) => setSupplierSearch(e.target.value)}
+                           onKeyDown={(e) => e.stopPropagation()}
+                         />
+                       </div>
+                       <SelectItem value="none" disabled>Select Partner/Supplier</SelectItem>
+                       <SelectItem value="ADD_NEW_SUPPLIER" className="text-primary font-medium focus:bg-primary/10 focus:text-primary">
+                         + Add New Partner/Supplier
+                       </SelectItem>
+                       {suppliers?.filter(s => s.name?.toLowerCase().includes(supplierSearch.toLowerCase())).map((s) => (
+                           <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                       ))}
+                     </SelectContent>
+                   </Select>
                  </div>
                )}
 
+               {/* Single Product Selection (For everything EXCEPT Partner Payout) */}
+               {formData.productAction !== 'PARTNER_PAYOUT' && (
+                 <div>
+                    <Label htmlFor="product">Select Product / Project</Label>
+                    <Select
+                      value={formData.productId}
+                      onValueChange={(value) => {
+                        if (value === "ADD_NEW_PRODUCT") {
+                          setShowAddProduct(true);
+                        } else {
+                          setFormData(prev => ({ ...prev, productId: value }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Choose a product" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <div className="flex items-center px-3 py-2 sticky top-0 bg-popover z-10 border-b">
+                          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                          <input
+                            className="flex h-8 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                            placeholder="Search product..."
+                            value={productSearch}
+                            onChange={(e) => setProductSearch(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        <SelectItem value="none" disabled>Select Product</SelectItem>
+                        <SelectItem value="ADD_NEW_PRODUCT" className="text-primary font-medium focus:bg-primary/10 focus:text-primary">
+                          + Add New Product
+                        </SelectItem>
+                        {products.filter(p => p.name?.toLowerCase().includes(productSearch.toLowerCase())).map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                 </div>
+               )}
+
+               {/* Multi Product Selection (For Partner Payout) */}
                {formData.productAction === 'PARTNER_PAYOUT' && (
                  <div>
-                   <Label>Select Partner</Label>
-                   <Select 
-                     value={formData.productPartnerName || ''}
-                     onValueChange={(v) => setFormData(prev => ({ ...prev, productPartnerName: v }))}
-                     required
-                   >
-                     <SelectTrigger className="mt-2"><SelectValue placeholder="Choose partner..." /></SelectTrigger>
-                     <SelectContent>
-                         {Object.keys(products.find(p => p.id === formData.productId)?.partners || {}).length === 0 && (
-                            <SelectItem value="none" disabled>No active partners</SelectItem>
-                         )}
-                         {Object.keys(products.find(p => p.id === formData.productId)?.partners || {}).map(name => (
-                             <SelectItem key={name} value={name}>{name}</SelectItem>
-                         ))}
-                     </SelectContent>
-                   </Select>
+                    <Label>Select Product(s) for Payback</Label>
+                    <Select 
+                      value="none" 
+                      onValueChange={(val) => {
+                         if (val === "ADD_NEW_PRODUCT") {
+                            setShowAddProduct(true);
+                         } else if (val !== "none" && !formData.selectedProducts.includes(val)) {
+                             setFormData(prev => ({ ...prev, selectedProducts: [...prev.selectedProducts, val] }));
+                         }
+                      }}
+                    >
+                        <SelectTrigger className="mt-2"><SelectValue placeholder="Add product..." /></SelectTrigger>
+                        <SelectContent>
+                          <div className="flex items-center px-3 py-2 sticky top-0 bg-popover z-10 border-b">
+                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                            <input
+                              className="flex h-8 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                              placeholder="Search product..."
+                              value={productSearch}
+                              onChange={(e) => setProductSearch(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          <SelectItem value="none" disabled>Select Product to Add</SelectItem>
+                          <SelectItem value="ADD_NEW_PRODUCT" className="text-primary font-medium focus:bg-primary/10 focus:text-primary">
+                            + Add New Product
+                          </SelectItem>
+                          {products.filter(p => p.name?.toLowerCase().includes(productSearch.toLowerCase()) && !formData.selectedProducts.includes(p.id)).map((p) => (
+                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                    </Select>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                       {formData.selectedProducts.map(pid => {
+                           const prod = products.find(p => p.id === pid);
+                           return (
+                               <Badge key={pid} variant="secondary" className="flex items-center gap-1 text-sm py-1 px-2">
+                                  {prod?.name}
+                                  <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => setFormData(prev => ({ ...prev, selectedProducts: prev.selectedProducts.filter(id => id !== pid) }))} />
+                               </Badge>
+                           )
+                       })}
+                    </div>
                  </div>
                )}
 
@@ -783,6 +899,10 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
     <AddCustomerDialog 
        open={showAddCustomer} 
        onOpenChange={setShowAddCustomer} 
+    />
+    <AddSupplierDialog
+       open={showAddSupplier}
+       onOpenChange={setShowAddSupplier}
     />
     </>
   );

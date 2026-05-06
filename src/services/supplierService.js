@@ -326,10 +326,8 @@ export class SupplierService {
         addError(result, paidError.field, paidError.message);
       }
 
-      // Validate that paidAmount doesn't exceed totalAmount
-      if (transactionData.totalAmount != null && transactionData.paidAmount > transactionData.totalAmount) {
-        addError(result, 'paidAmount', 'Paid amount cannot exceed total amount');
-      }
+      // Removed validation that paidAmount doesn't exceed totalAmount
+      // This allows for pure payouts/payments where totalAmount = 0 and paidAmount > 0.
     }
 
     return result;
