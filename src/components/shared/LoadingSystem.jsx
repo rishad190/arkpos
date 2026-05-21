@@ -182,7 +182,7 @@ export function OverlayLoading({
 }) {
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg border flex items-center space-x-3">
+      <div className="bg-card/85 backdrop-blur-md text-card-foreground p-6 rounded-lg shadow-lg border border-border/50 flex items-center space-x-3">
         {showSpinner && <LoadingSpinner size="md" />}
         <span className="text-sm font-medium">{message}</span>
       </div>

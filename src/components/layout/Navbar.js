@@ -74,7 +74,7 @@ export function Navbar() {
   ];
 
   return (
-    <nav className="bg-white border-b sticky top-0 z-50">
+    <nav className="bg-background/80 backdrop-blur-md border-b border-border/40 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
@@ -86,7 +86,7 @@ export function Navbar() {
                 height={40}
                 className="rounded-md"
               />
-              <span className="ml-2 text-xl md:text-2xl font-semibold text-gray-800">
+              <span className="ml-2 text-xl md:text-2xl font-semibold text-foreground">
                 ARK Enterprise
               </span>
             </Link>
@@ -101,8 +101,8 @@ export function Navbar() {
                   href={item.href}
                   className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-gray-700 hover:bg-gray-100"
+                      ? "bg-primary text-primary-foreground animate-pulse-subtle"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
                   }`}
                 >
                   <item.icon className="h-4 w-4 mr-2" />
@@ -115,7 +115,7 @@ export function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+                    className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80"
                   >
                     More
                   </Button>
@@ -130,7 +130,7 @@ export function Navbar() {
                           className={`flex items-center ${
                             isActive
                               ? "bg-accent text-accent-foreground"
-                              : "text-gray-700"
+                              : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
                           <item.icon className="h-4 w-4 mr-2" />

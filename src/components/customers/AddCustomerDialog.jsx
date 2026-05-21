@@ -71,11 +71,11 @@ export function AddCustomerDialog({ open, onOpenChange, onClose }) {
     validateCustomer,
     async (data) => {
       try {
-        await addCustomer({
+        const result = await addCustomer({
           ...data,
           createdAt: new Date().toISOString(),
         });
-        onClose?.();
+        onClose?.(result);
         return true;
       } catch (error) {
         throw new Error(error.message || "Failed to add customer");
