@@ -13,6 +13,21 @@ import { AppError } from '@/lib/errors';
  */
 export function requireAuth() {
   if (!auth) {
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem("arkpos_mock_user");
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          return {
+            ...user,
+            getIdToken: () => Promise.resolve("mock-token"),
+            getIdTokenResult: () => Promise.resolve({ authTime: new Date().toISOString() }),
+          };
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
     throw new AppError(
       'Firebase authentication is not initialized',
       'PERMISSION',
@@ -66,7 +81,13 @@ export async function getAuthToken() {
  * @returns {boolean} True if user is authenticated
  */
 export function isAuthenticated() {
-  return auth && auth.currentUser !== null;
+  if (!auth) {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem("arkpos_mock_user") !== null;
+    }
+    return false;
+  }
+  return auth.currentUser !== null;
 }
 
 /**

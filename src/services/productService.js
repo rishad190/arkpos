@@ -8,6 +8,7 @@ import {
   orderByChild,
   serverTimestamp,
 } from "firebase/database";
+import { AppError, ERROR_TYPES } from "@/lib/errors";
 
 const PRODUCTS_PATH = "products";
 
@@ -17,6 +18,12 @@ export class ProductService {
     this.logger = logger;
   }
 
+  checkDb() {
+    if (!this.db) {
+      throw new AppError("Database is not initialized. Firebase features are disabled.", ERROR_TYPES.NETWORK);
+    }
+  }
+
   /**
    * Add a new product/project
    * @param {Object} productData
@@ -24,6 +31,7 @@ export class ProductService {
    */
   async addProduct(productData) {
     try {
+      this.checkDb();
       const productsRef = ref(this.db, PRODUCTS_PATH);
       const newProductRef = push(productsRef);
       
@@ -49,6 +57,7 @@ export class ProductService {
    */
   async updateProduct(id, updates) {
     try {
+      this.checkDb();
       const productRef = ref(this.db, `${PRODUCTS_PATH}/${id}`);
       await update(productRef, {
         ...updates,
@@ -67,6 +76,7 @@ export class ProductService {
    */
   async deleteProduct(id) {
     try {
+      this.checkDb();
       const productRef = ref(this.db, `${PRODUCTS_PATH}/${id}`);
       await remove(productRef);
       this.logger.info(`Product deleted: ${id}`);
@@ -82,6 +92,10 @@ export class ProductService {
    * @returns {Function} unsubscribe
    */
   subscribeToProducts(callback) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const productsRef = ref(this.db, PRODUCTS_PATH);
     const q = query(productsRef, orderByChild("createdAt"));
 
@@ -120,6 +134,7 @@ export class ProductService {
    */
   async addProductTransaction(productId, transactionData) {
     try {
+      this.checkDb();
       const txRef = push(ref(this.db, `${PRODUCTS_PATH}/${productId}/transactions`));
       await update(txRef, {
         ...transactionData,
@@ -141,6 +156,7 @@ export class ProductService {
    */
   async updateProductTransaction(productId, transactionId, updates) {
     try {
+      this.checkDb();
       const txRef = ref(this.db, `${PRODUCTS_PATH}/${productId}/transactions/${transactionId}`);
       await update(txRef, {
         ...updates,
@@ -160,6 +176,7 @@ export class ProductService {
    */
   async deleteProductTransaction(productId, transactionId) {
     try {
+      this.checkDb();
       const txRef = ref(this.db, `${PRODUCTS_PATH}/${productId}/transactions/${transactionId}`);
       await remove(txRef);
       this.logger.info(`Product transaction deleted: ${transactionId} from product ${productId}`);

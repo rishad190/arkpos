@@ -46,6 +46,12 @@ export class TransactionService {
     this.atomicOperations = atomicOperations;
   }
 
+  checkDb() {
+    if (!this.db) {
+      throw new AppError("Database is not initialized. Firebase features are disabled.", ERROR_TYPES.NETWORK);
+    }
+  }
+
   /**
    * Subscribe to real-time transaction updates
    * @param {TransactionCallback} callback - Function called with updated transactions
@@ -56,6 +62,10 @@ export class TransactionService {
    * @returns {Unsubscribe} Function to unsubscribe
    */
   subscribeToTransactions(callback, options = {}) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const transactionsRef = ref(this.db, COLLECTION_PATH);
     let q = query(transactionsRef, orderByChild("createdAt"));
 
@@ -94,6 +104,10 @@ export class TransactionService {
    * @returns {Unsubscribe} Function to unsubscribe
    */
   subscribeToCustomerTransactions(customerId, callback) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const transactionsRef = ref(this.db, COLLECTION_PATH);
     const q = query(transactionsRef, orderByChild("customerId"), equalTo(customerId));
 
@@ -125,6 +139,7 @@ export class TransactionService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async addTransaction(transactionData) {
+    this.checkDb();
     // Validate authentication
     requireAuth();
 
@@ -190,6 +205,7 @@ export class TransactionService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async updateTransaction(transactionId, updatedData) {
+    this.checkDb();
     // Validate authentication
     requireAuth();
 
@@ -268,6 +284,7 @@ export class TransactionService {
    * @returns {Promise<void>}
    */
   async deleteTransaction(transactionId) {
+    this.checkDb();
     // Validate authentication
     requireAuth();
 
@@ -598,6 +615,7 @@ export class TransactionService {
    * @returns {Promise<string>} The new payment transaction ID
    */
   async addPaymentToMemo(memoNumber, paymentData, customerId) {
+    this.checkDb();
     // Validate authentication
     requireAuth();
 

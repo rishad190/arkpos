@@ -91,6 +91,10 @@ export function useAtomicOperations() {
 
   // Connection monitoring and offline queue processing
   useEffect(() => {
+    if (!db) {
+      dispatch({ type: "SET_CONNECTION_STATE", payload: "disconnected" });
+      return;
+    }
     const connectedRef = ref(db, ".info/connected");
     const unsubscribe = onValue(connectedRef, (snapshot) => {
       const connected = snapshot.val();

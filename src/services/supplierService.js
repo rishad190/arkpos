@@ -34,12 +34,22 @@ export class SupplierService {
     this.atomicOperations = atomicOperations;
   }
 
+  checkDb() {
+    if (!this.db) {
+      throw new AppError("Database is not initialized. Firebase features are disabled.", ERROR_TYPES.NETWORK);
+    }
+  }
+
   /**
    * Subscribe to supplier updates
    * @param {Function} callback - Function called with updated supplier list
    * @returns {Function} Unsubscribe function
    */
   subscribeToSuppliers(callback) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const suppliersRef = ref(this.db, COLLECTION_PATH);
     return onValue(suppliersRef, (snapshot) => {
       const data = snapshot.val();
@@ -64,6 +74,10 @@ export class SupplierService {
    * @returns {Function} Unsubscribe function
    */
   subscribeToSupplierTransactions(callback) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const transactionsRef = ref(this.db, SUPPLIER_TRANSACTIONS_PATH);
     return onValue(transactionsRef, (snapshot) => {
       const data = snapshot.val();
@@ -89,6 +103,7 @@ export class SupplierService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async addSupplier(supplierData) {
+    this.checkDb();
     const validationResult = this.validateSupplierData(supplierData);
     if (!validationResult.isValid) {
       throw new AppError(
@@ -118,6 +133,7 @@ export class SupplierService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async updateSupplier(supplierId, updatedData) {
+    this.checkDb();
     const validationResult = this.validateSupplierData(updatedData);
     if (!validationResult.isValid) {
       throw new AppError(
@@ -143,6 +159,7 @@ export class SupplierService {
    * @throws {AppError} If supplier not found or database operation fails
    */
   async deleteSupplier(supplierId) {
+    this.checkDb();
     return this.atomicOperations.execute("deleteSupplier", async () => {
       const supplierRef = ref(this.db, `${COLLECTION_PATH}/${supplierId}`);
       const supplierSnapshot = await get(supplierRef);
@@ -167,6 +184,7 @@ export class SupplierService {
    * @returns {Promise<{calculated: number, stored: number, isValid: boolean}>} Due calculation result
    */
   async calculateAndValidateSupplierDue(supplierId, supplierTransactions = []) {
+    this.checkDb();
     return this.atomicOperations.execute("calculateSupplierDue", async () => {
       // Get supplier data
       const supplierRef = ref(this.db, `${COLLECTION_PATH}/${supplierId}`);
@@ -218,6 +236,7 @@ export class SupplierService {
    * @returns {Promise<void>}
    */
   async updateSupplierTotalDue(supplierId, supplierTransactions = []) {
+    this.checkDb();
     return this.atomicOperations.execute("updateSupplierTotalDue", async () => {
       const calculatedTotalDue = supplierTransactions
         .filter((t) => t.supplierId === supplierId)
@@ -339,6 +358,7 @@ export class SupplierService {
    * @returns {Promise<string>}
    */
   async addSupplierTransaction(transactionData) {
+    this.checkDb();
     const validationResult = this.validateSupplierTransactionData(transactionData);
     if (!validationResult.isValid) {
       throw new AppError(
@@ -385,6 +405,7 @@ export class SupplierService {
    * @returns {Promise<void>}
    */
   async updateSupplierTransaction(transactionId, updatedData) {
+     this.checkDb();
      return this.atomicOperations.execute("updateSupplierTransaction", async () => {
        const transactionRef = ref(this.db, `${SUPPLIER_TRANSACTIONS_PATH}/${transactionId}`);
        const snapshot = await get(transactionRef);
@@ -430,6 +451,7 @@ export class SupplierService {
    * @returns {Promise<void>}
    */
   async deleteSupplierTransaction(transactionId, supplierId, amount, paidAmount) {
+    this.checkDb();
     return this.atomicOperations.execute("deleteSupplierTransaction", async () => {
       await remove(ref(this.db, `${SUPPLIER_TRANSACTIONS_PATH}/${transactionId}`));
       

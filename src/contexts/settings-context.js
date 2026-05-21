@@ -69,6 +69,10 @@ export function SettingsProvider({ children }) {
 
   // Subscribe to store balance from Firebase
   useEffect(() => {
+    if (!db) {
+      setStoreBalance({ cash: 0, bank: 0 });
+      return;
+    }
     const balanceRef = ref(db, "settings/store/balance");
     const unsubscribe = onValue(balanceRef, (snapshot) => {
       const data = snapshot.val();

@@ -33,6 +33,12 @@ export class CashTransactionService {
     this.atomicOperations = atomicOperations;
   }
 
+  checkDb() {
+    if (!this.db) {
+      throw new AppError("Database is not initialized. Firebase features are disabled.", ERROR_TYPES.NETWORK);
+    }
+  }
+
   /**
    * Subscribe to daily cash income
    * @param {Function} callback - Function called with updated income list
@@ -40,6 +46,10 @@ export class CashTransactionService {
    * @returns {Function} Unsubscribe function
    */
   subscribeToDailyCashIncome(callback) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const incomeRef = ref(this.db, DAILY_CASH_INCOME_PATH);
     const q = query(incomeRef, orderByChild("createdAt"));
 
@@ -69,6 +79,10 @@ export class CashTransactionService {
    * @returns {Function} Unsubscribe function
    */
   subscribeToDailyCashExpense(callback) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const expenseRef = ref(this.db, DAILY_CASH_EXPENSE_PATH);
     const q = query(expenseRef, orderByChild("createdAt"));
 
@@ -99,6 +113,7 @@ export class CashTransactionService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async addCashTransaction(cashTransactionData, relatedTransactionId = null) {
+    this.checkDb();
     const validationResult = this.validateCashTransactionData(cashTransactionData);
     if (!validationResult.isValid) {
       throw new AppError(
@@ -174,6 +189,7 @@ export class CashTransactionService {
     relatedTransactionId = null,
     previousCashAmount = 0
   ) {
+    this.checkDb();
     const validationResult = this.validateCashTransactionData(updatedData);
     if (!validationResult.isValid) {
       throw new AppError(
@@ -256,6 +272,7 @@ export class CashTransactionService {
    * @throws {AppError} If cash transaction not found or database operation fails
    */
   async deleteCashTransaction(cashTransactionId, reference = null) {
+    this.checkDb();
     return this.atomicOperations.execute("deleteCashTransaction", async () => {
       const updates = {};
       
@@ -375,6 +392,10 @@ export class CashTransactionService {
    * @returns {Function} Unsubscribe function
    */
   subscribeToCategories(callback) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const categoriesRef = ref(this.db, CATEGORIES_PATH);
     const q = query(categoriesRef, orderByChild("name"));
 
@@ -401,6 +422,7 @@ export class CashTransactionService {
    * @returns {Promise<string>} The new category ID
    */
   async addCategory(category) {
+    this.checkDb();
     // Validate
     if (!category.name || !category.type) {
       throw new Error("Category name and type are required");
@@ -435,6 +457,7 @@ export class CashTransactionService {
    * @returns {Promise<void>}
    */
   async deleteCategory(categoryId) {
+    this.checkDb();
     if (!categoryId) {
       throw new Error("Category ID is required");
     }
@@ -452,6 +475,7 @@ export class CashTransactionService {
    * @returns {Promise<string>} New transaction ID
    */
   async addAccountTransaction(transaction) {
+    this.checkDb();
     // Sanitize amount (remove commas and parse)
     let sanitizedAmount = transaction.amount;
     if (typeof sanitizedAmount === 'string') {
@@ -543,6 +567,7 @@ export class CashTransactionService {
    * @returns {Promise<void>}
    */
   async updateAccountTransaction(id, updatedTransaction) {
+    this.checkDb();
     if (!updatedTransaction.amount || updatedTransaction.amount <= 0) {
       throw new AppError(ERROR_TYPES.VALIDATION, "Amount must be positive", "amount");
     }
@@ -610,6 +635,7 @@ export class CashTransactionService {
    * @returns {Promise<void>}
    */
   async deleteAccountTransaction(id) {
+    this.checkDb();
     return this.atomicOperations.execute("deleteAccountTransaction", async () => {
        const transactionRef = ref(this.db, `${TRANSACTIONS_PATH}/${id}`);
        const snapshot = await get(transactionRef);

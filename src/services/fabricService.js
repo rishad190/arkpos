@@ -35,6 +35,12 @@ export class FabricService {
     this.logger = logger;
     this.atomicOperations = atomicOperations;
   }
+
+  checkDb() {
+    if (!this.db) {
+      throw new AppError("Database is not initialized. Firebase features are disabled.", ERROR_TYPES.NETWORK);
+    }
+  }
   /**
    * Subscribe to fabric updates
    * @param {Function} callback - Function called with updated fabric list
@@ -43,6 +49,10 @@ export class FabricService {
    * @returns {Function} Unsubscribe function
    */
   subscribeToFabrics(callback, options = {}) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const fabricsRef = ref(this.db, COLLECTION_PATH);
     let q = query(fabricsRef, orderByChild("createdAt"));
 
@@ -76,6 +86,7 @@ export class FabricService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async addFabric(fabricData) {
+    this.checkDb();
     const validationResult = this.validateFabricData(fabricData);
     if (!validationResult.isValid) {
       throw new AppError(
@@ -108,6 +119,7 @@ export class FabricService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async updateFabric(fabricId, updatedData) {
+    this.checkDb();
     const validationResult = this.validateFabricData(updatedData);
     if (!validationResult.isValid) {
       throw new AppError(
@@ -132,6 +144,7 @@ export class FabricService {
    * @returns {Promise<void>}
    */
   async deleteFabric(fabricId) {
+    this.checkDb();
     return this.atomicOperations.execute("deleteFabric", async () => {
       await remove(ref(this.db, `${COLLECTION_PATH}/${fabricId}`));
     });
@@ -144,6 +157,7 @@ export class FabricService {
    * @throws {AppError} If validation fails, fabric not found, or database operation fails
    */
   async addFabricBatch(batchData) {
+    this.checkDb();
     const validationResult = this.validateBatchData(batchData);
     if (!validationResult.isValid) {
       throw new AppError(
@@ -199,6 +213,7 @@ export class FabricService {
    * @throws {AppError} If validation fails, fabric/batch not found, or database operation fails
    */
   async updateFabricBatch(fabricId, batchId, updatedData) {
+    this.checkDb();
     const validationResult = this.validateBatchData(updatedData);
     if (!validationResult.isValid) {
       throw new AppError(
@@ -273,6 +288,7 @@ export class FabricService {
    * );
    */
   async reduceInventory(saleProducts, acquireBatchLock, releaseBatchLock) {
+    this.checkDb();
     return this.atomicOperations.execute("reduceInventory", async () => {
       const updatePromises = [];
       const lockedBatches = new Set(); // Track locked batches for cleanup

@@ -25,6 +25,7 @@ import {
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { AddCashTransactionDialog } from "@/components/transactions/AddCashTransactionDialog";
 import { EditCashTransactionDialog } from "@/components/transactions/EditCashTransactionDialog";
+import { LedgerExtractorDialog } from "@/components/transactions/LedgerExtractorDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,6 +50,7 @@ import {
   TrashIcon,
   DollarSign,
   Building2,
+  ScanLine,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -841,6 +843,15 @@ export default function CashBookPage() {
                     Add Transaction
                   </Button>
                 </AddCashTransactionDialog>
+                <LedgerExtractorDialog selectedDate={date}>
+                  <Button
+                    className="w-full md:w-auto bg-violet-600 hover:bg-violet-700 text-white border-none shadow-md hover:shadow-lg transition-all duration-300"
+                    disabled={loadingState.actions || isReconciled}
+                  >
+                    <ScanLine className="mr-2 h-4 w-4" />
+                    Scan Ledger (ছবি থেকে যোগ)
+                  </Button>
+                </LedgerExtractorDialog>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button

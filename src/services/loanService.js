@@ -9,6 +9,7 @@ import {
   get,
   serverTimestamp,
 } from "firebase/database";
+import { AppError, ERROR_TYPES } from "@/lib/errors";
 
 const LOANS_PATH = "loans";
 
@@ -18,6 +19,12 @@ export class LoanService {
     this.logger = logger;
   }
 
+  checkDb() {
+    if (!this.db) {
+      throw new AppError("Database is not initialized. Firebase features are disabled.", ERROR_TYPES.NETWORK);
+    }
+  }
+
   /**
    * Add a new loan
    * @param {Object} loanData
@@ -25,6 +32,7 @@ export class LoanService {
    */
   async addLoan(loanData) {
     try {
+      this.checkDb();
       const loansRef = ref(this.db, LOANS_PATH);
       const newLoanRef = push(loansRef);
       
@@ -50,6 +58,7 @@ export class LoanService {
    */
   async updateLoan(id, updates) {
     try {
+      this.checkDb();
       const loanRef = ref(this.db, `${LOANS_PATH}/${id}`);
       await update(loanRef, {
         ...updates,
@@ -68,6 +77,7 @@ export class LoanService {
    */
   async deleteLoan(id) {
     try {
+      this.checkDb();
       const loanRef = ref(this.db, `${LOANS_PATH}/${id}`);
       await remove(loanRef);
       this.logger.info(`Loan deleted: ${id}`);
@@ -83,6 +93,10 @@ export class LoanService {
    * @returns {Function} unsubscribe
    */
   subscribeToLoans(callback) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const loansRef = ref(this.db, LOANS_PATH);
     const q = query(loansRef, orderByChild("createdAt"));
 
@@ -121,6 +135,7 @@ export class LoanService {
    */
   async addLoanTransaction(loanId, transactionData) {
     try {
+      this.checkDb();
       const loanTxRef = push(ref(this.db, `${LOANS_PATH}/${loanId}/transactions`));
       await update(loanTxRef, {
         ...transactionData,
@@ -142,6 +157,7 @@ export class LoanService {
    */
   async updateLoanTransaction(loanId, transactionId, updates) {
     try {
+      this.checkDb();
       const loanTxRef = ref(this.db, `${LOANS_PATH}/${loanId}/transactions/${transactionId}`);
       await update(loanTxRef, {
         ...updates,
@@ -161,6 +177,7 @@ export class LoanService {
    */
   async deleteLoanTransaction(loanId, transactionId) {
     try {
+      this.checkDb();
       const loanTxRef = ref(this.db, `${LOANS_PATH}/${loanId}/transactions/${transactionId}`);
       await remove(loanTxRef);
       this.logger.info(`Loan transaction deleted: ${transactionId} from loan ${loanId}`);
