@@ -20,6 +20,9 @@ class BackupService {
    * Export all data from Firebase to a structured JSON format
    */
   async exportAllData() {
+    if (!db) {
+      throw new Error("Firebase database is not initialized. Cannot export data.");
+    }
     try {
       const backupData = {
         metadata: {

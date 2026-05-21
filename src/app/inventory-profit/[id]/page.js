@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { DollarSign, ShoppingCart, TrendingUp } from "lucide-react";
+import { DollarSign, ShoppingCart, TrendingUp, HelpCircle } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 export default function FabricProfitDetailPage() {
   const { id } = useParams();
@@ -59,14 +60,29 @@ export default function FabricProfitDetailPage() {
 
   return (
     <DataErrorBoundary>
-    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+      <TooltipProvider delayDuration={150}>
+        <div className="p-4 md:p-8 max-w-7xl mx-auto">
       <h1 className="text-3xl font-bold tracking-tight mb-2">{fabric.name}</h1>
       <p className="text-muted-foreground mb-8">{fabric.code}</p>
 
       <div className="grid gap-4 md:grid-cols-3 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+            <CardTitle className="text-sm font-medium flex items-center gap-1.5">
+              Total Profit
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                    <HelpCircle className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="font-normal text-xs text-left max-w-xs">
+                    Accumulated profit for this fabric, matching sales against chronological import batch costs (FIFO).
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -88,7 +104,21 @@ export default function FabricProfitDetailPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Profit Margin</CardTitle>
+            <CardTitle className="text-sm font-medium flex items-center gap-1.5">
+              Profit Margin
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                    <HelpCircle className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="font-normal text-xs text-left max-w-xs">
+                    Profit margin percentage calculated as (Total Profit ÷ Total Revenue) × 100.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -108,7 +138,23 @@ export default function FabricProfitDetailPage() {
                 <TableHead>Date</TableHead>
                 <TableHead>Transaction ID</TableHead>
                 <TableHead className="text-right">Quantity Sold</TableHead>
-                <TableHead className="text-right">Profit</TableHead>
+                <TableHead className="text-right">
+                  <span className="flex items-center justify-end gap-1.5">
+                    Profit
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                          <HelpCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="font-normal text-xs text-left max-w-xs">
+                          Profit for this transaction, calculated as revenue minus cost of goods sold from depleted FIFO batches.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -127,6 +173,7 @@ export default function FabricProfitDetailPage() {
         </CardContent>
       </Card>
     </div>
+      </TooltipProvider>
     </DataErrorBoundary>
   );
 }

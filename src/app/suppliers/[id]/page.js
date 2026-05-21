@@ -1,7 +1,7 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import logger from "@/utils/logger";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useInventory } from "@/contexts/inventory-context";
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
@@ -63,6 +63,7 @@ export default function SupplierDetail() {
   const [loading, setLoading] = useState({
     action: false,
   });
+  const lastAttemptedReconcileVal = useRef(null);
 
   const supplier = useMemo(() => 
     suppliers?.find(s => s.id === params.id), 
@@ -225,42 +226,39 @@ export default function SupplierDetail() {
     return sum + (total - paid);
   }, 0);
 
-  if (typeof supplier?.totalDue !== "undefined") {
-    if (Math.abs((derivedTotalDue || 0) - (supplier.totalDue || 0)) > 0.001) {
-      console.warn(
-        "Supplier totalDue mismatch:",
-        { supplierId: params.id },
-        { supplierTotalDue: supplier.totalDue },
-        { computedTotalDue: derivedTotalDue },
-        { lastCumulative: cumulativeMap.lastBalance ?? 0 }
-      );
+  // Background auto-reconciliation of supplier outstanding balance
+  useEffect(() => {
+    if (
+      supplier &&
+      typeof supplier.totalDue !== "undefined" &&
+      Math.abs((derivedTotalDue || 0) - (supplier.totalDue || 0)) > 0.001 &&
+      !loading.action &&
+      lastAttemptedReconcileVal.current !== derivedTotalDue
+    ) {
+      lastAttemptedReconcileVal.current = derivedTotalDue;
+      
+      const reconcile = async () => {
+        try {
+          setLoading((prev) => ({ ...prev, action: true }));
+          await updateSupplier(params.id, {
+            ...supplier,
+            totalDue: derivedTotalDue,
+            updatedAt: new Date().toISOString(),
+          });
+          toast({
+            title: "Balance Reconciled",
+            description: `Supplier outstanding balance reconciled automatically in the background. Stored Total Due updated to ৳${derivedTotalDue.toLocaleString()}.`,
+          });
+        } catch (error) {
+          console.error("Auto-reconciliation failed:", error);
+        } finally {
+          setLoading((prev) => ({ ...prev, action: false }));
+        }
+      };
+      
+      reconcile();
     }
-  }
-
-  const handleFixTotalDue = async () => {
-    if (!window.confirm("Update stored Total Due to computed value?")) return;
-    try {
-      setLoading((prev) => ({ ...prev, action: true }));
-      await updateSupplier(params.id, {
-        ...supplier,
-        totalDue: derivedTotalDue,
-        updatedAt: new Date().toISOString(),
-      });
-      toast({
-        title: "Success",
-        description: "Supplier totalDue updated to computed value",
-      });
-    } catch (error) {
-      console.error("Failed to update supplier totalDue:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update supplier totalDue",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading((prev) => ({ ...prev, action: false }));
-    }
-  };
+  }, [supplier, derivedTotalDue, params.id, updateSupplier, loading.action, toast]);
 
 
 
@@ -447,26 +445,6 @@ export default function SupplierDetail() {
       </div>
 
       {/* Transactions Table */}
-      {typeof supplier?.totalDue !== "undefined" &&
-        Math.abs((derivedTotalDue || 0) - (supplier.totalDue || 0)) > 0.001 && (
-          <div className="mb-4 p-4 rounded-md bg-yellow-50 border border-yellow-200 text-sm flex items-start justify-between gap-4">
-            <div>
-              <strong>Warning:</strong> Computed total from transactions ( ৳
-              {derivedTotalDue.toLocaleString()}) does not match stored Total
-              Due ( ৳{(supplier.totalDue || 0).toLocaleString()}). Difference: ৳
-              {(derivedTotalDue - (supplier.totalDue || 0)).toLocaleString()}
-            </div>
-            <div className="flex-shrink-0">
-              <button
-                className="inline-flex items-center px-3 py-1.5 bg-primary text-white rounded-md"
-                onClick={handleFixTotalDue}
-                disabled={loading.action}
-              >
-                Fix Total Due
-              </button>
-            </div>
-          </div>
-        )}
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>

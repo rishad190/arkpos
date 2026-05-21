@@ -11,6 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { HelpCircle } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -156,6 +158,7 @@ export function EditPartnerProductDialog({ product, isOpen, onClose, onSave }) {
           onSubmit={handleSubmit}
           className="space-y-4 max-h-[70vh] overflow-y-auto pr-2"
         >
+          <TooltipProvider delayDuration={150}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="edit-productName">Product Name</Label>
@@ -218,7 +221,19 @@ export function EditPartnerProductDialog({ product, isOpen, onClose, onSave }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="edit-quantityMeter">Quantity (meter)</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="edit-quantityMeter">Quantity (meter)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>The total length of fabric in meters as imported.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Input
                 id="edit-quantityMeter"
                 name="quantityMeter"
@@ -236,7 +251,19 @@ export function EditPartnerProductDialog({ product, isOpen, onClose, onSave }) {
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-priceDollar">Price ($ per meter)</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="edit-priceDollar">Price ($ per meter)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>FOB (Free on Board) purchase price per meter in USD.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Input
                 id="edit-priceDollar"
                 name="priceDollar"
@@ -257,7 +284,19 @@ export function EditPartnerProductDialog({ product, isOpen, onClose, onSave }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="edit-dollarRate">Dollar Rate (Taka)</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="edit-dollarRate">Dollar Rate (Taka)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>The exchange rate for 1 USD to Bangladeshi Taka (BDT) at the time of purchase.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Input
                 id="edit-dollarRate"
                 name="dollarRate"
@@ -275,7 +314,19 @@ export function EditPartnerProductDialog({ product, isOpen, onClose, onSave }) {
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-premiumTaka">Premium (Taka)</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="edit-premiumTaka">Premium (Taka)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Premium, customs clearance, or duty fees paid in Taka (BDT).</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Input
                 id="edit-premiumTaka"
                 name="premiumTaka"
@@ -290,7 +341,19 @@ export function EditPartnerProductDialog({ product, isOpen, onClose, onSave }) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-otherCostTaka">Other Costs (Taka)</Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="edit-otherCostTaka">Other Costs (Taka)</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                    <HelpCircle className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Additional overhead costs (shipping, local transport, labor) in Taka (BDT).</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <Input
               id="edit-otherCostTaka"
               name="otherCostTaka"
@@ -306,6 +369,7 @@ export function EditPartnerProductDialog({ product, isOpen, onClose, onSave }) {
           {errors.submit && (
             <p className="text-sm text-red-500 mt-2">{errors.submit}</p>
           )}
+          </TooltipProvider>
         </form>
         <DialogFooter className="mt-4 pt-4 border-t">
           <Button

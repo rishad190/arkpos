@@ -26,7 +26,7 @@ export default function RootLayout({ children }) {
           <ProtectedRoute>
             <div className="flex flex-col min-h-screen">
               <Navbar />
-              <main className="flex-1 bg-gray-50">{children}</main>
+              <main className="flex-1 bg-background">{children}</main>
             </div>
           </ProtectedRoute>
         </ClientLayout>

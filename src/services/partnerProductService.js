@@ -10,12 +10,22 @@ class PartnerProductService {
     this.atomicOperations = atomicOperations;
   }
 
+  checkDb() {
+    if (!this.db) {
+      throw new AppError("Database is not initialized. Firebase features are disabled.", ERROR_TYPES.NETWORK);
+    }
+  }
+
   /**
    * Subscribe to partner product updates
    * @param {Function} callback - Function called with updated product list
    * @returns {Function} Unsubscribe function
    */
   subscribeToPartnerProducts(callback) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const itemsRef = ref(this.db, COLLECTION_PATH);
     return onValue(itemsRef, (snapshot) => {
       const data = snapshot.val();
@@ -37,6 +47,7 @@ class PartnerProductService {
   // --- Basic CRUD ---
 
   async create(data) {
+    this.checkDb();
     return this.atomicOperations.execute("createPartnerProduct", async () => {
       const itemsRef = ref(this.db, COLLECTION_PATH);
       const newItemRef = push(itemsRef);
@@ -48,6 +59,7 @@ class PartnerProductService {
   }
 
   async update(id, data) {
+    this.checkDb();
     return this.atomicOperations.execute("updatePartnerProduct", async () => {
       const itemRef = ref(this.db, `${COLLECTION_PATH}/${id}`);
       await update(itemRef, { ...data, updatedAt: new Date().toISOString() });
@@ -55,6 +67,7 @@ class PartnerProductService {
   }
 
   async delete(id) {
+    this.checkDb();
     return this.atomicOperations.execute("deletePartnerProduct", async () => {
        const itemRef = ref(this.db, `${COLLECTION_PATH}/${id}`);
        await remove(itemRef);
@@ -64,6 +77,7 @@ class PartnerProductService {
   // --- Partner Sub-operations ---
 
   async addPartnerToProduct(productId, partnerName) {
+    this.checkDb();
     return this.atomicOperations.execute("addPartnerToProduct", async () => {
       const productRef = ref(this.db, `${COLLECTION_PATH}/${productId}`);
       const snapshot = await get(productRef);
@@ -86,6 +100,7 @@ class PartnerProductService {
   }
 
   async updatePartnerName(productId, oldName, newName) {
+    this.checkDb();
     return this.atomicOperations.execute("updatePartnerName", async () => {
       const productRef = ref(this.db, `${COLLECTION_PATH}/${productId}`);
       const snapshot = await get(productRef);
@@ -104,6 +119,7 @@ class PartnerProductService {
   }
 
   async deletePartner(productId, partnerName) {
+    this.checkDb();
     return this.atomicOperations.execute("deletePartner", async () => {
       const productRef = ref(this.db, `${COLLECTION_PATH}/${productId}`);
       const snapshot = await get(productRef);
@@ -120,6 +136,7 @@ class PartnerProductService {
   // --- Partner Transaction Sub-operations ---
 
   async addTransactionToPartner(productId, partnerName, transactionData) {
+    this.checkDb();
     return this.atomicOperations.execute("addTransactionToPartner", async () => {
       const productRef = ref(this.db, `${COLLECTION_PATH}/${productId}`);
       const snapshot = await get(productRef);
@@ -147,6 +164,7 @@ class PartnerProductService {
   }
 
   async updatePartnerTransaction(productId, partnerName, transactionId, updatedData) {
+    this.checkDb();
     return this.atomicOperations.execute("updatePartnerTransaction", async () => {
       const productRef = ref(this.db, `${COLLECTION_PATH}/${productId}`);
       const snapshot = await get(productRef);
@@ -171,6 +189,7 @@ class PartnerProductService {
   }
 
   async deletePartnerTransaction(productId, partnerName, transactionId) {
+    this.checkDb();
     return this.atomicOperations.execute("deletePartnerTransaction", async () => {
       const productRef = ref(this.db, `${COLLECTION_PATH}/${productId}`);
       const snapshot = await get(productRef);

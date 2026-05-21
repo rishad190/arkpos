@@ -62,6 +62,10 @@ export function TransactionProvider({ children }) {
   // Connection State
   const [connectionState, setConnectionState] = useState("connecting");
   useEffect(() => {
+    if (!db) {
+      setConnectionState("disconnected");
+      return;
+    }
     const connectedRef = ref(db, ".info/connected");
     const unsub = onValue(connectedRef, (snap) => {
       if (snap.val() === true) {

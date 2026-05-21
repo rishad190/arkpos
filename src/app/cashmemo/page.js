@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCustomers } from "@/contexts/customer-context";
 import { useInventory } from "@/contexts/inventory-context";
 import { useTransactions } from "@/contexts/transaction-context";
+import { AddCustomerDialog } from "@/components/customers/AddCustomerDialog";
 
 import { CashMemoPrint } from "@/components/transactions/CashMemoPrint";
 import { TransactionErrorBoundary } from "@/components/shared/ErrorBoundary";
@@ -28,7 +29,9 @@ import {
   CheckCircle,
   Check,
   ChevronsUpDown,
+  HelpCircle,
 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 import { Toaster } from "@/components/ui/toaster";
 import {
@@ -68,6 +71,7 @@ export default function CashMemoPage() {
   const [customerId, setCustomerId] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showQuickAddCustomer, setShowQuickAddCustomer] = useState(false);
   const [openPhonePopover, setOpenPhonePopover] = useState(false);
   const [phoneSearchValue, setPhoneSearchValue] = useState("");
   const [openProductPopover, setOpenProductPopover] = useState(false);
@@ -347,6 +351,20 @@ export default function CashMemoPage() {
     });
     setCustomerId(customer.id);
     setOpenPhonePopover(false);
+  };
+
+  const handleQuickCustomerCreated = (newCustomerId) => {
+    setShowQuickAddCustomer(false);
+    if (newCustomerId && customers) {
+      const newCustomer = customers.find((c) => c.id === newCustomerId);
+      if (newCustomer) {
+        handleSelectCustomer(newCustomer);
+        toast({
+          title: "Customer Selected",
+          description: `Automatically selected: ${newCustomer.name}`,
+        });
+      }
+    }
   };
 
   const handleSelectProduct = (fabric) => {
@@ -733,11 +751,12 @@ export default function CashMemoPage() {
 
   return (
     <TransactionErrorBoundary>
-      <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
-        <Toaster />
+      <TooltipProvider delayDuration={150}>
+        <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
+          <Toaster />
         {isSaving && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-white p-6 rounded-lg shadow-lg border flex items-center space-x-3">
+            <div className="bg-card/85 backdrop-blur-md text-card-foreground p-6 rounded-lg shadow-lg border border-border/50 flex items-center space-x-3">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
               <span className="text-sm font-medium">Saving memo...</span>
             </div>
@@ -757,7 +776,17 @@ export default function CashMemoPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Customer Name</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-sm font-medium">Customer Name</label>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 text-xs text-primary font-medium hover:underline"
+                    onClick={() => setShowQuickAddCustomer(true)}
+                  >
+                    + Quick Add
+                  </Button>
+                </div>
                 <Input
                   value={memoData.customerName}
                   onChange={(e) =>
@@ -808,7 +837,23 @@ export default function CashMemoPage() {
                           onValueChange={setPhoneSearchValue}
                         />
                         <CommandList>
-                          <CommandEmpty>No customer found.</CommandEmpty>
+                          <CommandEmpty>
+                            <div className="flex flex-col items-center justify-center p-4 text-center">
+                              <p className="text-sm text-muted-foreground mb-2">No customer found.</p>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="w-full text-xs"
+                                onClick={() => {
+                                  setShowQuickAddCustomer(true);
+                                  setOpenPhonePopover(false);
+                                }}
+                              >
+                                + Quick Add Customer
+                              </Button>
+                            </div>
+                          </CommandEmpty>
                           <CommandGroup>
                             {customers
                               ?.filter(
@@ -1153,7 +1198,21 @@ export default function CashMemoPage() {
                       Total
                     </TableHead>
                     <TableHead className="text-right whitespace-nowrap">
-                      Profit
+                      <span className="flex items-center justify-end gap-1.5">
+                        Profit
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                              <HelpCircle className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-normal text-xs text-left max-w-xs">
+                              FIFO Profit = Sale Price − Cost of Goods Sold (COGS). Oldest fabric batches are sold first.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1199,7 +1258,21 @@ export default function CashMemoPage() {
                       colSpan={5}
                       className="text-right font-bold text-green-600"
                     >
-                      Total Profit:
+                      <span className="flex items-center justify-end gap-1.5">
+                        Total Profit:
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-green-600/70 hover:text-green-600 transition-colors cursor-help">
+                              <HelpCircle className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-normal text-xs text-left max-w-xs">
+                              Total estimated profit for this transaction, calculated using FIFO COGS across all items.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </span>
                     </TableCell>
                     <TableCell className="text-right font-bold whitespace-nowrap text-green-600">
                       ৳
@@ -1287,7 +1360,14 @@ export default function CashMemoPage() {
           />
         </div>
         {/* --- END OF FIX --- */}
+
+        <AddCustomerDialog
+          open={showQuickAddCustomer}
+          onOpenChange={setShowQuickAddCustomer}
+          onClose={handleQuickCustomerCreated}
+        />
       </div>
+     </TooltipProvider>
     </TransactionErrorBoundary>
   );
 }

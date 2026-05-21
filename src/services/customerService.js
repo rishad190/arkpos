@@ -34,12 +34,22 @@ export class CustomerService {
     this.atomicOperations = atomicOperations;
   }
 
+  checkDb() {
+    if (!this.db) {
+      throw new AppError("Database is not initialized. Firebase features are disabled.", ERROR_TYPES.NETWORK);
+    }
+  }
+
   /**
    * Subscribe to customer updates
    * @param {Function} callback - Function called with updated customer list
    * @returns {Function} Unsubscribe function
    */
   subscribeToCustomers(callback) {
+    if (!this.db) {
+      callback([]);
+      return () => {};
+    }
     const customersRef = ref(this.db, COLLECTION_PATH);
     return onValue(customersRef, (snapshot) => {
       const data = snapshot.val();
@@ -65,6 +75,7 @@ export class CustomerService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async addCustomer(customerData) {
+    this.checkDb();
     // Validate authentication
     requireAuth();
 
@@ -99,6 +110,7 @@ export class CustomerService {
    * @throws {AppError} If validation fails or database operation fails
    */
   async updateCustomer(customerId, updatedData) {
+    this.checkDb();
     // Validate authentication
     requireAuth();
 
@@ -131,6 +143,7 @@ export class CustomerService {
    * @throws {AppError} If deletion fails or customer not found
    */
   async deleteCustomer(customerId, customerTransactions = []) {
+    this.checkDb();
     // Validate authentication
     requireAuth();
 
@@ -191,6 +204,7 @@ export class CustomerService {
    * @returns {Promise<Customer|null>} The customer object or null if not found
    */
   async getCustomer(customerId) {
+    this.checkDb();
     // Validate authentication
     requireAuth();
 

@@ -25,6 +25,7 @@ import {
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { AddCashTransactionDialog } from "@/components/transactions/AddCashTransactionDialog";
 import { EditCashTransactionDialog } from "@/components/transactions/EditCashTransactionDialog";
+import { LedgerExtractorDialog } from "@/components/transactions/LedgerExtractorDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,6 +50,7 @@ import {
   TrashIcon,
   DollarSign,
   Building2,
+  ScanLine,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -107,6 +109,43 @@ export default function CashBookPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [openingBalance, setOpeningBalance] = useState(0);
+
+  // Daily Cash Box Reconciler state
+  const [actualCash, setActualCash] = useState("");
+  const [isReconciled, setIsReconciled] = useState(false);
+
+  // Load reconciliation state for the selected date
+  useEffect(() => {
+    if (typeof window !== "undefined" && date) {
+      try {
+        const savedData = localStorage.getItem(`cashbook_reconcile_${date}`);
+        if (savedData) {
+          const parsed = JSON.parse(savedData);
+          setActualCash(parsed.actualCash !== undefined ? parsed.actualCash : "");
+          setIsReconciled(!!parsed.isReconciled);
+        } else {
+          setActualCash("");
+          setIsReconciled(false);
+        }
+      } catch (e) {
+        console.error("Failed to load daily reconciliation state:", e);
+      }
+    }
+  }, [date]);
+
+  // Save reconciliation state helper
+  const saveReconciliation = (actualVal, reconciledVal) => {
+    if (typeof window !== "undefined" && date) {
+      try {
+        localStorage.setItem(
+          `cashbook_reconcile_${date}`,
+          JSON.stringify({ actualCash: actualVal, isReconciled: reconciledVal })
+        );
+      } catch (e) {
+        console.error("Failed to save daily reconciliation state:", e);
+      }
+    }
+  };
 
   const dailyCashTransactions = useMemo(() => {
     // 1. Process Legacy Data (DailyCashIncome/Expense)
@@ -212,6 +251,58 @@ export default function CashBookPage() {
 
     return { cash, bank };
   }, [dailyCashIncome, dailyCashExpense, transactions]);
+
+  const expectedCashForDate = useMemo(() => {
+    if (!date) return calculatedBalance.cash; // if no date filter, use total current cash
+    
+    let cash = 0;
+    // 1. Legacy Data
+    if (dailyCashIncome) {
+      dailyCashIncome.forEach((t) => {
+        if (t.date <= date) cash += Number(t.cashIn) || 0;
+      });
+    }
+    if (dailyCashExpense) {
+      dailyCashExpense.forEach((t) => {
+        if (t.date <= date) cash -= Number(t.cashOut) || 0;
+      });
+    }
+
+    // 2. Modern Data
+    const modern = (transactions || []).filter(
+      (t) => {
+        const isStandardCashbook = ['income', 'expense', 'transfer'].includes(t.type) && !t.customerId;
+        const isCustomerCashbook = ['income', 'expense'].includes(t.cashbookType) && t.customerId;
+        const txDate = t.date || (t.createdAt ? t.createdAt.split('T')[0] : "");
+        return (isStandardCashbook || isCustomerCashbook) && txDate && txDate <= date;
+      }
+    );
+
+    modern.forEach((t) => {
+      const effectiveType = t.cashbookType || t.type;
+      const amt = Number(t.deposit || t.amount) || 0;
+      const mode = t.paymentMode || 'cash';
+
+      if (effectiveType === "income") {
+        if (mode !== "bank") cash += amt;
+      } else if (effectiveType === "expense") {
+        if (mode !== "bank") cash -= amt;
+      } else if (effectiveType === "transfer") {
+        if (t.transferType === "deposit") {
+          cash -= amt; // Cash -> Bank
+        } else if (t.transferType === "withdraw") {
+          cash += amt; // Bank -> Cash
+        }
+      }
+    });
+
+    return cash;
+  }, [dailyCashIncome, dailyCashExpense, transactions, date, calculatedBalance.cash]);
+
+  const discrepancy = useMemo(() => {
+    if (actualCash === "") return 0;
+    return (parseFloat(actualCash) || 0) - expectedCashForDate;
+  }, [actualCash, expectedCashForDate]);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -752,6 +843,15 @@ export default function CashBookPage() {
                     Add Transaction
                   </Button>
                 </AddCashTransactionDialog>
+                <LedgerExtractorDialog selectedDate={date}>
+                  <Button
+                    className="w-full md:w-auto bg-violet-600 hover:bg-violet-700 text-white border-none shadow-md hover:shadow-lg transition-all duration-300"
+                    disabled={loadingState.actions || isReconciled}
+                  >
+                    <ScanLine className="mr-2 h-4 w-4" />
+                    Scan Ledger (ছবি থেকে যোগ)
+                  </Button>
+                </LedgerExtractorDialog>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -836,6 +936,117 @@ export default function CashBookPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Daily Cash Drawer Audit (Reconciler) */}
+            <Card className="mb-8 border border-border/40 bg-card/65 backdrop-blur-md shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-bold flex items-center justify-between">
+                  <span>Daily Cash Drawer Audit</span>
+                  <Badge variant={isReconciled ? "success" : "outline"} className={isReconciled ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" : ""}>
+                    {isReconciled ? "Audited & Closed" : "Pending Audit"}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 pt-0">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                  
+                  {/* Left Column: Input field */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Actual Drawer Cash Count
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Counted cash amount..."
+                        value={actualCash}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setActualCash(val);
+                          saveReconciliation(val, isReconciled);
+                        }}
+                        disabled={isReconciled}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setActualCash(String(expectedCashForDate));
+                          saveReconciliation(String(expectedCashForDate), isReconciled);
+                        }}
+                        disabled={isReconciled}
+                      >
+                        Match Expected
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Input the total physical cash counted in the register drawer.
+                    </p>
+                  </div>
+
+                  {/* Middle Column: Calculations and Status */}
+                  <div className="space-y-2 border-t md:border-t-0 md:border-x px-0 md:px-6 py-4 md:py-0 border-border/40">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Expected system cash:</span>
+                      <span className="font-semibold">{formatCurrency(expectedCashForDate)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Actual drawer cash:</span>
+                      <span className="font-semibold">
+                        {actualCash !== "" ? formatCurrency(parseFloat(actualCash) || 0) : "Not entered"}
+                      </span>
+                    </div>
+                    <div className="border-t border-border/40 pt-2 flex justify-between items-center">
+                      <span className="text-sm font-medium">Audit Difference:</span>
+                      {actualCash === "" ? (
+                        <span className="text-sm text-muted-foreground italic">Awaiting count</span>
+                      ) : discrepancy === 0 ? (
+                        <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold">
+                          ৳0.00 (Balanced)
+                        </Badge>
+                      ) : discrepancy > 0 ? (
+                        <Badge className="bg-amber-500 hover:bg-amber-600 text-white font-semibold">
+                          +{formatCurrency(discrepancy)} (Surplus)
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-red-500 hover:bg-red-600 text-white font-semibold">
+                          {formatCurrency(discrepancy)} (Shortage)
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Toggle/Action button */}
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <Button
+                      type="button"
+                      className={`w-full ${isReconciled ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
+                      onClick={() => {
+                        const nextReconciled = !isReconciled;
+                        setIsReconciled(nextReconciled);
+                        saveReconciliation(actualCash, nextReconciled);
+                        toast({
+                          title: nextReconciled ? "Drawer Audited & Closed" : "Drawer Unlocked",
+                          description: nextReconciled
+                            ? `Tally complete for date ${date ? formatDate(date) : "all dates"}.`
+                            : `Audit has been unlocked for editing.`,
+                        });
+                      }}
+                    >
+                      {isReconciled ? "Unlock Audit" : "Reconcile & Close Drawer"}
+                    </Button>
+                    <p className="text-xs text-center text-muted-foreground max-w-[200px]">
+                      {isReconciled
+                        ? "Audit locked. Unlock to modify drawer inputs."
+                        : "Locking prevents accidental edits to the audited balance."}
+                    </p>
+                  </div>
+                  
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Monthly Summary */}
             <Card className="mb-8 border-none shadow-md overflow-hidden">

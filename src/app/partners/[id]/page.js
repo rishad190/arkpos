@@ -10,8 +10,9 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { ArrowLeft, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, MoreVertical, Edit, Trash2, HelpCircle } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -325,36 +326,170 @@ export default function PartnerProductDetailPage() {
   const formatNum = (num, digits = 2) => Number(num || 0).toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8">
-      <PageHeader title={product.productName} description={`Details for product import on ${new Date(product.createdAt || product.date).toLocaleDateString()}`} actions={<Button onClick={() => router.back()}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>} />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2">
-          <CardHeader><CardTitle>Import Details</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <div className="font-semibold text-muted-foreground">Supplier</div><div>{product.supplierName}</div>
-            <div className="font-semibold text-muted-foreground">Date</div><div>{new Date(product.date).toLocaleDateString()}</div>
-            <div className="font-semibold text-muted-foreground">Quantity</div><div>{formatNum(product.quantityMeter)} meters / {formatNum(product.quantityYard)} yards</div>
-            <div className="font-semibold text-muted-foreground">Price per Meter</div><div>${formatNum(product.priceDollar)}</div>
-            <div className="font-semibold text-muted-foreground">Dollar Rate</div><div>৳{formatNum(product.dollarRate)}</div>
+    <TooltipProvider delayDuration={150}>
+      <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8">
+        <PageHeader title={product.productName} description={`Details for product import on ${new Date(product.createdAt || product.date).toLocaleDateString()}`} actions={<Button onClick={() => router.back()}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>} />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="md:col-span-2">
+            <CardHeader><CardTitle>Import Details</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <div className="font-semibold text-muted-foreground">Supplier</div><div>{product.supplierName}</div>
+              <div className="font-semibold text-muted-foreground">Date</div><div>{new Date(product.date).toLocaleDateString()}</div>
+              
+              <div className="font-semibold text-muted-foreground flex items-center gap-1.5">
+                Quantity
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Formula: Quantity (m) × 1.09361. Converts meters to standard sales units (yards).</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div>{formatNum(product.quantityMeter)} meters / {formatNum(product.quantityYard)} yards</div>
+              
+              <div className="font-semibold text-muted-foreground flex items-center gap-1.5">
+                Price per Meter
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>FOB (Free on Board) purchase price per meter in USD.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div>${formatNum(product.priceDollar)}</div>
+              
+              <div className="font-semibold text-muted-foreground flex items-center gap-1.5">
+                Dollar Rate
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>The exchange rate for 1 USD to Bangladeshi Taka (BDT) at the time of purchase.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div>৳{formatNum(product.dollarRate)}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-primary/5 border-primary/20">
+            <CardHeader>
+              <CardTitle className="text-primary flex items-center gap-1.5">
+                Landed Cost
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-primary/70 hover:text-primary transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Formula: Total Cost (Taka) ÷ Quantity (yd). Landed cost per yard (used for FIFO valuation and sales margins).</p>
+                  </TooltipContent>
+                </Tooltip>
+              </CardTitle>
+              <CardDescription>Final cost per yard in Taka.</CardDescription>
+            </CardHeader>
+            <CardContent className="text-center"><p className="text-4xl font-bold text-primary">৳{formatNum(product.pricePerYard)}</p><p className="text-sm text-muted-foreground">per yard</p></CardContent>
+          </Card>
+        </div>
+        <Card>
+          <CardHeader><CardTitle>Cost Breakdown</CardTitle><CardDescription>Detailed breakdown of all costs involved.</CardDescription></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between items-center border-b pb-2">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                Total Price (USD)
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Formula: Quantity (m) × Price ($/m). Base invoice cost in USD.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
+              <span className="font-semibold">${formatNum(product.totalPriceDollar)}</span>
+            </div>
+            <div className="flex justify-between items-center border-b pb-2">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                Total Price (Taka)
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Formula: Total Price ($) × Exchange Rate (BDT). Base invoice cost in Taka.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
+              <span className="font-semibold">৳{formatNum(product.totalPriceTaka)}</span>
+            </div>
+            <div className="flex justify-between items-center border-b pb-2">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                Premium (Taka)
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Premium, customs clearance, or duty fees paid in Taka (BDT).</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
+              <span className="font-semibold">৳{formatNum(product.premiumTaka)}</span>
+            </div>
+            <div className="flex justify-between items-center border-b pb-2">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                Other Costs (Taka)
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Additional overhead costs (shipping, local transport, labor) in Taka (BDT).</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
+              <span className="font-semibold">৳{formatNum(product.otherCostTaka)}</span>
+            </div>
+            <div className="flex justify-between items-center pt-2 font-bold text-lg">
+              <span className="flex items-center gap-1.5">
+                Total Landed Cost (Taka)
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-normal text-sm">Formula: Total Price (Taka) + Premium + Other Costs. Total capital required for this import.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
+              <span>৳{formatNum(product.totalCostTaka)}</span>
+            </div>
           </CardContent>
         </Card>
-        <Card className="bg-primary/5 border-primary/20">
-          <CardHeader><CardTitle className="text-primary">Landed Cost</CardTitle><CardDescription>Final cost per yard in Taka.</CardDescription></CardHeader>
-          <CardContent className="text-center"><p className="text-4xl font-bold text-primary">৳{formatNum(product.pricePerYard)}</p><p className="text-sm text-muted-foreground">per yard</p></CardContent>
-        </Card>
+        <hr />
+        <PartnerAccounts product={product} />
       </div>
-      <Card>
-        <CardHeader><CardTitle>Cost Breakdown</CardTitle><CardDescription>Detailed breakdown of all costs involved.</CardDescription></CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex justify-between items-center border-b pb-2"><span className="text-muted-foreground">Total Price (USD)</span><span className="font-semibold">${formatNum(product.totalPriceDollar)}</span></div>
-          <div className="flex justify-between items-center border-b pb-2"><span className="text-muted-foreground">Total Price (Taka)</span><span className="font-semibold">৳{formatNum(product.totalPriceTaka)}</span></div>
-          <div className="flex justify-between items-center border-b pb-2"><span className="text-muted-foreground">Premium (Taka)</span><span className="font-semibold">৳{formatNum(product.premiumTaka)}</span></div>
-          <div className="flex justify-between items-center border-b pb-2"><span className="text-muted-foreground">Other Costs (Taka)</span><span className="font-semibold">৳{formatNum(product.otherCostTaka)}</span></div>
-          <div className="flex justify-between items-center pt-2 font-bold text-lg"><span>Total Landed Cost (Taka)</span><span>৳{formatNum(product.totalCostTaka)}</span></div>
-        </CardContent>
-      </Card>
-      <hr />
-      <PartnerAccounts product={product} />
-    </div>
+    </TooltipProvider>
   );
 }

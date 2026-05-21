@@ -21,10 +21,20 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!auth) {
-      setLoading(false);
-      if (pathname !== "/login") {
-        router.push("/login");
+      try {
+        const storedUser = localStorage.getItem("arkpos_mock_user");
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        } else {
+          setUser(null);
+          if (pathname !== "/login") {
+            router.push("/login");
+          }
+        }
+      } catch (e) {
+        console.error("Error reading mock user:", e);
       }
+      setLoading(false);
       return;
     }
 
@@ -48,10 +58,34 @@ export function AuthProvider({ children }) {
   }, [router, pathname]);
 
   const login = (email, password) => {
+    if (!auth) {
+      const mockUser = {
+        uid: "mock-user-123",
+        email: email,
+        displayName: "Demo User",
+      };
+      try {
+        localStorage.setItem("arkpos_mock_user", JSON.stringify(mockUser));
+      } catch (e) {
+        console.error("Error saving mock user:", e);
+      }
+      setUser(mockUser);
+      return Promise.resolve(mockUser);
+    }
     return signInWithEmailAndPassword(auth, email, password);
   };
 
   const logout = () => {
+    if (!auth) {
+      try {
+        localStorage.removeItem("arkpos_mock_user");
+      } catch (e) {
+        console.error("Error removing mock user:", e);
+      }
+      setUser(null);
+      router.push("/login");
+      return Promise.resolve();
+    }
     return signOut(auth);
   };
 

@@ -42,8 +42,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-xl shadow-lg">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/50 p-4">
+      <div className="max-w-md w-full space-y-8 p-8 bg-card/65 backdrop-blur-lg border border-border/40 shadow-xl rounded-2xl">
         <div className="space-y-4">
           <div className="flex justify-center">
             <Image
@@ -51,14 +51,14 @@ export default function LoginPage() {
               alt="ARK"
               width={80}
               height={80}
-              className="rounded-lg shadow-sm"
+              className="rounded-xl shadow-sm border border-border/30"
               priority
             />
           </div>
-          <h2 className="text-center text-3xl font-bold text-gray-900">
+          <h2 className="text-center text-3xl font-extrabold tracking-tight text-foreground bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
             ARK ENTERPRISE
           </h2>
-          <p className="text-center text-sm text-gray-600">
+          <p className="text-center text-sm text-muted-foreground">
             Welcome back! Please sign in to continue.
           </p>
         </div>
