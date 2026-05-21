@@ -29,7 +29,9 @@ import {
   CheckCircle,
   Check,
   ChevronsUpDown,
+  HelpCircle,
 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 import { Toaster } from "@/components/ui/toaster";
 import {
@@ -749,8 +751,9 @@ export default function CashMemoPage() {
 
   return (
     <TransactionErrorBoundary>
-      <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
-        <Toaster />
+      <TooltipProvider delayDuration={150}>
+        <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
+          <Toaster />
         {isSaving && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
             <div className="bg-card/85 backdrop-blur-md text-card-foreground p-6 rounded-lg shadow-lg border border-border/50 flex items-center space-x-3">
@@ -1195,7 +1198,21 @@ export default function CashMemoPage() {
                       Total
                     </TableHead>
                     <TableHead className="text-right whitespace-nowrap">
-                      Profit
+                      <span className="flex items-center justify-end gap-1.5">
+                        Profit
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                              <HelpCircle className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-normal text-xs text-left max-w-xs">
+                              FIFO Profit = Sale Price − Cost of Goods Sold (COGS). Oldest fabric batches are sold first.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1241,7 +1258,21 @@ export default function CashMemoPage() {
                       colSpan={5}
                       className="text-right font-bold text-green-600"
                     >
-                      Total Profit:
+                      <span className="flex items-center justify-end gap-1.5">
+                        Total Profit:
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-green-600/70 hover:text-green-600 transition-colors cursor-help">
+                              <HelpCircle className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-normal text-xs text-left max-w-xs">
+                              Total estimated profit for this transaction, calculated using FIFO COGS across all items.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </span>
                     </TableCell>
                     <TableCell className="text-right font-bold whitespace-nowrap text-green-600">
                       ৳
@@ -1336,6 +1367,7 @@ export default function CashMemoPage() {
           onClose={handleQuickCustomerCreated}
         />
       </div>
+     </TooltipProvider>
     </TransactionErrorBoundary>
   );
 }

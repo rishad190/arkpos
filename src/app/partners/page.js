@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/hooks/use-toast";
-import { Edit, Trash2, MoreVertical } from "lucide-react";
+import { Edit, Trash2, MoreVertical, HelpCircle } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -206,7 +207,8 @@ export default function PartnerPage() {
   );
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+    <TooltipProvider delayDuration={150}>
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
       <PageHeader
         title="Partner Imports"
         description="Calculate and manage product import costs with partners."
@@ -273,9 +275,19 @@ export default function PartnerPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="quantityMeter">
-                      Product Quantity (meter)
-                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="quantityMeter">Product Quantity (meter)</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                            <HelpCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>The total length of fabric in meters as imported.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                     <Input
                       id="quantityMeter"
                       name="quantityMeter"
@@ -287,9 +299,19 @@ export default function PartnerPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="priceDollar">
-                      Product Price ($ per meter)
-                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="priceDollar">Product Price ($ per meter)</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                            <HelpCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>FOB (Free on Board) purchase price per meter in USD.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                     <Input
                       id="priceDollar"
                       name="priceDollar"
@@ -304,7 +326,19 @@ export default function PartnerPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="dollarRate">Dollar Price (Taka)</Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="dollarRate">Dollar Price (Taka)</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                            <HelpCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>The exchange rate for 1 USD to Bangladeshi Taka (BDT) at the time of purchase.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                     <Input
                       id="dollarRate"
                       name="dollarRate"
@@ -316,7 +350,19 @@ export default function PartnerPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="premiumTaka">Premium (Taka)</Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="premiumTaka">Premium (Taka)</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                            <HelpCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Premium, customs clearance, or duty fees paid in Taka (BDT).</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                     <Input
                       id="premiumTaka"
                       name="premiumTaka"
@@ -329,7 +375,19 @@ export default function PartnerPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="otherCostTaka">Other Costs (Taka)</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="otherCostTaka">Other Costs (Taka)</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                          <HelpCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Additional overhead costs (shipping, local transport, labor) in Taka (BDT).</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   <Input
                     id="otherCostTaka"
                     name="otherCostTaka"
@@ -360,8 +418,18 @@ export default function PartnerPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center border-b pb-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground flex items-center gap-1.5">
                   Total Price ($)
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                        <HelpCircle className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Formula: Quantity (m) × Price ($/m). Base invoice cost in USD.</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </span>
                 <span className="font-semibold text-lg">
                   $
@@ -372,8 +440,18 @@ export default function PartnerPage() {
                 </span>
               </div>
               <div className="flex justify-between items-center border-b pb-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground flex items-center gap-1.5">
                   Total Price (Taka)
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                        <HelpCircle className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Formula: Total Price ($) × Exchange Rate (BDT). Base invoice cost in Taka.</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </span>
                 <span className="font-semibold text-lg">
                   ৳
@@ -384,8 +462,18 @@ export default function PartnerPage() {
                 </span>
               </div>
               <div className="flex justify-between items-center border-b pb-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground flex items-center gap-1.5">
                   Total Cost (Taka)
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                        <HelpCircle className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Formula: Total Price (Taka) + Premium + Other Costs. Total capital required for this import.</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </span>
                 <span className="font-semibold text-lg">
                   ৳
@@ -396,8 +484,18 @@ export default function PartnerPage() {
                 </span>
               </div>
               <div className="flex justify-between items-center border-b pb-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground flex items-center gap-1.5">
                   Quantity (yard)
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                        <HelpCircle className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Formula: Quantity (m) × 1.09361. Converts meters to standard sales units (yards).</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </span>
                 <span className="font-semibold text-lg">
                   {calculations.quantityYard.toLocaleString(undefined, {
@@ -407,7 +505,19 @@ export default function PartnerPage() {
                 </span>
               </div>
               <div className="flex justify-between items-center pt-2 bg-muted p-3 rounded-lg">
-                <span className="font-semibold">Price per Yard (Taka)</span>
+                <span className="font-semibold flex items-center gap-1.5">
+                  Price per Yard (Taka)
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                        <HelpCircle className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Formula: Total Cost (Taka) ÷ Quantity (yd). Landed cost per yard (used for FIFO valuation and sales margins).</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </span>
                 <span className="font-bold text-xl text-primary">
                   ৳
                   {calculations.pricePerYard.toLocaleString(undefined, {
@@ -558,6 +668,7 @@ export default function PartnerPage() {
           onSave={handleUpdate}
         />
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

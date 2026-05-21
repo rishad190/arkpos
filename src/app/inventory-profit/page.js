@@ -14,7 +14,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { DollarSign, ArrowUpDown } from "lucide-react";
+import { DollarSign, ArrowUpDown, HelpCircle } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 import { DataErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { useRouter } from "next/navigation";
@@ -110,15 +111,28 @@ export default function InventoryProfitPage() {
 
   return (
     <DataErrorBoundary>
-    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+      <TooltipProvider delayDuration={150}>
+        <div className="p-4 md:p-8 max-w-7xl mx-auto">
       <h1 className="text-3xl font-bold tracking-tight mb-8">
         Inventory Profit
       </h1>
 
       <Card className="mb-8">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">
+          <CardTitle className="text-sm font-medium flex items-center gap-1.5">
             Total Inventory Profit
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                  <HelpCircle className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="font-normal text-xs text-left max-w-xs">
+                  Total profit accumulated from all transactions, calculated on a First-In, First-Out (FIFO) basis by tracking matching import costs.
+                </p>
+              </TooltipContent>
+            </Tooltip>
           </CardTitle>
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -165,11 +179,47 @@ export default function InventoryProfitPage() {
                 <TableHead className="text-right" onClick={() => requestSort("totalQuantitySold")}>
                   <Button variant="ghost">Total Quantity Sold <ArrowUpDown className="ml-2 h-4 w-4" /></Button>
                 </TableHead>
-                <TableHead className="text-right" onClick={() => requestSort("profitMargin")}>
-                  <Button variant="ghost">Profit Margin <ArrowUpDown className="ml-2 h-4 w-4" /></Button>
+                 <TableHead className="text-right" onClick={() => requestSort("profitMargin")}>
+                  <div className="flex items-center justify-end">
+                    <Button variant="ghost">Profit Margin <ArrowUpDown className="ml-2 h-4 w-4" /></Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button 
+                          type="button" 
+                          onClick={(e) => e.stopPropagation()} 
+                          className="text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                        >
+                          <HelpCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="font-normal text-xs text-left max-w-xs">
+                          Profit margin percentage calculated as (Total Profit ÷ Total Revenue) × 100.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </TableHead>
                 <TableHead className="text-right" onClick={() => requestSort("totalProfit")}>
-                  <Button variant="ghost">Total Profit <ArrowUpDown className="ml-2 h-4 w-4" /></Button>
+                  <div className="flex items-center justify-end">
+                    <Button variant="ghost">Total Profit <ArrowUpDown className="ml-2 h-4 w-4" /></Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button 
+                          type="button" 
+                          onClick={(e) => e.stopPropagation()} 
+                          className="text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                        >
+                          <HelpCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="font-normal text-xs text-left max-w-xs">
+                          Accumulated profit for this fabric, matching sales against chronological import batch costs (FIFO).
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -196,6 +246,7 @@ export default function InventoryProfitPage() {
         </CardContent>
       </Card>
     </div>
+      </TooltipProvider>
     </DataErrorBoundary>
   );
 }
