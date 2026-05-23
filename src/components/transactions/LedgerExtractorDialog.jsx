@@ -159,8 +159,8 @@ For each identified transaction, populate:
 2. "amount": parsed numeric amount.
 3. "paymentMode": "bank" if description contains bank-related terms (e.g. CC 98, সিসি, bank, bkash, nagad, check, cards, ব্যাংক, বিকাশ, নগদ, চেক) else "cash".
 4. "suggestedCategory": based on context, choose one of these string values:
-   - For Income: "Customer Payment" (if customer payment/due collection/ledger payment), "Partner Payment" (if partner deposit/equity), "Loan Activity" (if loan received), "Other Income" (general).
-   - For Expense: "Supplier Payment" (vendor payment), "Product Activity" (buying fabrics/materials), "Loan Activity" (loan repayment/giving), "Own Expense", "Shop Expense", "Other Expense".
+   - For Income: "Customer Payment" (if customer payment/due collection/ledger payment), "Partner Payment" (if partner deposit/equity), "Loan Activity" (if loan received), "Transfer" (if bank withdrawal, cash from bank, bank to cash, bank transfer, ব্যাংক থেকে উত্তোলন), "Other Income" (general).
+   - For Expense: "Supplier Payment" (vendor payment), "Product Activity" (buying fabrics/materials), "Loan Activity" (loan repayment/giving), "Transfer" (if bank deposit, cash to bank, bank transfer, ব্যাংকে জমা), "Own Expense", "Shop Expense", "Other Expense".
 
 Return the response as a strict JSON object structure:
 {
@@ -228,43 +228,51 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
       const parsed = JSON.parse(rawText.trim());
       
       // Normalize and add client-side unique IDs and default transaction routing states
-      const normalizedIncome = (parsed.income || []).map((item, idx) => ({
-        ...item,
-        id: `inc-${idx}-${Date.now()}`,
-        type: "income",
-        approved: true,
-        customerId: "none",
-        loanId: "none",
-        loanAction: "PRINCIPAL",
-        productId: "none",
-        productAction: item.suggestedCategory === "Partner Payment" ? "PARTNER_INVESTMENT" : "PRODUCT_COST",
-        supplierId: "none",
-        selectedProducts: [],
-        productSoldQuantity: "",
-        productSoldColor: "",
-        productSoldToCustomer: "none",
-        category: item.suggestedCategory || "Other Income",
-        bankFlow: "standard_bank"
-      }));
+      const normalizedIncome = (parsed.income || []).map((item, idx) => {
+        const isTransfer = item.suggestedCategory === "Transfer";
+        return {
+          ...item,
+          id: `inc-${idx}-${Date.now()}`,
+          type: "income",
+          approved: true,
+          customerId: "none",
+          loanId: "none",
+          loanAction: "PRINCIPAL",
+          productId: "none",
+          productAction: item.suggestedCategory === "Partner Payment" ? "PARTNER_INVESTMENT" : "PRODUCT_COST",
+          supplierId: "none",
+          selectedProducts: [],
+          productSoldQuantity: "",
+          productSoldColor: "",
+          productSoldToCustomer: "none",
+          category: item.suggestedCategory || "Other Income",
+          paymentMode: isTransfer ? "bank" : (item.paymentMode || "cash"),
+          bankFlow: isTransfer ? "transfer_withdraw" : "standard_bank"
+        };
+      });
 
-      const normalizedExpense = (parsed.expense || []).map((item, idx) => ({
-        ...item,
-        id: `exp-${idx}-${Date.now()}`,
-        type: "expense",
-        approved: true,
-        customerId: "none",
-        loanId: "none",
-        loanAction: "PRINCIPAL",
-        productId: "none",
-        productAction: "PRODUCT_COST",
-        supplierId: "none",
-        selectedProducts: [],
-        productSoldQuantity: "",
-        productSoldColor: "",
-        productSoldToCustomer: "none",
-        category: item.suggestedCategory || "Other Expense",
-        bankFlow: "standard_bank"
-      }));
+      const normalizedExpense = (parsed.expense || []).map((item, idx) => {
+        const isTransfer = item.suggestedCategory === "Transfer";
+        return {
+          ...item,
+          id: `exp-${idx}-${Date.now()}`,
+          type: "expense",
+          approved: true,
+          customerId: "none",
+          loanId: "none",
+          loanAction: "PRINCIPAL",
+          productId: "none",
+          productAction: "PRODUCT_COST",
+          supplierId: "none",
+          selectedProducts: [],
+          productSoldQuantity: "",
+          productSoldColor: "",
+          productSoldToCustomer: "none",
+          category: item.suggestedCategory || "Other Expense",
+          paymentMode: isTransfer ? "bank" : (item.paymentMode || "cash"),
+          bankFlow: isTransfer ? "transfer_deposit" : "standard_bank"
+        };
+      });
 
       setExtractedItems([...normalizedIncome, ...normalizedExpense]);
       setStep(3); // Review step
@@ -536,7 +544,13 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
         }
         // 3.5. Transfer Activity
         else if (isTransfer) {
-          const transferType = item.type === "income" ? "withdraw" : "deposit";
+          let transferType = item.type === "income" ? "withdraw" : "deposit";
+          if (item.bankFlow === "transfer_withdraw") {
+            transferType = "withdraw";
+          } else if (item.bankFlow === "transfer_deposit") {
+            transferType = "deposit";
+          }
+          
           const transaction = {
             type: "transfer",
             date: targetDate,
@@ -949,7 +963,7 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                               onValueChange={(val) => {
                                 handleUpdateItem(item.id, { 
                                   bankFlow: val,
-                                  category: val === "transfer_withdraw" ? "Transfer" : "Other Income"
+                                  category: (val === "transfer_withdraw" || val === "transfer_deposit") ? "Transfer" : "Other Income"
                                 });
                               }}
                             >
@@ -959,6 +973,7 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                               <SelectContent>
                                 <SelectItem value="standard_bank">Bank এ গেছে / Received to Bank (Income)</SelectItem>
                                 <SelectItem value="transfer_withdraw">Bank থেকে আসছে / Withdraw to Cash (Transfer)</SelectItem>
+                                <SelectItem value="transfer_deposit">Bank এ গেছে / Deposit (Cash to Bank) (Transfer)</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -1312,7 +1327,7 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                               onValueChange={(val) => {
                                 handleUpdateItem(item.id, { 
                                   bankFlow: val,
-                                  category: val === "transfer_deposit" ? "Transfer" : "Other Expense"
+                                  category: (val === "transfer_withdraw" || val === "transfer_deposit") ? "Transfer" : "Other Expense"
                                 });
                               }}
                             >
@@ -1321,6 +1336,7 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="standard_bank">Bank থেকে গেছে / Paid from Bank (Expense)</SelectItem>
+                                <SelectItem value="transfer_withdraw">Bank থেকে আসছে / Withdraw to Cash (Transfer)</SelectItem>
                                 <SelectItem value="transfer_deposit">Bank এ গেছে / Deposit (Cash to Bank) (Transfer)</SelectItem>
                               </SelectContent>
                             </Select>
