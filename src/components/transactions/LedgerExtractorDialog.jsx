@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +62,9 @@ export function LedgerExtractorDialog({ children, selectedDate }) {
   const [showKey, setShowKey] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
+  
+  // Mobile responsive active review tab state
+  const [activeReviewTab, setActiveReviewTab] = useState("income");
   
   // OCR Results State
   const [extractedItems, setExtractedItems] = useState([]); // Array of parsed transactions
@@ -151,7 +155,7 @@ Recognize Bengali handwriting (including cursive), Bengali numbers (১, ২, �
 Strictly convert all Bengali digits/numerals to standard English decimal numbers (e.g. ১৫০০ -> 1500, ৩০০০ -> 3000, ১,০৫,০০০ -> 105000).
 
 For each identified transaction, populate:
-1. "description": transaction detail/description in Bengali/English exactly as written.
+1. "description": transaction detail/description. If the description is written in Bengali, translate it to English (e.g., "সুতা কেনা" -> "Yarn purchase", "গাড়ি ভাড়া" -> "Car rent", "নাস্তা" -> "Snacks/Breakfast"). Transliterate names to English (e.g., "আলমগীর" -> "Alamgir"). The final output value must be fully in English.
 2. "amount": parsed numeric amount.
 3. "paymentMode": "bank" if description contains bank-related terms (e.g. CC 98, সিসি, bank, bkash, nagad, check, cards, ব্যাংক, বিকাশ, নগদ, চেক) else "cash".
 4. "suggestedCategory": based on context, choose one of these string values:
@@ -239,7 +243,8 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
         productSoldQuantity: "",
         productSoldColor: "",
         productSoldToCustomer: "none",
-        category: item.suggestedCategory || "Other Income"
+        category: item.suggestedCategory || "Other Income",
+        bankFlow: "standard_bank"
       }));
 
       const normalizedExpense = (parsed.expense || []).map((item, idx) => ({
@@ -257,7 +262,8 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
         productSoldQuantity: "",
         productSoldColor: "",
         productSoldToCustomer: "none",
-        category: item.suggestedCategory || "Other Expense"
+        category: item.suggestedCategory || "Other Expense",
+        bankFlow: "standard_bank"
       }));
 
       setExtractedItems([...normalizedIncome, ...normalizedExpense]);
@@ -352,6 +358,7 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
         const isCustomerPayment = item.type === "income" && item.category === "Customer Payment";
         const isLoanTransaction = item.category === "Loan Activity";
         const isProductTransaction = item.category === "Product Activity";
+        const isTransfer = item.category === "Transfer" || item.bankFlow === "transfer_withdraw" || item.bankFlow === "transfer_deposit";
 
         // 1. Customer Payment
         if (isCustomerPayment) {
@@ -527,6 +534,22 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
             await addAccountTransaction(transaction);
           }
         }
+        // 3.5. Transfer Activity
+        else if (isTransfer) {
+          const transferType = item.type === "income" ? "withdraw" : "deposit";
+          const transaction = {
+            type: "transfer",
+            date: targetDate,
+            amount: amount,
+            description: item.description || (transferType === 'deposit' 
+              ? 'Bank Deposit (Cash -> Bank)' 
+              : 'Bank Withdrawal (Bank -> Cash)'),
+            reference: "OCR Import",
+            transferType: transferType,
+            category: "Transfer",
+          };
+          await addAccountTransaction(transaction);
+        }
         // 4. Standard transactions
         else {
           // If custom category is entered, create it if it doesn't exist
@@ -590,7 +613,7 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
     }}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       
-      <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] flex flex-col p-6 overflow-hidden bg-card/95 backdrop-blur-lg border border-border/40 rounded-2xl shadow-xl">
+      <DialogContent className="max-w-5xl w-[98vw] md:w-[95vw] max-h-[95vh] md:max-h-[90vh] flex flex-col p-3 md:p-6 overflow-hidden bg-card/95 backdrop-blur-lg border border-border/40 rounded-2xl shadow-xl">
         <DialogHeader className="pb-3 border-b border-border/40">
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary animate-pulse" />
@@ -779,11 +802,31 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
               </div>
             </div>
 
+            {/* Mobile Tab Selectors */}
+            <div className="flex md:hidden gap-2 mb-4">
+              <Button 
+                type="button"
+                variant={activeReviewTab === "income" ? "default" : "outline"} 
+                className={`flex-1 text-xs py-2 h-9 font-bold ${activeReviewTab === "income" ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}
+                onClick={() => setActiveReviewTab("income")}
+              >
+                INCOME (৳{stats.incomeTotal.toLocaleString()})
+              </Button>
+              <Button 
+                type="button"
+                variant={activeReviewTab === "expense" ? "default" : "outline"} 
+                className={`flex-1 text-xs py-2 h-9 font-bold ${activeReviewTab === "expense" ? "bg-red-600 hover:bg-red-700 text-white" : ""}`}
+                onClick={() => setActiveReviewTab("expense")}
+              >
+                EXPENSE (৳{stats.expenseTotal.toLocaleString()})
+              </Button>
+            </div>
+
             {/* Side-by-side Review Grid */}
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0 overflow-hidden">
               
               {/* INCOME COLUMN */}
-              <div className="flex flex-col border border-border/40 rounded-xl overflow-hidden min-h-0 bg-background/40">
+              <div className={`flex-col border border-border/40 rounded-xl overflow-hidden min-h-0 bg-background/40 md:flex ${activeReviewTab === "income" ? "flex" : "hidden"}`}>
                 <div className="p-3 bg-green-500/10 border-b border-green-500/20 flex items-center justify-between">
                   <h3 className="font-bold text-green-600 flex items-center gap-1.5 text-sm">
                     <Check className="h-4 w-4" />
@@ -837,7 +880,7 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                         </div>
 
                         {/* Middle Controls (Amount, Payment Mode, Category) */}
-                        <div className="grid grid-cols-3 gap-2 mt-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                           <div>
                             <Label className="text-[9px] text-muted-foreground">Amount (Taka)</Label>
                             <Input
@@ -851,7 +894,13 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                             <Label className="text-[9px] text-muted-foreground">Payment Mode</Label>
                             <Select
                               value={item.paymentMode}
-                              onValueChange={(val) => handleUpdateItem(item.id, { paymentMode: val })}
+                              onValueChange={(val) => {
+                                const updates = { paymentMode: val };
+                                if (val === "cash" && item.category === "Transfer") {
+                                  updates.category = "Other Income";
+                                }
+                                handleUpdateItem(item.id, updates);
+                              }}
                             >
                               <SelectTrigger className="h-7 text-[10px] px-1.5">
                                 <SelectValue />
@@ -866,7 +915,14 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                             <Label className="text-[9px] text-muted-foreground">Category</Label>
                             <Select
                               value={item.category}
-                              onValueChange={(val) => handleUpdateItem(item.id, { category: val, customerId: "none", productId: "none", loanId: "none" })}
+                              onValueChange={(val) => {
+                                const updates = { category: val, customerId: "none", productId: "none", loanId: "none" };
+                                if (val === "Transfer") {
+                                  updates.paymentMode = "bank";
+                                  updates.bankFlow = "transfer_withdraw";
+                                }
+                                handleUpdateItem(item.id, updates);
+                              }}
                             >
                               <SelectTrigger className="h-7 text-[10px] px-1.5">
                                 <SelectValue />
@@ -878,10 +934,35 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                                 <SelectItem value="Product Activity">Product Activity</SelectItem>
                                 <SelectItem value="Other Income">Other Income</SelectItem>
                                 <SelectItem value="Sales">Sales</SelectItem>
+                                <SelectItem value="Transfer">Transfer</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
+
+                        {/* Conditional Bank Action / Direction Selector */}
+                        {item.paymentMode === "bank" && (
+                          <div className="mt-2 p-2 bg-muted/40 border border-border/40 rounded-md space-y-1">
+                            <Label className="text-[9px] text-primary font-semibold">Bank Action / Direction (ব্যাংক লেনদেন ধরণ) *</Label>
+                            <Select
+                              value={item.bankFlow || "standard_bank"}
+                              onValueChange={(val) => {
+                                handleUpdateItem(item.id, { 
+                                  bankFlow: val,
+                                  category: val === "transfer_withdraw" ? "Transfer" : "Other Income"
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="h-7 text-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="standard_bank">Bank এ গেছে / Received to Bank (Income)</SelectItem>
+                                <SelectItem value="transfer_withdraw">Bank থেকে আসছে / Withdraw to Cash (Transfer)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
 
                         {/* CONDITIONAL SUB-SELECTORS */}
                         {/* 1. Customer Payment Selector */}
@@ -1107,7 +1188,7 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
               </div>
 
               {/* EXPENSE COLUMN */}
-              <div className="flex flex-col border border-border/40 rounded-xl overflow-hidden min-h-0 bg-background/40">
+              <div className={`flex-col border border-border/40 rounded-xl overflow-hidden min-h-0 bg-background/40 md:flex ${activeReviewTab === "expense" ? "flex" : "hidden"}`}>
                 <div className="p-3 bg-red-500/10 border-b border-red-500/20 flex items-center justify-between">
                   <h3 className="font-bold text-red-600 flex items-center gap-1.5 text-sm">
                     <Check className="h-4 w-4" />
@@ -1161,7 +1242,7 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                         </div>
 
                         {/* Middle Controls */}
-                        <div className="grid grid-cols-3 gap-2 mt-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                           <div>
                             <Label className="text-[9px] text-muted-foreground">Amount (Taka)</Label>
                             <Input
@@ -1175,7 +1256,13 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                             <Label className="text-[9px] text-muted-foreground">Payment Mode</Label>
                             <Select
                               value={item.paymentMode}
-                              onValueChange={(val) => handleUpdateItem(item.id, { paymentMode: val })}
+                              onValueChange={(val) => {
+                                const updates = { paymentMode: val };
+                                if (val === "cash" && item.category === "Transfer") {
+                                  updates.category = "Other Expense";
+                                }
+                                handleUpdateItem(item.id, updates);
+                              }}
                             >
                               <SelectTrigger className="h-7 text-[10px] px-1.5">
                                 <SelectValue />
@@ -1190,7 +1277,14 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                             <Label className="text-[9px] text-muted-foreground">Category</Label>
                             <Select
                               value={item.category}
-                              onValueChange={(val) => handleUpdateItem(item.id, { category: val, customerId: "none", productId: "none", loanId: "none" })}
+                              onValueChange={(val) => {
+                                const updates = { category: val, customerId: "none", productId: "none", loanId: "none" };
+                                if (val === "Transfer") {
+                                  updates.paymentMode = "bank";
+                                  updates.bankFlow = "transfer_deposit";
+                                }
+                                handleUpdateItem(item.id, updates);
+                              }}
                             >
                               <SelectTrigger className="h-7 text-[10px] px-1.5">
                                 <SelectValue />
@@ -1203,10 +1297,35 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
                                 <SelectItem value="Shop Expense">Shop Expense</SelectItem>
                                 <SelectItem value="Own Expense">Own Expense</SelectItem>
                                 <SelectItem value="Other Expense">Other Expense</SelectItem>
+                                <SelectItem value="Transfer">Transfer</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
+
+                        {/* Conditional Bank Action / Direction Selector */}
+                        {item.paymentMode === "bank" && (
+                          <div className="mt-2 p-2 bg-muted/40 border border-border/40 rounded-md space-y-1">
+                            <Label className="text-[9px] text-primary font-semibold">Bank Action / Direction (ব্যাংক লেনদেন ধরণ) *</Label>
+                            <Select
+                              value={item.bankFlow || "standard_bank"}
+                              onValueChange={(val) => {
+                                handleUpdateItem(item.id, { 
+                                  bankFlow: val,
+                                  category: val === "transfer_deposit" ? "Transfer" : "Other Expense"
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="h-7 text-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="standard_bank">Bank থেকে গেছে / Paid from Bank (Expense)</SelectItem>
+                                <SelectItem value="transfer_deposit">Bank এ গেছে / Deposit (Cash to Bank) (Transfer)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
 
                         {/* CONDITIONAL SUB-SELECTORS */}
                         {/* 1. Loan Activity Selector */}
