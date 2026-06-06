@@ -913,7 +913,7 @@ export default function CashBookPage() {
             </div>
 
             {/* Balance Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div className="grid grid-cols-1 gap-4 mb-8">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Cash Balance</CardTitle>
@@ -922,16 +922,6 @@ export default function CashBookPage() {
                 <CardContent>
                   <div className="text-2xl font-bold">{formatCurrency(calculatedBalance.cash)}</div>
                   <p className="text-xs text-muted-foreground">Physical Cash on Hand</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Bank Balance</CardTitle>
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{formatCurrency(calculatedBalance.bank)}</div>
-                  <p className="text-xs text-muted-foreground">Bank Account Funds</p>
                 </CardContent>
               </Card>
             </div>
