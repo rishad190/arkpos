@@ -227,7 +227,7 @@ function ProductsPageContent() {
   };
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-6 flex flex-col lg:h-[calc(100vh-64px)] lg:overflow-hidden">
+    <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex-none">
         <PageHeader
           title={activeTab === "products" ? "Product Ledger" : "Fabric Inventory"}
@@ -252,14 +252,14 @@ function ProductsPageContent() {
         />
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid grid-cols-2 max-w-md flex-none">
           <TabsTrigger value="products">Product Ledgers</TabsTrigger>
           <TabsTrigger value="inventory">Fabric Inventory</TabsTrigger>
         </TabsList>
 
         {/* Tab content: Products */}
-        <TabsContent value="products" className="flex-1 flex flex-col min-h-0 space-y-6 focus-visible:outline-none focus-visible:ring-0">
+        <TabsContent value="products" className="space-y-6 focus-visible:outline-none focus-visible:ring-0">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 flex-none">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -314,7 +314,7 @@ function ProductsPageContent() {
             </Card>
           </div>
 
-          <Card className="flex-1 flex flex-col min-h-0">
+          <Card className="shadow-md">
             <CardHeader className="flex-none pb-4 border-b">
               <div className="flex justify-between items-center">
                 <div>
@@ -328,7 +328,7 @@ function ProductsPageContent() {
                 </AddProductDialog>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-auto p-0">
+            <CardContent className="p-0 overflow-x-auto">
               <Table className="min-w-[800px]">
                 <TableHeader className="bg-white sticky top-0 z-10 shadow-sm">
                   <TableRow>
@@ -456,8 +456,8 @@ function ProductsPageContent() {
         </TabsContent>
 
         {/* Tab content: Fabric Inventory */}
-        <TabsContent value="inventory" className="flex-1 flex flex-col min-h-0 space-y-4 focus-visible:outline-none focus-visible:ring-0">
-          <Card className="flex-1 flex flex-col min-h-0">
+        <TabsContent value="inventory" className="space-y-4 focus-visible:outline-none focus-visible:ring-0">
+          <Card className="shadow-md">
             <CardHeader className="flex-none pb-4 border-b">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="relative max-w-sm w-full">
@@ -474,7 +474,7 @@ function ProductsPageContent() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-auto p-0">
+            <CardContent className="p-0 overflow-x-auto">
               <Table className="min-w-[700px]">
                 <TableHeader className="bg-white sticky top-0 z-10 shadow-sm">
                   <TableRow>
