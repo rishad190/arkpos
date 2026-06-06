@@ -5,6 +5,7 @@ import { useProducts } from "@/contexts/product-context";
 import { useInventory } from "@/contexts/inventory-context";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Plus, Trash2, TrendingUp, TrendingDown, Package, MoreHorizontal, Search, ArrowLeft } from "lucide-react";
 import {
   DropdownMenu,
