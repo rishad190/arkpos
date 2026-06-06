@@ -164,7 +164,6 @@ export default function CashBookPage() {
     // 2. Process New Account Transactions
     const modern = (transactions || []).filter(
       (t) => {
-        // Exclude Bank-Only transactions (Income/Expense paid via Bank) as they do not affect "Cash in Hand"
         // Transfer ALWAYS affects cash (either in or out)
         if (t.type === 'transfer') return true;
         
@@ -174,8 +173,8 @@ export default function CashBookPage() {
         const isCustomerCashbook = ['income', 'expense'].includes(t.cashbookType) && t.customerId;
 
         if (isStandardCashbook || isCustomerCashbook) {
-            // Income/Expense: Only include if Payment Mode is 'cash' (or legacy/undefined which defaults to cash)
-            return !t.paymentMode || t.paymentMode === 'cash';
+            // Include both 'cash' and 'bank' payment modes (or legacy/undefined which defaults to cash)
+            return !t.paymentMode || t.paymentMode === 'cash' || t.paymentMode === 'bank';
         }
         
         return false;

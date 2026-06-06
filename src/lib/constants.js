@@ -99,6 +99,7 @@ export const CASH_TRANSACTION_CATEGORIES = {
     "Customer Payment",
     "Loan Activity",
     "Product Activity",
+    "Bank Deposit",
     "Other Income",
     "Income from Rent",
     "Partner Payment"
@@ -111,6 +112,7 @@ export const CASH_TRANSACTION_CATEGORIES = {
     "Partner Payment",
     "Shop Expense",
     "Product Expense",
+    "Bank Withdrawal",
     "Short Taka",
     "Other Expense"
   ]

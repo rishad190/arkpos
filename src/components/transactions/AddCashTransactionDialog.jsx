@@ -786,10 +786,9 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="income">Income</TabsTrigger>
                 <TabsTrigger value="expense">Expense</TabsTrigger>
-                <TabsTrigger value="transfer">Transfer</TabsTrigger>
               </TabsList>
               
               <div className="mt-4 space-y-4">
