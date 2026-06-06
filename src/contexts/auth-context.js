@@ -6,7 +6,8 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { ref, get, set } from "firebase/database";
 import { useRouter, usePathname } from "next/navigation";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { initializeSessionManager } from "@/lib/sessionManager";
@@ -24,7 +25,12 @@ export function AuthProvider({ children }) {
       try {
         const storedUser = localStorage.getItem("arkpos_mock_user");
         if (storedUser) {
-          setUser(JSON.parse(storedUser));
+          const parsedUser = JSON.parse(storedUser);
+          if (!parsedUser.role) {
+            const email = parsedUser.email || "";
+            parsedUser.role = email.includes("admin") ? "admin" : "staff";
+          }
+          setUser(parsedUser);
         } else {
           setUser(null);
           if (pathname !== "/login") {
@@ -46,11 +52,59 @@ export function AuthProvider({ children }) {
       },
     });
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-      if (!user && pathname !== "/login") {
-        router.push("/login");
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setLoading(true);
+        try {
+          let role = null;
+          if (db) {
+            const roleRef = ref(db, `users/${firebaseUser.uid}/role`);
+            const snapshot = await get(roleRef);
+            role = snapshot.val();
+            
+            if (!role) {
+              // Initialize role
+              const email = firebaseUser.email || "";
+              role = email.includes("admin") ? "admin" : "staff";
+              
+              // Save to Firebase
+              await set(ref(db, `users/${firebaseUser.uid}`), {
+                email: email,
+                role: role,
+                displayName: firebaseUser.displayName || "",
+                createdAt: new Date().toISOString(),
+              });
+            }
+          } else {
+            const email = firebaseUser.email || "";
+            role = email.includes("admin") ? "admin" : "staff";
+          }
+          
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            role: role,
+          });
+        } catch (error) {
+          console.error("Error fetching user role:", error);
+          const email = firebaseUser.email || "";
+          const fallbackRole = email.includes("admin") ? "admin" : "staff";
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            role: fallbackRole,
+          });
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setUser(null);
+        setLoading(false);
+        if (pathname !== "/login") {
+          router.push("/login");
+        }
       }
     });
 
@@ -59,10 +113,12 @@ export function AuthProvider({ children }) {
 
   const login = (email, password) => {
     if (!auth) {
+      const calculatedRole = email.includes("admin") ? "admin" : "staff";
       const mockUser = {
         uid: "mock-user-123",
         email: email,
         displayName: "Demo User",
+        role: calculatedRole,
       };
       try {
         localStorage.setItem("arkpos_mock_user", JSON.stringify(mockUser));

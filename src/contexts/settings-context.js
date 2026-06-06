@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useReducer, useCallback, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, set } from "firebase/database";
 import { db } from "@/lib/firebase";
 
 // Initial settings state
@@ -35,6 +35,20 @@ const INITIAL_SETTINGS = {
     requirePassword: false,
     sessionTimeout: 30,
     backupEnabled: true,
+  },
+  permissions: {
+    dashboard: true,
+    customers: true,
+    cashbook: false,
+    inventory: true,
+    cashmemo: true,
+    suppliers: false,
+    inventoryProfit: false,
+    partners: false,
+    loans: false,
+    products: false,
+    expenseReport: false,
+    settings: false,
   },
 };
 
@@ -86,6 +100,24 @@ export function SettingsProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
+  // Subscribe to settings config from Firebase
+  useEffect(() => {
+    if (!db) return;
+    const settingsRef = ref(db, "settings/config");
+    const unsubscribe = onValue(settingsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        dispatch({ type: "UPDATE_SETTINGS", payload: data });
+      } else {
+        // Seed database with initial settings if empty
+        set(settingsRef, INITIAL_SETTINGS).catch((error) => {
+          console.error("Failed to seed initial settings to Firebase:", error);
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Load settings from localStorage on mount
   useEffect(() => {
     try {
@@ -124,25 +156,54 @@ export function SettingsProvider({ children }) {
     }
   }, [settings.appearance.theme]);
 
-  const updateSettings = useCallback((newSettings) => {
+  const updateSettings = useCallback(async (newSettings) => {
     dispatch({ type: "UPDATE_SETTINGS", payload: newSettings });
+    if (db) {
+      try {
+        const updated = {
+          ...settings,
+          ...newSettings,
+        };
+        await set(ref(db, "settings/config"), updated);
+      } catch (error) {
+        console.error("Failed to sync settings to Firebase:", error);
+      }
+    }
     toast({
       title: "Settings Updated",
       description: "Your preferences have been saved.",
     });
-  }, [toast]);
+  }, [settings, toast]);
 
-  const updateSection = useCallback((section, data) => {
+  const updateSection = useCallback(async (section, data) => {
     dispatch({ type: "UPDATE_SECTION", section, payload: data });
+    if (db) {
+      try {
+        const updatedSection = {
+          ...(settings[section] || {}),
+          ...data,
+        };
+        await set(ref(db, `settings/config/${section}`), updatedSection);
+      } catch (error) {
+        console.error("Failed to sync settings section to Firebase:", error);
+      }
+    }
     toast({
       title: "Settings Updated",
       description: `${section.charAt(0).toUpperCase() + section.slice(1)} settings saved.`,
     });
-  }, [toast]);
+  }, [settings, toast]);
 
-  const resetSettings = useCallback(() => {
+  const resetSettings = useCallback(async () => {
     if (confirm("Are you sure you want to reset all settings to default?")) {
       dispatch({ type: "RESET_SETTINGS" });
+      if (db) {
+        try {
+          await set(ref(db, "settings/config"), INITIAL_SETTINGS);
+        } catch (error) {
+          console.error("Failed to reset settings in Firebase:", error);
+        }
+      }
       toast({
         title: "Settings Reset",
         description: "All settings have been restored to defaults.",

@@ -29,11 +29,13 @@ import {
   DollarSign,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { useSettings } from "@/contexts/settings-context";
 import { ConnectionIndicator } from "@/components/layout/ConnectionIndicator";
 
 
 export function Navbar() {
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
@@ -59,19 +61,26 @@ export function Navbar() {
     return null;
   }
 
+  const permissions = settings?.permissions || {};
+  const showSettings = user?.role === "admin" || permissions.settings !== false;
+
   const navItems = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/customers", label: "Customers", icon: User },
-    { href: "/cashbook", label: "Cash Book", icon: BookOpen },
-    { href: "/inventory", label: "Inventory", icon: Package },
-    { href: "/cashmemo", label: "Cash Memo", icon: Receipt },
-    { href: "/suppliers", label: "Suppliers", icon: Users },
-    { href: "/inventory-profit", label: "Inventory Profit", icon: BarChart3 },
-    { href: "/partners", label: "Partners", icon: GitMerge },
-    { href: "/loans", label: "Loans", icon: DollarSign },
-    { href: "/products", label: "Products", icon: Package },
-    { href: "/reports/expense", label: "Expense Report", icon: BarChart3 },
+    { href: "/", label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+    { href: "/customers", label: "Customers", icon: User, key: "customers" },
+    { href: "/cashbook", label: "Cash Book", icon: BookOpen, key: "cashbook" },
+    { href: "/inventory", label: "Inventory", icon: Package, key: "inventory" },
+    { href: "/cashmemo", label: "Cash Memo", icon: Receipt, key: "cashmemo" },
+    { href: "/suppliers", label: "Suppliers", icon: Users, key: "suppliers" },
+    { href: "/inventory-profit", label: "Inventory Profit", icon: BarChart3, key: "inventoryProfit" },
+    { href: "/partners", label: "Partners", icon: GitMerge, key: "partners" },
+    { href: "/loans", label: "Loans", icon: DollarSign, key: "loans" },
+    { href: "/products", label: "Products", icon: Package, key: "products" },
+    { href: "/reports/expense", label: "Expense Report", icon: BarChart3, key: "expenseReport" },
   ];
+
+  const visibleNavItems = user?.role === "admin"
+    ? navItems
+    : navItems.filter((item) => permissions[item.key] !== false);
 
   return (
     <nav className="bg-background/80 backdrop-blur-md border-b border-border/40 sticky top-0 z-50">
@@ -93,7 +102,7 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center space-x-1">
-            {navItems.slice(0, 5).map((item) => {
+            {visibleNavItems.slice(0, 5).map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
@@ -110,7 +119,7 @@ export function Navbar() {
                 </Link>
               );
             })}
-            {navItems.length > 5 && (
+            {visibleNavItems.length > 5 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -121,7 +130,7 @@ export function Navbar() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {navItems.slice(5).map((item) => {
+                  {visibleNavItems.slice(5).map((item) => {
                     const isActive = pathname === item.href;
                     return (
                       <DropdownMenuItem key={item.href} asChild>
@@ -162,14 +171,15 @@ export function Navbar() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <UserNav handleLogout={handleLogout} router={router} />
+            <UserNav handleLogout={handleLogout} router={router} showSettings={showSettings} />
 
             <div className="block md:hidden">
               <MobileNav
                 handleLogout={handleLogout}
                 router={router}
                 pathname={pathname}
-                navItems={navItems}
+                navItems={visibleNavItems}
+                showSettings={showSettings}
               />
             </div>
           </div>
