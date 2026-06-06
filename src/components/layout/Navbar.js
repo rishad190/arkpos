@@ -68,7 +68,6 @@ export function Navbar() {
     { href: "/", label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
     { href: "/customers", label: "Customers", icon: User, key: "customers" },
     { href: "/cashbook", label: "Cash Book", icon: BookOpen, key: "cashbook" },
-    { href: "/inventory", label: "Inventory", icon: Package, key: "inventory" },
     { href: "/cashmemo", label: "Cash Memo", icon: Receipt, key: "cashmemo" },
     { href: "/suppliers", label: "Suppliers", icon: Users, key: "suppliers" },
     { href: "/inventory-profit", label: "Inventory Profit", icon: BarChart3, key: "inventoryProfit" },

@@ -11,7 +11,6 @@ function getRequiredPermissionKey(pathname) {
   if (pathname.startsWith("/customers")) return "customers";
   if (pathname.startsWith("/cashbook")) return "cashbook";
   if (pathname.startsWith("/inventory-profit")) return "inventoryProfit";
-  if (pathname.startsWith("/inventory")) return "inventory";
   if (pathname.startsWith("/cashmemo")) return "cashmemo";
   if (pathname.startsWith("/suppliers")) return "suppliers";
   if (pathname.startsWith("/partners")) return "partners";
