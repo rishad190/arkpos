@@ -26,6 +26,7 @@ import { formatDate, formatCurrency } from "@/lib/utils";
 import { AddCashTransactionDialog } from "@/components/transactions/AddCashTransactionDialog";
 import { EditCashTransactionDialog } from "@/components/transactions/EditCashTransactionDialog";
 import { LedgerExtractorDialog } from "@/components/transactions/LedgerExtractorDialog";
+import { VoiceDictationDialog } from "@/components/transactions/VoiceDictationDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -851,6 +852,14 @@ export default function CashBookPage() {
                     Scan Ledger (ছবি থেকে যোগ)
                   </Button>
                 </LedgerExtractorDialog>
+                <VoiceDictationDialog defaultDate={date}>
+                  <Button
+                    className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-md hover:shadow-lg transition-all duration-300 gap-2"
+                    disabled={loadingState.actions || isReconciled}
+                  >
+                    <span>🎤</span> Voice Input (ভয়েস ইনপুট)
+                  </Button>
+                </VoiceDictationDialog>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button

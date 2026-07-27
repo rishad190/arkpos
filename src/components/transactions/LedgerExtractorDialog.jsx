@@ -76,11 +76,15 @@ export function LedgerExtractorDialog({ children, selectedDate }) {
   const [supplierSearches, setSupplierSearches] = useState({});
   const [productCustomerSearches, setProductCustomerSearches] = useState({});
 
-  // Load API key from local storage on mount
+  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
+
+  // Load API key & model from local storage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedKey = localStorage.getItem("arkpos_gemini_api_key") || "";
+      const savedModel = localStorage.getItem("arkpos_gemini_model") || process.env.NEXT_PUBLIC_GEMINI_MODEL || "gemini-2.5-flash";
       setApiKey(savedKey);
+      setSelectedModel(savedModel);
     }
   }, []);
 
@@ -91,14 +95,111 @@ export function LedgerExtractorDialog({ children, selectedDate }) {
     }
   };
 
-  const handleFileChange = (file) => {
+  const saveModel = (model) => {
+    setSelectedModel(model);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("arkpos_gemini_model", model);
+    }
+  };
+
+  const processImageContrastAndGrayscale = (file, contrastLevel = 0.5) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // 1. Initial draw on temp canvas
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = img.width;
+          tempCanvas.height = img.height;
+          const tempCtx = tempCanvas.getContext("2d");
+          tempCtx.drawImage(img, 0, 0);
+
+          const origData = tempCtx.getImageData(0, 0, img.width, img.height);
+          const pixels = origData.data;
+
+          // 2. Auto-Detect Content Bounding Box (Auto Crop)
+          let minX = img.width;
+          let minY = img.height;
+          let maxX = 0;
+          let maxY = 0;
+          let foundContent = false;
+
+          for (let y = 0; y < img.height; y++) {
+            for (let x = 0; x < img.width; x++) {
+              const idx = (y * img.width + x) * 4;
+              const gray = 0.299 * pixels[idx] + 0.587 * pixels[idx + 1] + 0.114 * pixels[idx + 2];
+              
+              // Non-white pixels (dark ink/text content)
+              if (gray < 225) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+                foundContent = true;
+              }
+            }
+          }
+
+          // Calculate Crop Rect with 20px safety padding
+          const padding = 20;
+          const cropX = foundContent ? Math.max(0, minX - padding) : 0;
+          const cropY = foundContent ? Math.max(0, minY - padding) : 0;
+          const cropW = foundContent ? Math.min(img.width - cropX, (maxX - minX) + padding * 2) : img.width;
+          const cropH = foundContent ? Math.min(img.height - cropY, (maxY - minY) + padding * 2) : img.height;
+
+          // 3. Draw onto final Cropped Canvas
+          const canvas = document.createElement("canvas");
+          canvas.width = cropW;
+          canvas.height = cropH;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+          // 4. Apply Grayscale + High Contrast Enhancement
+          const imageData = ctx.getImageData(0, 0, cropW, cropH);
+          const data = imageData.data;
+
+          const factor =
+            (259 * (contrastLevel * 255 + 255)) /
+            (255 * (259 - contrastLevel * 255));
+
+          for (let i = 0; i < data.length; i += 4) {
+            const gray =
+              0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+
+            let enhanced = factor * (gray - 128) + 128;
+            enhanced = Math.max(0, Math.min(255, enhanced));
+
+            data[i] = enhanced;     // R
+            data[i + 1] = enhanced; // G
+            data[i + 2] = enhanced; // B
+          }
+
+          ctx.putImageData(imageData, 0, 0);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+          const base64 = dataUrl.split(",")[1];
+          resolve({ dataUrl, base64 });
+        };
+        img.onerror = (err) => reject(err);
+        img.src = e.target.result;
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  const handleFileChange = async (file) => {
     if (file && file.type.startsWith("image/")) {
       setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const { dataUrl } = await processImageContrastAndGrayscale(file);
+        setImagePreview(dataUrl);
+      } catch (err) {
+        // Fallback to standard reader if canvas fails
+        const reader = new FileReader();
+        reader.onloadend = () => setImagePreview(reader.result);
+        reader.readAsDataURL(file);
+      }
       setStep(1);
     } else {
       toast({
@@ -109,16 +210,18 @@ export function LedgerExtractorDialog({ children, selectedDate }) {
     }
   };
 
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64Data = reader.result.split(",")[1];
-        resolve(base64Data);
-      };
-      reader.onerror = (error) => reject(error);
-    });
+  const fileToBase64 = async (file) => {
+    try {
+      const { base64 } = await processImageContrastAndGrayscale(file);
+      return base64;
+    } catch (e) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = (error) => reject(error);
+      });
+    }
   };
 
   const runOCR = async () => {
@@ -147,22 +250,24 @@ export function LedgerExtractorDialog({ children, selectedDate }) {
       const base64Image = await fileToBase64(imageFile);
       
       const prompt = `
-Extract transactions from this handwritten daily cash book ledger image. 
-The ledger layout is split vertically: Left column contains Inflow/Income (জমা / ইনকাম) and Right column contains Outflow/Expense (খরচ / পেমেন্ট).
+Perform step-by-step reasoning (Chain-of-Thought) to accurately extract transactions from this handwritten daily cash book ledger image.
 
-Identify all transaction entries.
-Recognize Bengali handwriting (including cursive), Bengali numbers (১, ২, ৩...), English words, and mixed text.
-Strictly convert all Bengali digits/numerals to standard English decimal numbers (e.g. ১৫০০ -> 1500, ৩০০০ -> 3000, ১,০৫,০০০ -> 105000).
+--- STEP 1: VISUAL SCANNING & RECONSTRUCTION ---
+- Read the ledger split layout vertically: Left column contains Inflow/Income (জমা / ইনকাম) and Right column contains Outflow/Expense (খরচ / পেমেন্ট).
+- Carefully inspect handwritten strokes, Bengali script (cursive & print), and mixed English/Bengali text.
+- Pay special attention to Bengali digits (০, ১, ২, ৩, ৪, ৫, ৬, ৭, ৮, ৯). Convert all Bengali digits to standard numbers (e.g., ১৫০০ -> 1500, ৩০০০ -> 3000, ১,০৫,০০০ -> 105000).
+- Double check digit shapes to avoid misreading handwritten numbers (e.g., distinguish 1 vs 7, 5 vs 6, and count trailing zeros accurately).
 
-For each identified transaction, populate:
-1. "description": transaction detail/description. If the description is written in Bengali, translate it to English (e.g., "সুতা কেনা" -> "Yarn purchase", "গাড়ি ভাড়া" -> "Car rent", "নাস্তা" -> "Snacks/Breakfast"). Transliterate names to English (e.g., "আলমগীর" -> "Alamgir"). The final output value must be fully in English.
-2. "amount": parsed numeric amount.
-3. "paymentMode": "bank" if description contains bank-related terms (e.g. CC 98, সিসি, bank, bkash, nagad, check, cards, ব্যাংক, বিকাশ, নগদ, চেক) else "cash".
-4. "suggestedCategory": based on context, choose one of these string values:
-   - For Income: "Customer Payment" (if customer payment/due collection/ledger payment), "Partner Payment" (if partner deposit/equity), "Loan Activity" (if loan received), "Transfer" (if bank withdrawal, cash from bank, bank to cash, bank transfer, ব্যাংক থেকে উত্তোলন), "Other Income" (general).
-   - For Expense: "Supplier Payment" (vendor payment), "Product Activity" (buying fabrics/materials), "Loan Activity" (loan repayment/giving), "Transfer" (if bank deposit, cash to bank, bank transfer, ব্যাংকে জমা), "Own Expense", "Shop Expense", "Other Expense".
+--- STEP 2: TRANSLATION & CATEGORIZATION ---
+- Translate Bengali transaction descriptions to clear English (e.g., "সুতা কেনা" -> "Yarn purchase", "গাড়ি ভাড়া" -> "Car rent", "নাস্তা" -> "Snacks/Breakfast").
+- Transliterate proper names to English (e.g., "আলমগীর" -> "Alamgir").
+- Determine payment mode: "bank" if description mentions bank/online terms (CC, sisl, bank, bkash, nagad, check, cards, ব্যাংক, বিকাশ, নগদ, চেক) else "cash".
+- Assign suggestedCategory:
+   * Income categories: "Customer Payment", "Partner Payment", "Loan Activity", "Transfer", "Other Income".
+   * Expense categories: "Supplier Payment", "Product Activity", "Loan Activity", "Transfer", "Own Expense", "Shop Expense", "Other Expense".
 
-Return the response as a strict JSON object structure:
+--- STEP 3: STRUCTURED JSON OUTPUT ---
+Return the result strictly as a valid JSON object without markdown codeblocks:
 {
   "income": [
     {
@@ -181,40 +286,67 @@ Return the response as a strict JSON object structure:
     }
   ]
 }
-
-Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`json) in the response.
 `;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${finalApiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: prompt },
+      // Try selected model first, with fallbacks to gemini-2.5-flash and gemini-1.5-pro
+      const candidateModels = [
+        selectedModel || "gemini-2.5-flash",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-pro",
+      ];
+
+      let response = null;
+      let lastErrorMessage = "";
+
+      for (const modelName of [...new Set(candidateModels)]) {
+        try {
+          response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${finalApiKey}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                contents: [
                   {
-                    inlineData: {
-                      mimeType: imageFile.type,
-                      data: base64Image,
-                    },
+                    parts: [
+                      { text: prompt },
+                      {
+                        inlineData: {
+                          mimeType: "image/jpeg",
+                          data: base64Image,
+                        },
+                      },
+                    ],
                   },
                 ],
-              },
-            ],
-            generationConfig: {
-              responseMimeType: "application/json",
-            },
-          }),
-        }
-      );
+                generationConfig: {
+                  responseMimeType: "application/json",
+                },
+              }),
+            }
+          );
 
-      if (!response.ok) {
-        throw new Error(`API returned error status: ${response.status}`);
+          if (response.ok) {
+            break;
+          } else {
+            const errJson = await response.json().catch(() => ({}));
+            lastErrorMessage = errJson.error?.message || `HTTP ${response.status}`;
+            
+            // If API key is invalid (400/403), stop immediately instead of cycling non-existent models
+            if (response.status === 400 || response.status === 403) {
+              break;
+            }
+          }
+        } catch (err) {
+          lastErrorMessage = err.message;
+        }
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(`Gemini API Error: ${lastErrorMessage || "Failed to reach Gemini API. Please check your API key."}`);
       }
 
       const resData = await response.json();
@@ -638,41 +770,30 @@ Ensure the output is valid JSON. Do not include markdown codeblocks (like \`\`\`
         {/* STEP 1: UPLOAD AND API CONFIGURATION */}
         {step === 1 && (
           <div className="flex-1 overflow-y-auto py-4 space-y-6">
-            {/* Gemini API Key Block */}
-            {!process.env.NEXT_PUBLIC_GEMINI_API_KEY && (
-              <div className="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="p-4 rounded-xl border border-border/60 bg-muted/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2 font-medium text-amber-500 text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    Gemini API Key Required
+                  <div className="flex items-center gap-2 font-medium text-sm">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    AI Model Engine Selection
                   </div>
-                  <p className="text-xs text-muted-foreground max-w-xl">
-                    To perform offline handwriting recognition, this tool runs Gemini 2.5 Flash. Get a free API Key from{" "}
-                    <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-primary hover:underline font-semibold">
-                      Google AI Studio
-                    </a>. Key remains in local browser storage.
+                  <p className="text-xs text-muted-foreground">
+                    Select the Gemini model for handwriting OCR. <span className="font-semibold text-foreground">gemini-1.5-pro</span> handles bad handwriting best.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 w-full md:w-auto min-w-[250px]">
-                  <div className="relative flex-1">
-                    <Input
-                      type={showKey ? "text" : "password"}
-                      placeholder="AIzaSy..."
-                      value={apiKey}
-                      onChange={(e) => saveApiKey(e.target.value)}
-                      className="pr-8 h-9 text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowKey(!showKey)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                    </button>
-                  </div>
+
+                <div className="w-full md:w-auto min-w-[200px]">
+                  <Select value={selectedModel} onValueChange={saveModel}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select Model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gemini-2.5-flash">⚡ Gemini 2.5 Flash (AI Studio Recommended)</SelectItem>
+                      <SelectItem value="gemini-2.0-flash">🚀 Gemini 2.0 Flash</SelectItem>
+                      <SelectItem value="gemini-1.5-pro">🧠 Gemini 1.5 Pro (Best for Bad Handwriting)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-            )}
 
             {/* Drag & Drop File Selector */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
