@@ -27,22 +27,11 @@ export function getAvailableColors(productName, fabrics, fabricBatches) {
     .filter((item) => item.quantity > 0);
 }
 
-/**
- * Formats a color display string, showing a dash if no color is provided
- * @param {string|null} color - The color to display
- * @returns {string} Formatted color string
- */
 export function formatColorDisplay(color) {
   return color || "-";
 }
 
-/**
- * Formats a product display string including color if present
- * @param {Object} product - Product object containing name and color
- * @param {string} product.name - Product name
- * @param {string|null} product.color - Product color (optional)
- * @returns {string} Formatted product display string
- */
 export function formatProductWithColor(product) {
   return `${product.name}${product.color ? ` (${product.color})` : ""}`;
 }
+

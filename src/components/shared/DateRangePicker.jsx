@@ -1,8 +1,6 @@
 "use client";
 import * as React from "react";
-import { format } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -11,6 +9,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+
+const formatDate = (d) =>
+  d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+
 
 export function DateRangePicker({ className, value, onChange }) {
   return (
@@ -29,11 +31,10 @@ export function DateRangePicker({ className, value, onChange }) {
             {value?.from ? (
               value.to ? (
                 <>
-                  {format(value.from, "LLL dd, y")} -{" "}
-                  {format(value.to, "LLL dd, y")}
+                  {formatDate(value.from)} - {formatDate(value.to)}
                 </>
               ) : (
-                format(value.from, "LLL dd, y")
+                formatDate(value.from)
               )
             ) : (
               <span>Pick a date range</span>

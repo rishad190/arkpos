@@ -9,7 +9,6 @@ import {
   formatValidationErrors,
 } from "@/lib/validation";
 import { requireAuth } from "@/lib/authValidation";
-import { sanitizeObject } from "@/lib/sanitization";
 
 const COLLECTION_PATH = "transactions";
 
