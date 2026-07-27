@@ -92,6 +92,47 @@ export default function SupplierDetail() {
     }
   }, [supplier, suppliers, router, toast]);
 
+  // Diagnostic: compute derived total due from allTransactions and compare with supplier.totalDue
+  const derivedTotalDue = allTransactions.reduce((sum, t) => {
+    const total = Number(t.totalAmount) || 0;
+    const paid = Number(t.paidAmount) || 0;
+    return sum + (total - paid);
+  }, 0);
+
+  // Background auto-reconciliation of supplier outstanding balance
+  useEffect(() => {
+    if (
+      supplier &&
+      typeof supplier.totalDue !== "undefined" &&
+      Math.abs((derivedTotalDue || 0) - (supplier.totalDue || 0)) > 0.001 &&
+      !loading.action &&
+      lastAttemptedReconcileVal.current !== derivedTotalDue
+    ) {
+      lastAttemptedReconcileVal.current = derivedTotalDue;
+      
+      const reconcile = async () => {
+        try {
+          setLoading((prev) => ({ ...prev, action: true }));
+          await updateSupplier(params.id, {
+            ...supplier,
+            totalDue: derivedTotalDue,
+            updatedAt: new Date().toISOString(),
+          });
+          toast({
+            title: "Balance Reconciled",
+            description: `Supplier outstanding balance reconciled automatically in the background. Stored Total Due updated to ৳${derivedTotalDue.toLocaleString()}.`,
+          });
+        } catch (error) {
+          console.error("Auto-reconciliation failed:", error);
+        } finally {
+          setLoading((prev) => ({ ...prev, action: false }));
+        }
+      };
+      
+      reconcile();
+    }
+  }, [supplier, derivedTotalDue, params.id, updateSupplier, loading.action, toast]);
+
   if (!supplier) {
       return (
         <div className="flex items-center justify-center min-h-screen">
@@ -219,46 +260,7 @@ export default function SupplierDetail() {
     cumulativeBalance: cumulativeMap.byId?.[transaction.id] ?? 0,
   }));
 
-  // Diagnostic: compute derived total due from allTransactions and compare with supplier.totalDue
-  const derivedTotalDue = allTransactions.reduce((sum, t) => {
-    const total = Number(t.totalAmount) || 0;
-    const paid = Number(t.paidAmount) || 0;
-    return sum + (total - paid);
-  }, 0);
 
-  // Background auto-reconciliation of supplier outstanding balance
-  useEffect(() => {
-    if (
-      supplier &&
-      typeof supplier.totalDue !== "undefined" &&
-      Math.abs((derivedTotalDue || 0) - (supplier.totalDue || 0)) > 0.001 &&
-      !loading.action &&
-      lastAttemptedReconcileVal.current !== derivedTotalDue
-    ) {
-      lastAttemptedReconcileVal.current = derivedTotalDue;
-      
-      const reconcile = async () => {
-        try {
-          setLoading((prev) => ({ ...prev, action: true }));
-          await updateSupplier(params.id, {
-            ...supplier,
-            totalDue: derivedTotalDue,
-            updatedAt: new Date().toISOString(),
-          });
-          toast({
-            title: "Balance Reconciled",
-            description: `Supplier outstanding balance reconciled automatically in the background. Stored Total Due updated to ৳${derivedTotalDue.toLocaleString()}.`,
-          });
-        } catch (error) {
-          console.error("Auto-reconciliation failed:", error);
-        } finally {
-          setLoading((prev) => ({ ...prev, action: false }));
-        }
-      };
-      
-      reconcile();
-    }
-  }, [supplier, derivedTotalDue, params.id, updateSupplier, loading.action, toast]);
 
 
 
@@ -348,7 +350,7 @@ export default function SupplierDetail() {
                 <CardContent className="p-4">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-blue-600">
-                      Total Amount
+                      টোটাল টাকা দিয়েছে
                     </span>
                     <DollarSign className="h-4 w-4 text-blue-600" />
                   </div>
@@ -365,7 +367,7 @@ export default function SupplierDetail() {
                 <CardContent className="p-4">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-green-600">
-                      Total Paid
+                      টোটাল টাকা ফেরত দেওয়া হয়েছে
                     </span>
                     <CreditCard className="h-4 w-4 text-green-600" />
                   </div>
@@ -392,7 +394,7 @@ export default function SupplierDetail() {
                           : "text-green-600"
                       }`}
                     >
-                      Total Due
+                      টোটাল অ্যামাউন্ট
                     </span>
                     <FileText
                       className={`h-4 w-4 ${
@@ -455,13 +457,13 @@ export default function SupplierDetail() {
               </TableHead>
               <TableHead className="whitespace-nowrap">Details</TableHead>
               <TableHead className="text-right whitespace-nowrap">
-                Total Amount
+                কত টাকা দিয়েছে
               </TableHead>
               <TableHead className="text-right whitespace-nowrap">
-                Paid Amount
+                কত টাকা ফেরত দেওয়া হয়েছে
               </TableHead>
               <TableHead className="text-right whitespace-nowrap">
-                Due Amount
+                টোটাল অ্যামাউন্ট
               </TableHead>
               <TableHead className="text-right whitespace-nowrap">
                 Balance

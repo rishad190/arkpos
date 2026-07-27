@@ -110,7 +110,7 @@ export function AddSupplierTransactionDialog({ supplierId, onAddTransaction }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Total Amount *</label>
+                <label className="text-sm font-medium">কত টাকা দিয়েছে *</label>
                 <Input
                   type="number"
                   step="0.01"
@@ -120,7 +120,7 @@ export function AddSupplierTransactionDialog({ supplierId, onAddTransaction }) {
                     setFormData({ ...formData, totalAmount: e.target.value })
                   }
                   className={errors.totalAmount ? "border-red-500" : ""}
-                  placeholder="Enter total amount"
+                  placeholder="Enter amount given"
                 />
                 {errors.totalAmount && (
                   <p className="text-sm text-red-500">{errors.totalAmount}</p>
@@ -128,7 +128,7 @@ export function AddSupplierTransactionDialog({ supplierId, onAddTransaction }) {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Paid Amount</label>
+                <label className="text-sm font-medium">কত টাকা ফেরত দেওয়া হয়েছে</label>
                 <Input
                   type="number"
                   step="0.01"
@@ -138,7 +138,7 @@ export function AddSupplierTransactionDialog({ supplierId, onAddTransaction }) {
                     setFormData({ ...formData, paidAmount: e.target.value })
                   }
                   className={errors.paidAmount ? "border-red-500" : ""}
-                  placeholder="Enter paid amount"
+                  placeholder="Enter amount returned"
                 />
                 {errors.paidAmount && (
                   <p className="text-sm text-red-500">{errors.paidAmount}</p>

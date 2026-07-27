@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { Menu as MenuIcon, Settings, LogOut } from "lucide-react";
 
-export function MobileNav({ handleLogout, router, pathname, navItems, user }) {
+export function MobileNav({ handleLogout, router, pathname, navItems, showSettings }) {
   const [isOpen, setIsOpen] = React.useState(false);
 
   return (
@@ -56,17 +56,19 @@ export function MobileNav({ handleLogout, router, pathname, navItems, user }) {
           })}
 
           <div className="pt-4 border-t space-y-2">
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2"
-              onClick={() => {
-                setIsOpen(false);
-                router.push("/settings");
-              }}
-            >
-              <Settings className="h-5 w-5" />
-              Settings
-            </Button>
+            {showSettings !== false && (
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-2"
+                onClick={() => {
+                  setIsOpen(false);
+                  router.push("/settings");
+                }}
+              >
+                <Settings className="h-5 w-5" />
+                Settings
+              </Button>
+            )}
 
             <Button
               variant="ghost"

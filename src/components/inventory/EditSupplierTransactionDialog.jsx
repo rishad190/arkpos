@@ -122,7 +122,7 @@ export function EditSupplierTransactionDialog({ transaction, onSave }) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Total Amount *</label>
+              <label className="text-sm font-medium">কত টাকা দিয়েছে *</label>
               <Input
                 type="number"
                 min="0"
@@ -139,7 +139,7 @@ export function EditSupplierTransactionDialog({ transaction, onSave }) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Paid Amount</label>
+              <label className="text-sm font-medium">কত টাকা ফেরত দেওয়া হয়েছে</label>
               <Input
                 type="number"
                 min="0"

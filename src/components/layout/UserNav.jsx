@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Settings, LogOut, User } from "lucide-react";
 
-export function UserNav({ handleLogout, router }) {
+export function UserNav({ handleLogout, router, showSettings }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -27,10 +27,12 @@ export function UserNav({ handleLogout, router }) {
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/settings")}>
-          <Settings className="h-4 w-4 mr-2" />
-          Settings
-        </DropdownMenuItem>
+        {showSettings !== false && (
+          <DropdownMenuItem onClick={() => router.push("/settings")}>
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="h-4 w-4 mr-2" />
           Logout

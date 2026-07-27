@@ -253,7 +253,7 @@ export default function Dashboard() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => router.push("/inventory")}
+                    onClick={() => router.push("/products?tab=inventory")}
                   >
                     View All
                   </Button>
@@ -303,7 +303,7 @@ export default function Dashboard() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => router.push("/inventory")}
+                  onClick={() => router.push("/products?tab=inventory")}
                 >
                   View All
                 </Button>

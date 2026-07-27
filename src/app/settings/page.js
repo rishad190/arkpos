@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/contexts/settings-context";
+import { useAuth } from "@/contexts/auth-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Store,
@@ -24,12 +25,14 @@ import {
   Save,
   RefreshCw,
   ArrowLeft,
+  Shield,
 } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { settings, updateSettings } = useSettings();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -61,6 +64,21 @@ export default function SettingsPage() {
     backupEnabled: true,
   });
 
+  const [permissionsSettings, setPermissionsSettings] = useState({
+    dashboard: true,
+    customers: true,
+    cashbook: false,
+    inventory: true,
+    cashmemo: true,
+    suppliers: false,
+    inventoryProfit: false,
+    partners: false,
+    loans: false,
+    products: false,
+    expenseReport: false,
+    settings: false,
+  });
+
   useEffect(() => {
     if (settings) {
       setStoreSettings(settings.store || {
@@ -86,6 +104,20 @@ export default function SettingsPage() {
         sessionTimeout: 30,
         backupEnabled: true,
       });
+      setPermissionsSettings(settings.permissions || {
+        dashboard: true,
+        customers: true,
+        cashbook: false,
+        inventory: true,
+        cashmemo: true,
+        suppliers: false,
+        inventoryProfit: false,
+        partners: false,
+        loans: false,
+        products: false,
+        expenseReport: false,
+        settings: false,
+      });
       setLoading(false);
     } else {
       // If no settings from context, stop loading after a delay
@@ -102,6 +134,7 @@ export default function SettingsPage() {
         notifications: notificationSettings,
         appearance: appearanceSettings,
         security: securitySettings,
+        permissions: permissionsSettings,
       });
       toast({
         title: "Success",
@@ -192,7 +225,7 @@ export default function SettingsPage() {
 
       {/* Settings Tabs */}
       <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+        <TabsList className={`grid w-full h-auto ${user?.role === "admin" ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
           <TabsTrigger value="general" className="text-xs sm:text-sm py-2">
             <Store className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">General</span>
@@ -212,6 +245,12 @@ export default function SettingsPage() {
             <Lock className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             Security
           </TabsTrigger>
+          {user?.role === "admin" && (
+            <TabsTrigger value="permissions" className="text-xs sm:text-sm py-2">
+              <Shield className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              Permissions
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* General Settings */}
@@ -506,6 +545,249 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {user?.role === "admin" && (
+          <TabsContent value="permissions" className="space-y-4">
+            <Card className="border-none shadow-md bg-card/65 backdrop-blur-md">
+              <CardHeader className="pb-3 sm:pb-6">
+                <CardTitle className="text-lg sm:text-xl">Staff Permissions</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Configure which pages and options are accessible to Staff users.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  {/* Dashboard */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Dashboard</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Staff access to the main dashboard summary.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.dashboard}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          dashboard: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Customers */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Customers</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Manage customer ledger profiles and transactions.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.customers}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          customers: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Cash Book */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Cash Book</Label>
+                      <p className="text-xs text-muted-foreground">
+                        View and update cash/bank transaction records.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.cashbook}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          cashbook: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Inventory */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Inventory</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Manage stocks, updates, and Bengali scanner feature.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.inventory}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          inventory: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Cash Memo */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Cash Memo</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Create invoices and process POS checkout.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.cashmemo}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          cashmemo: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Suppliers */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Suppliers</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Manage suppliers lists and balance ledgers.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.suppliers}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          suppliers: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Inventory Profit */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Inventory Profit</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Analyze stock profit margins and valuation reports.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.inventoryProfit}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          inventoryProfit: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Partners */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Partners</Label>
+                      <p className="text-xs text-muted-foreground">
+                        View business partner investment details.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.partners}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          partners: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Loans */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Loans</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Track business loans and installment logs.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.loans}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          loans: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Products */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Products</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Add and edit product inventory listings.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.products}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          products: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Expense Report */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Expense Report</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Access and export detailed expense breakdown reports.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.expenseReport}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          expenseReport: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Settings */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-card/40 hover:bg-muted/30 transition-colors">
+                    <div className="space-y-0.5 flex-1 pr-4">
+                      <Label className="text-sm font-semibold">Settings Access</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Allow staff to open settings pages.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={permissionsSettings.settings}
+                      onCheckedChange={(checked) =>
+                        setPermissionsSettings({
+                          ...permissionsSettings,
+                          settings: checked,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

@@ -195,6 +195,37 @@ export default function ProductDetailPage() {
             )}
         </div>
 
+        {/* Product Details Card */}
+        <Card className="border-none shadow-sm bg-card/65 backdrop-blur-md">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Start Date</span>
+                <p className="text-sm font-semibold">{formatDate(product.startDate)}</p>
+                <p className="text-xs text-muted-foreground">({product.daysElapsed} days ago)</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Quantity</span>
+                <p className="text-sm font-semibold">{product.quantity || "N/A"}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Color / Spec</span>
+                <p className="text-sm font-semibold">{product.color || "N/A"}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Details</span>
+                <p className="text-sm font-semibold">{product.details || "N/A"}</p>
+              </div>
+            </div>
+            {product.notes && (
+              <div className="mt-4 pt-4 border-t border-border/40">
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider block mb-1">Notes</span>
+                <p className="text-sm italic text-foreground/80">{product.notes}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {showAddForm && (
             <Card className="bg-muted/30 border-dashed">
                 <CardContent className="pt-6 overflow-x-auto">
