@@ -57,7 +57,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { exportToCSV, exportToPDF, exportCashbookToPDF } from "@/utils/export";
+import { exportToCSV, exportToPDF } from "@/utils/export";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Popover,
